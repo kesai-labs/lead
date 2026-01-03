@@ -17,10 +17,9 @@
 
 <div align="center">
 
-| |
-|:--:|
-| <img src="docs/assets/banner.webp" alt="LEAD Banner" width="100%"> |
-| **End-to-end stress test:** Closed-loop execution of TransFuser v6, demonstrating stable control in a complex urban scenario under degraded environmental conditions and dense adversarial traffic.  |
+https://github.com/user-attachments/assets/311f9f81-17f1-4741-a37d-93da81d25d08
+
+**End-to-end stress test:** Closed-loop execution of TransFuser v6, a state-of-the-art driving policy in CARLA, demonstrating stable control in a complex urban scenario under degraded perception condition and dense adversarial traffic.
 
 </div>
 
