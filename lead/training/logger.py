@@ -9,8 +9,8 @@ from torch.utils.data import DataLoader, Dataset
 from torch.utils.tensorboard import SummaryWriter
 
 from lead.common.visualizer import visualize_sample
+from lead.tfv6.tfv6 import Prediction, TFv6
 from lead.training.config_training import TrainingConfig
-from lead.training.tfv6.tfv6 import Prediction, TFv6
 
 LOG = logging.getLogger(__name__)
 
@@ -29,6 +29,8 @@ class Logger:
         total_gradient_steps: int,
     ):
         """
+        Initialize the Logger for training.
+
         Args:
             config: The configuration dictionary.
             model: The model to log.
@@ -89,6 +91,8 @@ class Logger:
         log: dict,
     ):
         """
+        Log training information.
+
         Args:
             epoch_iteration: Current iteration number of training in the epoch.
             cur_epoch: Current epoch number.

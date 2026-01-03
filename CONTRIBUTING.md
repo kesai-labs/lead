@@ -2,28 +2,9 @@
 
 ## Thank You! 🙏
 
-Thank you for your interest in contributing to LEAD! We appreciate your enthusiasm and support for advancing end-to-end autonomous driving research.
+Thank you for your interest in contributing to LEAD! We appreciate your enthusiasm and support for advancing end-to-end autonomous driving research. Contributions are welcome and encouraged!
 
-## Current Status
-
-**Important:** The core Python codebase is currently under active development and may undergo significant changes. To avoid wasting anyone's time, we are **not accepting pull requests to core functionality** at this time.
-
-**What we DO accept:**
-- 🐛 Bug reports and issues
-- 📚 Documentation improvements
-- 🛠️ Setup and installation enhancements
-- 🐳 Docker configuration improvements
-- 📝 Tutorial and example improvements
-- 💬 General feedback and suggestions
-
-## Timeline
-
-We expect the repository to stabilize within a few weeks after the initial release (early January 2026). Once stable, we will:
-- Open the codebase for contributions
-- Provide detailed contribution guidelines
-- Welcome pull requests for new features and improvements
-
-## How to Help Now
+## How to Contribute
 
 ### Report Issues
 Found a bug? Please [open an issue](https://github.com/autonomousvision/lead/issues) with:
@@ -39,11 +20,19 @@ Documentation contributions are always welcome! This includes:
 - Improving setup instructions
 - Clarifying FAQ entries
 
-### Share Feedback
-Your experience matters! Let us know:
-- What worked well
-- What was confusing
-- What features you'd like to see
+### Feature Requests and Enhancements
+We welcome feature contributions! To ensure quality and maintainability:
+- **Include tests**: All new features should include appropriate unit tests in the `tests/` directory
+- **Verify scripts run**: Ensure all modified scripts execute successfully
+- **Keep PRs focused**: Smaller, well-scoped pull requests are easier to review and merge
+- **Follow existing patterns**: Match the coding style and architecture of the existing codebase
+
+### Code Quality Standards
+- Install pre-commit hooks locally before starting development: `pre-commit install`
+- Use type hints with `jaxtyping` for tensor operations
+- Add `beartype` decorators for runtime validation
+- Include docstrings for all public functions
+- Run existing tests before submitting: `pytest tests/`
 
 ## Contact
 

@@ -2,7 +2,7 @@ import os
 import shutil
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from lead.training.data_loader.buckets.abstract_bucket_collection import route_failed
+from lead.data_buckets import route_filtering
 
 BASE_DIR = "data/carla_leaderboard2_v3/data"
 DRY_RUN = False  # set False to actually delete
@@ -19,7 +19,7 @@ for scenario in os.listdir(BASE_DIR):
         if not os.path.isdir(route_dir):
             continue
 
-        if route_failed(route_dir):
+        if route_filtering.route_failed(route_dir):
             print(f"[{failed_counts}] Route failed: {route_dir}")
             to_be_deleted.append(route_dir)
             failed_counts += 1

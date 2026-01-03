@@ -11,7 +11,7 @@ shopt -s globstar
 set -e
 
 # Set up interpreter
-eval "$(../miniconda3/bin/conda shell.bash hook)"
+eval "$(conda shell.bash hook)"
 if [ -z "$CONDA_INTERPRETER" ]; then
     export CONDA_INTERPRETER="lead"
 fi
@@ -32,8 +32,8 @@ export PYTHONUNBUFFERED=1
 export PORT=2000
 export TM_PORT=8000
 if ! nvidia-smi | grep -q "CarlaUE4-Linux-Shipping"; then
-    export PORT=$(91_random_free_port.sh)
-    export TM_PORT=$(91_random_free_port.sh)
+    export PORT=$(random_free_port.sh)
+    export TM_PORT=$(random_free_port.sh)
     bash $CARLA_ROOT/CarlaUE4.sh --world-port=$PORT -nosound -graphicsadapter=0 -RenderOffScreen &
     sleep 180
     nvidia-smi

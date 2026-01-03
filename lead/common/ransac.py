@@ -9,6 +9,7 @@ Ground plane removal from a point cloud. What this algorithm does:
 5. Return the final ground mask which is the union of all ground masks of every center.
 """
 
+import jaxtyping as jt
 import numpy as np
 import numpy.typing as npt
 from beartype import beartype
@@ -164,7 +165,7 @@ def generate_center_grid(center_resolution, min_x, max_x, min_y, max_y):
 
 @beartype
 def remove_ground(
-    P: npt.NDArray[np.float64],
+    P: jt.Float[npt.NDArray, "n 3"],
     config: ExpertConfig | TrainingConfig,
     n_segments: int = 8,
     N_iter: int = 2,
@@ -176,12 +177,12 @@ def remove_ground(
     max_r: float = 32.0,
     center_resolution: float = 28.0,
     parallel: bool = False,
-) -> npt.NDArray[np.bool_]:
+) -> jt.Bool[npt.NDArray, " n"]:
     """Remove ground points from a point cloud.
 
     Args:
         P: shape=(N, 3): Point cloud to remove ground points from.
-        parallel: Whether to use parallel processing.
+        config: Configuration object containing dataset parameters.
         n_segments: Number of radial segments to divide around each center.
         N_iter: Number of iterations for ground plane fitting.
         N_LPR: Number of lowest points to consider for initial seed points.
@@ -191,8 +192,11 @@ def remove_ground(
         min_r: Minimum radius for selecting points around a center.
         max_r: Maximum radius for selecting points around a center.
         center_resolution: Resolution for generating centers.
+        parallel: Whether to use parallel processing.
     Returns:
-        npt.NDArray[np.bool_]: Boolean mask shape (n,) indicating whether a point is on a ground or not..
+        Boolean mask shape (n,) indicating whether a point is on a ground or not.
+            True indicates ground point.
+            False indicates non-ground point.
     """
     if P.dtype != np.float64:
         P = P.astype(np.float64)

@@ -9,8 +9,8 @@ from lead.common.pid_controller import LateralPIDController, PIDController, get_
 from lead.expert.config_expert import ExpertConfig
 from lead.inference.config_closed_loop import ClosedLoopConfig
 from lead.inference.open_loop_inference import OpenLoopInference, OpenLoopPrediction
+from lead.tfv6.tfv6 import Prediction
 from lead.training.config_training import TrainingConfig
-from lead.training.tfv6.tfv6 import Prediction
 
 np.set_printoptions(suppress=True)
 
@@ -88,6 +88,8 @@ class ClosedLoopInference(OpenLoopInference):
             pred_checkpoints: Predicted route checkpoints in ego-vehicle coordinates.
             pred_target_speed: Predicted target speed in m/s.
             speed: Current speed of the vehicle in m/s.
+            ego_vehicle_location: Current lateral location of the ego vehicle.
+            ego_vehicle_rotation: Current rotation of the ego vehicle.
         Returns:
             steer: Steering command in [-1, 1]
             throttle: Throttle command in [0, 1]

@@ -17,16 +17,28 @@ from lead.common.constants import (
     RadarLabels,
     TransfuserBoundingBoxIndex,
 )
+from lead.data_loader import carla_dataset_utils
 from lead.inference.closed_loop_inference import ClosedLoopPrediction
 from lead.inference.config_closed_loop import ClosedLoopConfig
 from lead.inference.open_loop_inference import OpenLoopPrediction
+from lead.tfv6.center_net_decoder import PredictedBoundingBox
+from lead.tfv6.tfv6 import Prediction
 from lead.training.config_training import TrainingConfig
-from lead.training.data_loader import carla_dataset_utils
-from lead.training.tfv6.center_net_decoder import PredictedBoundingBox
-from lead.training.tfv6.tfv6 import Prediction
 
 
 class Visualizer:
+    """Visualizer for LEAD training and inference results. This class provides methods to visualize various aspects
+    of the LEAD model's groundtruths and predictions
+
+    Args:
+        config: Training configuration object.
+        data: Dictionary containing input data tensors.
+        prediction: Prediction object containing model outputs.
+        training: Boolean indicating if in training mode.
+        config_test_time: Configuration for test-time settings.
+        test_time: Boolean indicating if in test-time mode.
+    """
+
     @beartype
     def __init__(
         self,
@@ -366,13 +378,16 @@ class Visualizer:
                 perspective_image = cv2.applyColorMap(log_image, cv2.COLORMAP_PLASMA)
             self.perspectives[perspective_modality] = perspective_image
 
-    def _concatenate_all_perspectives_and_bev(self, border_size=10, border_color=(255, 255, 255)):
+    def _concatenate_all_perspectives_and_bev(self, border_size: int = 10, border_color: tuple = (255, 255, 255)) -> np.ndarray:
         """
         Concatenate all perspectives vertically, then add BEV on the left side with white borders.
 
         Args:
-            border_size (int): Size of the white border between components in pixels
-            border_color (tuple): Color of the border as (B, G, R) for OpenCV
+            border_size: Size of the white border between components in pixels
+            border_color: Color of the border as (B, G, R) for OpenCV
+
+        Returns:
+            Concatenated image as a numpy array.
         """
         lidar_image = np.ascontiguousarray(self.bev_image, dtype=np.uint8)
 
@@ -839,7 +854,6 @@ class Visualizer:
             "route_labels_curvature",
             "distance_to_junction",
             "ego_lane_width",
-            "average_traffic_speed",
             "perturbation_translation",
             "perturbation_rotation",
             "speed",

@@ -1,29 +1,33 @@
 # Tutorial Jupyter Notebooks
 
-The notebooks were tested on VSCode. This [setting](https://github.com/autonomousvision/lead/blob/main/.vscode/settings.json) makes sure the notebooks are started in project root.
+The notebooks have been tested in VSCode. This [settings file](https://github.com/autonomousvision/lead/blob/main/.vscode/settings.json) ensures notebooks start with the project root as the working directory.
 
-## Pipline Verification Notebooks
+```{warning}
+If using an editor other than VSCode, ensure the Jupyter kernel's root directory matches the project root.
+```
 
-### 1. Inspect Expert's Output
+## Pipeline Verification Notebooks
+
+### Inspect Expert Output
 
 **Notebook:** [notebooks/inspect_expert_output.ipynb](https://github.com/autonomousvision/lead/blob/main/notebooks/inspect_expert_output.ipynb)
 
-Run expert, produce data and verify that everything works.
+Run the expert agent, produce data samples, and verify correct operation.
 
-### 2. Load Pre-trained Model, Data and Example Inference
+### Load Pre-trained Model and Run Offline Inference
 
 **Notebook:** [notebooks/carla_offline_inference.ipynb](https://github.com/autonomousvision/lead/blob/main/notebooks/carla_offline_inference.ipynb)
 
-Load model checkpoints. Load data, visualize a random sample, and run offline inference.
+Load model checkpoints, visualize random data samples, and run offline inference on collected data.
 
-## Data Format Explained Interactively
+## Understanding Data Format
 
 **Notebook:** [notebooks/data_format.ipynb](https://github.com/autonomousvision/lead/blob/main/notebooks/data_format.ipynb)
 
-Understand what the dataloader outputs and how to fit them to your model.
+Explore the dataloader output structure and learn how to adapt it for custom models.
 
-## Debug Closed-Loop Evaluation Interactively
+## Debug Closed-Loop Evaluation
 
 **Notebook:** [notebooks/inspect_sensor_agent_io.ipynb](https://github.com/autonomousvision/lead/blob/main/notebooks/inspect_sensor_agent_io.ipynb)
 
-Debug model inputs/outputs during closed-loop evaluation.
+Interactively debug model inputs and outputs during closed-loop evaluation to diagnose issues.

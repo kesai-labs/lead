@@ -1,5 +1,6 @@
 import os
 import sys
+from typing import Any
 
 from omegaconf import OmegaConf
 
@@ -365,7 +366,7 @@ class BaseConfig:
 
     # --- Configuration Parsing Methods ---
 
-    def load_from_args(self, loaded_config, raise_error_on_missing_key: bool):
+    def load_from_args(self, loaded_config: Any, raise_error_on_missing_key: bool):
         """Load configuration from command-line arguments.
 
         Args:

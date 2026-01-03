@@ -126,7 +126,7 @@ class SlurmJobPool:
                 processes.append(
                     subprocess.Popen(["kill", "-9", str(job_id)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 )
-            processes.append(subprocess.Popen(["90_clean_carla.sh"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+            processes.append(subprocess.Popen(["clean_carla.sh"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
 
         # Wait for all processes to complete
         for process in processes:

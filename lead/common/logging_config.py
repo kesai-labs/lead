@@ -2,12 +2,15 @@
 Central logging configuration for the LEAD project.
 
 This module provides a single point to configure logging for all components.
-Import and call setup_logging() at the start of your application.
+1. Import and call setup_logging() at the start of your application.
+2. Create a logger in each module using logging.getLogger(name)
 """
 
 import logging
 import os
 import sys
+
+from beartype import beartype
 
 
 # ANSI color codes for terminal output
@@ -16,24 +19,13 @@ class ColorCodes:
     BOLD = "\033[1m"
 
     # Colors
-    BLACK = "\033[30m"
     RED = "\033[31m"
-    GREEN = "\033[32m"
-    YELLOW = "\033[33m"
-    BLUE = "\033[34m"
-    MAGENTA = "\033[35m"
-    CYAN = "\033[36m"
-    WHITE = "\033[37m"
 
     # Bright colors
     BRIGHT_BLACK = "\033[90m"
     BRIGHT_RED = "\033[91m"
-    BRIGHT_GREEN = "\033[92m"
     BRIGHT_YELLOW = "\033[93m"
     BRIGHT_BLUE = "\033[94m"
-    BRIGHT_MAGENTA = "\033[95m"
-    BRIGHT_CYAN = "\033[96m"
-    BRIGHT_WHITE = "\033[97m"
 
 
 class ColoredFormatter(logging.Formatter):
@@ -80,7 +72,8 @@ class ColoredFormatter(logging.Formatter):
         return result
 
 
-def setup_logging(level=None, format_string=None):
+@beartype
+def setup_logging(level: str = None, format_string: str = None):
     """
     Configure logging for the entire application.
 
@@ -90,9 +83,6 @@ def setup_logging(level=None, format_string=None):
                Defaults to INFO.
         format_string: Custom format string for log messages.
                       Defaults to a standard format with timestamp.
-
-    Returns:
-        The root logger configured with the specified settings.
     """
     # Determine log level
     if level is None:
@@ -154,33 +144,3 @@ def setup_logging(level=None, format_string=None):
     logging.getLogger("lead").setLevel(level)
 
     logger.info("Logging configured: level=%s for 'lead' modules", logging.getLevelName(level))
-
-    return logger
-
-
-def get_logger(name):
-    """
-    Get a logger with the specified name.
-
-    Args:
-        name: Logger name (typically __name__ of the module)
-
-    Returns:
-        A logger instance
-    """
-    return logging.getLogger(name)
-
-
-# Convenience function to set log level at runtime
-def set_log_level(level):
-    """
-    Change the log level at runtime.
-
-    Args:
-        level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) as string or int
-    """
-    if isinstance(level, str):
-        level = getattr(logging, level.upper(), logging.INFO)
-
-    logging.getLogger().setLevel(level)
-    logging.info("Log level changed to: %s", logging.getLevelName(level))

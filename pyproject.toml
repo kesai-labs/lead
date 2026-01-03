@@ -5,6 +5,9 @@ description = "LEAD: Minimizing Learner-Expert Asymmetry in End-to-End Driving"
 requires-python = ">=3.10"
 dependencies = []
 
+[project.optional-dependencies]
+dev = []
+
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
@@ -12,7 +15,7 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["lead*", "slurm*"]
-exclude = ["data*", "outputs*", "notebooks*", "3rd_party*", "scripts*", "results_final*", "tests*", "docs*"]
+exclude = ["data*", "outputs*", "notebooks*", "3rd_party*", "scripts*", "docs*", "tests*"]
 
 [tool.setuptools.package-data]
 lead = ["**/*"]
@@ -21,7 +24,7 @@ lead = ["**/*"]
 line-length = 128
 
 # Only check these directories
-include = ["lead/**/*.py"]
+include = ["lead/**/*.py", "tests/**/*.py"]
 
 # Ignore specific directories/files
 exclude = [
@@ -36,8 +39,31 @@ ignore = ["E722", "F722"]
 [tool.ruff.format]
 quote-style = "double"
 
-# --- Pydoclint ---
-[tool.pydoclint]
-style="google"
-arg-type-hints-in-docstring=false
-exclude=["3rd_party/**", "scripts/**"]
+[tool.basedpyright]
+# Include directories to type check
+include = ["lead", "tests"]
+
+# Exclude directories from type checking
+exclude = [
+    "3rd_party",
+    "scripts",
+    "data",
+    "outputs",
+    "notebooks",
+    "docs"
+]
+
+# Path to custom type stubs
+stubPath = "3rd_party/typings"
+
+# Type checking mode: "off", "basic", "standard", or "strict"
+typeCheckingMode = "basic"
+
+# Python environment settings
+pythonPlatform = "Linux"
+pythonVersion = "3.10"
+
+# Reduce noise from libraries with incomplete type stubs (cv2, etc.)
+# while still catching real errors in your own code
+reportAttributeAccessIssue = "warning"
+reportMissingImports = "warning"

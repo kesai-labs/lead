@@ -18,7 +18,7 @@ LOG = logging.getLogger(__name__)
 
 
 class BaseAgent:
-    """Agent class handle basic sensor processing that both data agent and sensor agent need."""
+    """Agent class handle basic sensor processing that both expert and student need."""
 
     @beartype
     def setup(self, sensor_agent: bool = False):

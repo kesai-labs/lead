@@ -1,22 +1,19 @@
-import itertools
 import logging
 import lzma
 import math
+import numbers
 import pickle
 import pickletools
-from copy import deepcopy
 from typing import Any
 
 import carla
 import jaxtyping as jt
 import numpy as np
 import numpy.typing as npt
-import shapely
 import torch
 from agents.navigation.local_planner import RoadOption
 from beartype import beartype
 from scipy.optimize import fsolve
-from shapely.geometry import Polygon
 
 from lead.training.config_training import TrainingConfig
 
@@ -163,7 +160,9 @@ def is_point_in_camera_frustum(
     Returns:
         True if the point is within the camera frustum, False otherwise.
     """
-    if config.num_used_cameras >= 3:
+    if (
+        config.num_used_cameras >= 3
+    ):  # TODO: only a hack for now. We assume if 3 or more cameras are used, they cover 360 degree FOV
         return True
     fov_deg = config.num_used_cameras * 60 + 5  # in degrees
     fov_rad = math.radians(fov_deg / 2)
@@ -458,7 +457,8 @@ def align_lidar(
         translation: translations in meters.
         yaw: yaw angle in radians.
 
-    Returns: numpy LiDAR point cloud in the new coordinate system.
+    Returns:
+        numpy LiDAR point cloud in the new coordinate system.
     """
     rotation_matrix = np.array(
         [
@@ -575,210 +575,6 @@ def extract_yaw_from_matrix(matrix: jt.Float[npt.NDArray, "4 4"]) -> float:
     return yaw
 
 
-@beartype
-def non_maximum_suppression(
-    bounding_boxes: list[jt.Float[npt.NDArray, "num_boxes D"]], iou_treshhold: float
-) -> jt.Float[npt.NDArray, "num_filtered_boxes D"]:
-    """
-    Args:
-        bounding_boxes: List of bounding boxes produced by an ensemble of detectors.
-        iou_treshhold: IoU treshhold for NMS.
-
-    Return:
-        List of filtered bounding boxes after NMS.
-    """
-    filtered_boxes = []
-    bounding_boxes = np.array(list(itertools.chain.from_iterable(bounding_boxes)), dtype=object)
-
-    if bounding_boxes.size == 0:  # If no bounding boxes are detected can't do NMS
-        return np.array(filtered_boxes)
-    bounding_boxes = bounding_boxes.reshape(-1, 9)
-    confidences_indices = np.argsort(bounding_boxes[:, -1])
-    while len(confidences_indices) > 0:
-        idx = confidences_indices[-1]
-        current_bb = bounding_boxes[idx]
-        filtered_boxes.append(current_bb.copy())
-        # Remove last element from the list
-        confidences_indices = confidences_indices[:-1]
-
-        if len(confidences_indices) == 0:
-            break
-
-        for idx2 in deepcopy(confidences_indices):
-            if iou_bbs(current_bb, bounding_boxes[idx2]) > iou_treshhold:  # Remove BB from list
-                confidences_indices = confidences_indices[confidences_indices != idx2]
-
-    return np.array(filtered_boxes).astype(np.float32)
-
-
-def rect_polygon(x: float, y: float, width: float, height: float, angle: float) -> Polygon:
-    """Create a shapely Polygon representing a rotated rectangle.
-
-    Args:
-        x: Center x-coordinate of the rectangle.
-        y: Center y-coordinate of the rectangle.
-        width: Width of the rectangle.
-        height: Height of the rectangle.
-        angle: Rotation angle in radians.
-
-    Returns:
-        Shapely Polygon representing the rotated rectangle.
-    """
-    p = Polygon([(-width, -height), (width, -height), (width, height), (-width, height)])
-    # Shapely is very inefficient at these operations, worth rewriting
-    return shapely.affinity.translate(shapely.affinity.rotate(p, angle, use_radians=True), x, y)
-
-
-def iou_bbs(bb1: jt.Float[npt.NDArray, "5"], bb2: jt.Float[npt.NDArray, "5"]) -> float:
-    """Calculate Intersection over Union (IoU) between two oriented bounding boxes.
-
-    Args:
-        bb1: First bounding box as [x, y, width, height, angle].
-        bb2: Second bounding box as [x, y, width, height, angle].
-
-    Returns:
-        IoU value between 0 and 1.
-    """
-    a = rect_polygon(bb1[0], bb1[1], bb1[2], bb1[3], bb1[4])
-    b = rect_polygon(bb2[0], bb2[1], bb2[2], bb2[3], bb2[4])
-    intersection_area = a.intersection(b).area
-    union_area = a.union(b).area
-    iou = intersection_area / union_area
-    return iou
-
-
-def dot_product(vector1: carla.Vector3D, vector2: carla.Vector3D) -> float:
-    """Calculate dot product between two CARLA Vector3D objects.
-
-    Args:
-        vector1: First 3D vector.
-        vector2: Second 3D vector.
-
-    Returns:
-        Dot product as a scalar value.
-    """
-    return vector1.x * vector2.x + vector1.y * vector2.y + vector1.z * vector2.z
-
-
-def cross_product(vector1: carla.Vector3D, vector2: carla.Vector3D) -> carla.Vector3D:
-    """Calculate cross product between two CARLA Vector3D objects.
-
-    Args:
-        vector1: First 3D vector.
-        vector2: Second 3D vector.
-
-    Returns:
-        Cross product as a new CARLA Vector3D.
-    """
-    return carla.Vector3D(
-        x=vector1.y * vector2.z - vector1.z * vector2.y,
-        y=vector1.z * vector2.x - vector1.x * vector2.z,
-        z=vector1.x * vector2.y - vector1.y * vector2.x,
-    )
-
-
-def get_separating_plane(
-    r_pos: carla.Vector3D, plane: carla.Vector3D, obb1: carla.BoundingBox, obb2: carla.BoundingBox
-) -> bool:
-    """Check if there is a separating plane between two oriented bounding boxes.
-
-    Args:
-        r_pos: Position vector between the two bounding boxes.
-        plane: Plane normal vector to test for separation.
-        obb1: First oriented bounding box.
-        obb2: Second oriented bounding box.
-
-    Returns:
-        True if the plane separates the two bounding boxes, False otherwise.
-    """
-    return abs(dot_product(r_pos, plane)) > (
-        abs(dot_product((obb1.rotation.get_forward_vector() * obb1.extent.x), plane))
-        + abs(dot_product((obb1.rotation.get_right_vector() * obb1.extent.y), plane))
-        + abs(dot_product((obb1.rotation.get_up_vector() * obb1.extent.z), plane))
-        + abs(dot_product((obb2.rotation.get_forward_vector() * obb2.extent.x), plane))
-        + abs(dot_product((obb2.rotation.get_right_vector() * obb2.extent.y), plane))
-        + abs(dot_product((obb2.rotation.get_up_vector() * obb2.extent.z), plane))
-    )
-
-
-def check_obb_intersection(obb1: carla.BoundingBox, obb2: carla.BoundingBox) -> bool:
-    """Check whether two oriented bounding boxes intersect.
-
-    Uses the Separating Axis Theorem (SAT) for 3D oriented bounding boxes.
-    The algorithm is complex because it handles the general case of 3D OBBs.
-
-    Args:
-        obb1: First oriented bounding box.
-        obb2: Second oriented bounding box.
-
-    Returns:
-        True if the bounding boxes intersect, False otherwise.
-    """
-    r_pos = obb2.location - obb1.location
-    return not (
-        get_separating_plane(r_pos, obb1.rotation.get_forward_vector(), obb1, obb2)
-        or get_separating_plane(r_pos, obb1.rotation.get_right_vector(), obb1, obb2)
-        or get_separating_plane(r_pos, obb1.rotation.get_up_vector(), obb1, obb2)
-        or get_separating_plane(r_pos, obb2.rotation.get_forward_vector(), obb1, obb2)
-        or get_separating_plane(r_pos, obb2.rotation.get_right_vector(), obb1, obb2)
-        or get_separating_plane(r_pos, obb2.rotation.get_up_vector(), obb1, obb2)
-        or get_separating_plane(
-            r_pos,
-            cross_product(obb1.rotation.get_forward_vector(), obb2.rotation.get_forward_vector()),
-            obb1,
-            obb2,
-        )
-        or get_separating_plane(
-            r_pos,
-            cross_product(obb1.rotation.get_forward_vector(), obb2.rotation.get_right_vector()),
-            obb1,
-            obb2,
-        )
-        or get_separating_plane(
-            r_pos,
-            cross_product(obb1.rotation.get_forward_vector(), obb2.rotation.get_up_vector()),
-            obb1,
-            obb2,
-        )
-        or get_separating_plane(
-            r_pos,
-            cross_product(obb1.rotation.get_right_vector(), obb2.rotation.get_forward_vector()),
-            obb1,
-            obb2,
-        )
-        or get_separating_plane(
-            r_pos,
-            cross_product(obb1.rotation.get_right_vector(), obb2.rotation.get_right_vector()),
-            obb1,
-            obb2,
-        )
-        or get_separating_plane(
-            r_pos,
-            cross_product(obb1.rotation.get_right_vector(), obb2.rotation.get_up_vector()),
-            obb1,
-            obb2,
-        )
-        or get_separating_plane(
-            r_pos,
-            cross_product(obb1.rotation.get_up_vector(), obb2.rotation.get_forward_vector()),
-            obb1,
-            obb2,
-        )
-        or get_separating_plane(
-            r_pos,
-            cross_product(obb1.rotation.get_up_vector(), obb2.rotation.get_right_vector()),
-            obb1,
-            obb2,
-        )
-        or get_separating_plane(
-            r_pos,
-            cross_product(obb1.rotation.get_up_vector(), obb2.rotation.get_up_vector()),
-            obb1,
-            obb2,
-        )
-    )
-
-
 def encode_depth_8bit(depth: jt.Float[npt.NDArray, "h w"]) -> jt.UInt8[npt.NDArray, "h w"]:
     """Encode a depth map into 8-bit format for visualization.
 
@@ -890,15 +686,6 @@ def waypoints_signed_curvature(waypoints: torch.Tensor) -> torch.Tensor:
     return torch.mean(angles)  # Compute average angle
 
 
-def add_dict(src_dict: dict, tgt_dict: dict, n_count: int) -> dict:
-    for key, value in src_dict.items():
-        if key in tgt_dict:
-            tgt_dict[key] = (tgt_dict[key] * (n_count - 1) + value) / n_count
-        else:
-            tgt_dict[key] = value / n_count
-    return tgt_dict
-
-
 @beartype
 def average_displacement_error(predictions: torch.Tensor, observed_traj: torch.Tensor) -> float:
     """Compute L2 distance between proposed trajectories and ground truth.
@@ -922,8 +709,8 @@ def final_displacement_error(predictions: torch.Tensor, observed_traj: torch.Ten
     """Compute final L2 distance between proposed trajectories and ground truth.
 
     Args:
-        predictions: A numpy array representing model predictions of size: [# batch, # time steps, spatial features].
-        observed_traj: A tensor representing the observed trajectory in the logs of size [# batch, time steps, spatial features]
+        predictions: Model predictions of size: [# batch, # time steps, spatial features].
+        observed_traj: Observed trajectory in the logs of size [# batch, time steps, spatial features]
 
     Returns:
         float: L2 distance
@@ -943,7 +730,7 @@ def project_points_to_image(
     camera_width: int,
     camera_height: int,
     points: npt.NDArray,
-) -> tuple[list[tuple], list[bool]]:
+) -> tuple[list[tuple[numbers.Real, numbers.Real]], list[bool]]:
     """
     Project 2D points (with z=0) to 2D image coordinates using camera parameters.
 

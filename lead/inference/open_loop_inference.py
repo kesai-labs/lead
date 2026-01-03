@@ -10,14 +10,14 @@ import torch
 import torch.nn.functional as F
 from beartype import beartype
 
-import lead.common.common_utils as common_utils
 from lead.common.constants import TransfuserBoundingBoxIndex
+from lead.inference import inference_utils
 from lead.inference.config_open_loop import OpenLoopConfig
 from lead.training.config_training import TrainingConfig
-from lead.training.data_loader import carla_dataset_utils
-from lead.training.tfv6.center_net_decoder import PredictedBoundingBox
-from lead.training.tfv6.planning_decoder import decode_two_hot
-from lead.training.tfv6.tfv6 import Prediction, TFv6
+from lead.data_loader import carla_dataset_utils
+from lead.tfv6.center_net_decoder import PredictedBoundingBox
+from lead.tfv6.planning_decoder import decode_two_hot
+from lead.tfv6.tfv6 import Prediction, TFv6
 
 np.set_printoptions(suppress=True)
 
@@ -149,7 +149,7 @@ class OpenLoopInference:
                     pred_bounding_boxes_vehicle_system.append(pred_bb)
 
         if len(pred_bounding_boxes_vehicle_system) > 0:
-            pred_bounding_boxes_vehicle_system = common_utils.non_maximum_suppression(
+            pred_bounding_boxes_vehicle_system = inference_utils.non_maximum_suppression(
                 pred_bounding_boxes_vehicle_system, float(self.config_training.iou_treshold_nms)
             )
 

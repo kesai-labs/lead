@@ -1,46 +1,66 @@
-# Training
+# Training (10 minutes)
 
-This guide covers training models on CARLA data for CARLA Leaderboard.
+This guide covers local model training for CARLA Leaderboard.
 
-> **Note**: For training on cross-datasets (NavSim, Waymo), see [Cross-Dataset Training](cross_dataset_training.md).
+```{note}
+This tutorial is specific to training policies for CARLA Leaderboard. For cross-dataset training (NAVSIM, Waymo), see [Cross-dataset training](cross_dataset_training.md).
+For large-scale training on HPC clusters, refer to the [SLURM Training Guide](slurm_training.md).
+```
 
 ## Prerequisites
 
-Each of the following steps has to be done only once.
+The following steps need to be performed once per dataset.
 
-### 1. Prepare Data
+### Prepare Data
 
-We will upload a dataset soon. Stay tuned! In the mean time, follow this [tutorial](https://ln2697.github.io/lead/docs/data_collection.html) to collect data.
+We will upload a dataset soon. In the meantime, follow the [data collection tutorial](data_collection.md) to collect data locally.
 
-If data collected locally, run
+After collecting data locally, organize it with:
 
 ```bash
 cp -r data/expert_debug data/carla_leaderboard2
 ```
 
-### 2. Build Data Buckets
+Your data structure should match:
 
-Buckets group training samples by characteristics (e.g., scenarios, towns, weather, scenarios, road curvature, etc.) to enable curriculum learning and balanced batch sampling.
+```{code-block}
+:emphasize-lines: 2,3,4
 
-By default we use [full_pretrain_bucket_collection](https://github.com/autonomousvision/lead/blob/main/lead/training/data_loader/buckets/full_pretrain_bucket_collection.py) for pre-training and [full_posttrain_bucket_collection](https://github.com/autonomousvision/lead/blob/main/lead/training/data_loader/buckets/full_posttrain_bucket_collection.py) for post-training, e.g., we train uniformly on all samples.
+data/carla_leaderboard2
+├── data
+│   └── BlockedIntersection
+│       └── 999_Rep-1_Town06_13_route0_12_22_22_34_45
+└── results
+    └── Town06_13_result.json
+```
 
-Buckets are built once and stored on disk in the dataset directory. In subsequents runs they are reused automatically. This is neccessary to save time.
+### Build Data Buckets
 
-To build pretrain bucket, run
+Buckets group training samples by characteristics (scenarios, towns, weather, road curvature, etc.) to enable curriculum learning and balanced batch sampling.
+
+Default bucket collections:
+- **Pre-training**: [lead/data_buckets/full_pretrain_bucket_collection.py](https://github.com/autonomousvision/lead/blob/main/lead/data_buckets/full_pretrain_bucket_collection.py) samples uniformly across all available data
+- **Post-training**: [lead/data_buckets/full_posttrain_bucket_collection.py](https://github.com/autonomousvision/lead/blob/main/lead/data_buckets/full_posttrain_bucket_collection.py) filters out the initial and final samples of each sequence (which may contain initialization artifacts) and samples uniformly from the remaining data
+
+Buckets are built once, stored on disk, and automatically reused in subsequent runs.
+
+Build pre-training buckets:
 
 ```bash
 python3 scripts/build_buckets_pretrain.py
 ```
 
-To build posttrain bucket, run
+Build post-training buckets:
 
 ```bash
 python3 scripts/build_buckets_posttrain.py
 ```
 
-If everything is ok, this should be the output
+Expected output structure:
 
-```html
+```{code-block}
+:emphasize-lines: 2,3,4
+
 data/carla_leaderboard2
 ├── buckets
 │   ├── full_posttrain_buckets_8_8_8_5.gz
@@ -52,27 +72,36 @@ data/carla_leaderboard2
     └── Town06_13_result.json
 ```
 
-The bucket files can be used on other computers since file paths in each bucket is relative.
+Bucket files use relative paths and are portable across machines.
 
-**Note:** A bucket contains all and only the paths of data samples that are available at bucket building time. If you later add or delete routes, you need to rebuild the buckets.
+```{note}
+Buckets contain only the data samples available at build time. Rebuild buckets after adding or removing routes.
+```
 
-### 3. Build Persistent Data Cache
+```{note}
+If you encounter hard-to-debug errors after major code changes, try deleting and rebuilding the buckets.
+```
 
-Raw sensor data (images, LiDAR, RADAR, etc.) requires significant preprocessing before training - decompression, format conversion, and perturbation alignment. The training cache stores preprocessed and compressed data to disk, eliminating redundant computation and dramatically speeding up data loading. Once built, the cache is reused across training runs, reducing the data loading bottleneck.
+### Build Persistent Data Cache
 
-Two types of cache are used:
-- **`persistent_cache`**: Stored alongside the dataset, reused across all training sessions. See implementation at [PersistentCache](https://github.com/autonomousvision/lead/blob/main/lead/training/data_loader/carla_dataset_utils.py).
-- **`training_session_cache`**: Temporary cache on local SSD of a cluster job. We use [diskcache](https://pypi.org/project/diskcache/) for this purpose.
+Raw sensor data (images, LiDAR, RADAR) requires preprocessing—decompression, format conversion, and temporal alignment. The training cache stores preprocessed, compressed data on disk, eliminating redundant computation and accelerating data loading. Once built, the cache is reused across all training runs.
 
-To build cache, run
+Two cache types:
+
+- **`persistent_cache`**: Stored alongside the dataset, reused across all training sessions. See [PersistentCache](https://github.com/autonomousvision/lead/blob/main/lead/data_loader/training_cache.py)
+- **`training_session_cache`**: Temporary cache on local SSD during cluster jobs, implemented with [diskcache](https://pypi.org/project/diskcache/). During the first few epochs, data is loaded from shared storage and cached on the job's local SSD for faster subsequent access. This implementation is specific to our organization's SLURM cluster setup.
+
+Build the persistent cache:
 
 ```bash
 python3 scripts/build_cache.py
 ```
 
-If everything is ok, this should be the output
+Expected output structure:
 
-```html
+```{code-block}
+:emphasize-lines: 5,6,7
+
 data/carla_leaderboard2
 ├── buckets
 │   ├── full_posttrain_buckets_8_8_8_5.gz
@@ -87,25 +116,24 @@ data/carla_leaderboard2
     └── Town06_13_result.json
 ```
 
-**Note:** After changing something in pipeline (e.g., add new semantic class), you might need to check whether the cache needs to be rebuilt.
+Training session cache is loaded in the first few epochs of the training from shared disk and stored on training session's disk. This implementation is specific to SLURM clusters of our organization.
 
-**Note:** After building data cache, the pipeline only needs the meta files in `data/carla_leaderboard2/data`, everything else can be deleted.
+```{note}
+Rebuild the cache after modifying the data pipeline (e.g., adding new semantic classes or changing preprocessing steps).
+```
 
-## Model Training
+## Perception Pre-training
 
-Following standard procedures on CARLA, we train the model in two phases, first only the perception backbone is trained, only after that we train everything jointly..
-
-### 1. Perception pre-training
+Following standard TransFuser-like training procedures, training occurs in two phases: first, train only the perception backbone, then train the complete model end-to-end.
 
 ```bash
 bash scripts/pretrain.sh
 ```
 
-The training will takes around 1-2 minutes and produces following structure
+Training takes approximately 1-2 minutes if trained with only one route and produces:
 
-```html
+```
 outputs/local_training/pretrain
-├── clipper_0030.pth
 ├── config.json
 ├── events.out.tfevents.1764250874.local.105366.0
 ├── gradient_steps_skipped_0030.txt
@@ -115,52 +143,70 @@ outputs/local_training/pretrain
 └── scheduler_0030.pth
 ```
 
-To debug training, the script also regulary produces WandB/TensorBoard logs and images at `outputs/training_viz`. The frequency can be controlled with `log_scalars_frequency` and `log_images_frequency`.
+The training script generates WandB/TensorBoard logs and visualization images at `outputs/training_viz`. Control logging frequency with `log_scalars_frequency` and `log_images_frequency` in [lead/training/config_training.py](https://github.com/autonomousvision/lead/blob/main/lead/training/config_training.py).
 
-The image logging could be quite expensive, it runs at least once per epoch. To turn if off completely, set `visualize_training=false` in training config.
+Image logging runs at least once per epoch and can be expensive. Disable it by setting `visualize_training=false` in the config.
 
-To observe the training logging with TensorBoard, run
+View training logs with [TensorBoard](https://www.tensorflow.org/tensorboard):
 
 ```bash
 tensorboard --logdir outputs/local_training/pretrain
 ```
 
-We also support WandB, to turn it on, set `log_wandb=true` in training config.
+[WandB](https://wandb.ai) logging is also supported. Enable it by setting `log_wandb=true` in the training config.
 
-### 2. Post-training
+![](../assets/wandb.png)
 
-> **Note**: The epoch count will be reset back to 0.
+## Planning Post-training
 
-After pre-training, we continue with the post-training where we put the planner on top of the model
-and train the whole model end-to-end.
+```{note}
+During post-training, the epoch count resets to 0. The optimizer state is reinitialized because the planner was not included in the pre-training checkpoint.
+```
+
+After pre-training completes, continue with post-training to add the planner and train the complete model end-to-end:
 
 ```bash
 bash scripts/posttrain.sh
 ```
 
-### [Optional] Resume failed training
+## Resume Failed Training
 
-To continue a failed training, set `continue_failed_training=true`.
+To continue from a failed training run, set `continue_failed_training=true` in the training config.
 
-### [Optional] Distributed Training
+## Distributed Training
 
-The pipeline supports [Torch DDP](https://docs.pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html). An example:
+The pipeline supports [Torch DDP](https://docs.pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html). See example scripts:
+- [scripts/pretrain_ddp.sh](https://github.com/autonomousvision/lead/blob/main/scripts/pretrain_ddp.sh)
+- [scripts/posttrain_ddp.sh](https://github.com/autonomousvision/lead/blob/main/scripts/posttrain_ddp.sh)
 
-```bash
-torchrun --standalone --nnodes=1 --nproc_per_node=4 --max_restarts=0 --rdzv_backend=c10d python3 lead/training/train.py
-```
+## Common Issues
 
-## Common issues
+### CARLA Server Running in Background
 
-### CARLA server running
+This error may occur:
 
-A common error might happen with following error message
 ```bash
 RuntimeError: cuDNN error: CUDNN_STATUS_INTERNAL_ERROR
 ```
 
-It might come from CARLA server running in background and eating vram. To kill CARLA, run
+This typically indicates a CARLA server is consuming VRAM in the background. Kill all CARLA processes:
 
 ```bash
 bash scripts/clean_carla.sh
 ```
+
+### Unknown GPU Name: \<gpu_name>
+
+Register your GPU in the training configuration:
+
+**Step 1:** Add your GPU name to the `gpu_name` function in [lead/training/config_training.py](https://github.com/autonomousvision/lead/blob/main/lead/training/config_training.py).
+
+**Step 2:** If your GPU supports [bf16 (bfloat16)](https://docs.pytorch.org/docs/stable/amp.html), add it to both `use_mixed_precision_training` and `use_gradient_scaler` functions in the same file.
+
+**Why explicit registration?** Mixed precision training (BF16) is opt-in rather than automatic. On some older GPUs like RTX 2080 Ti, BF16 can degrade training performance, so we require explicit configuration.
+
+### Unknown CARLA Root Path: \<carla_root>
+
+Register your CARLA dataset configuration in the `target_dataset` function in [lead/training/config_training.py](https://github.com/autonomousvision/lead/blob/main/lead/training/config_training.py). Map your CARLA root path to the appropriate dataset configuration, which specifies the expected sensor setup and data format.
+
+**Why this design?** This allows running training experiments while simultaneously collecting data with different sensor configurations. The `target_dataset` in [lead/expert/config_expert.py](https://github.com/autonomousvision/lead/blob/main/lead/expert/config_expert.py) controls which sensors are mounted on the expert vehicle during data collection.

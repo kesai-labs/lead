@@ -3,54 +3,51 @@
 </h2>
 
 <p align="center">
-  <a href="https://ln2697.github.io/lead"><strong>Project Page</strong></a> ·
-  <a href="https://ln2697.github.io/lead/docs"><strong>Documentation</strong></a> ·
-  <a href="https://huggingface.co/ln2697/TFv6"><strong>Weights</strong></a> ·
-  <a href="https://arxiv.org/abs/2512.20563"><strong>Paper</strong></a> ·
-  <a href="https://ln2697.github.io/assets/pdf/Nguyen2026LEADSUPP.pdf"><strong>Supplementary Material</strong></a>
+  <h4 align="center">
+  <a href="https://ln2697.github.io/lead" style="text-decoration: none;">Project Page</a> |
+  <a href="https://ln2697.github.io/lead/docs" style="text-decoration: none;">Documentation</a> |
+  <a href="https://huggingface.co/ln2697/TFv6" style="text-decoration: none;">Checkpoints</a> |
+  <a href="https://huggingface.co/ln2697/LEAD" style="text-decoration: none;">Dataset</a> |
+  <a href="https://ln2697.github.io/assets/pdf/Nguyen2026LEADSUPP.pdf" style="text-decoration: none;">Supplementary Material</a> |
+  <a href="https://arxiv.org/abs/2512.20563" style="text-decoration: none;">Paper</a>
+  </h4>
 </p>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.10-blue.svg" alt="Python 3.10">
-  <img src="https://img.shields.io/badge/PyTorch-2.0+-orange.svg" alt="PyTorch 2.0+">
-  <img src="https://img.shields.io/badge/CARLA-0.9.15-green.svg" alt="CARLA 0.9.15">
-  <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT">
-</p>
+<p align="center">Official implementation of LEAD & TransFuser v6, an expert-student policy pair for autonomous driving research in CARLA. Includes a complete pipeline for data collection, training, and evaluation.</p>
 
-<p align="center">Official implementation of LEAD and TransFuser v6, an expert-student policy pair for autonomous driving research in CARLA. Includes a complete pipeline for data collection, training, and closed-loop evaluation.</p>
+<div align="center">
 
-<p align="center">
-  <img src="docs/assets/banner.webp" alt="LEAD Banner" width="80%">
-</p>
+| |
+|:--:|
+| <img src="docs/assets/banner.webp" alt="LEAD Banner" width="100%"> |
+| **End-to-end stress test:** Closed-loop execution of TransFuser v6, demonstrating stable control in a complex urban scenario under degraded environmental conditions and dense adversarial traffic.  |
 
-## Main Features
+</div>
 
-LEAD provides a comprehensive framework for end-to-end driving research in the CARLA simulator, featuring TransFuser v6 — a simple yet state-of-the-art model.
+## Overview
 
-Key highlights:
+LEAD provides a comprehensive framework for end-to-end driving research in the CARLA simulator, features:
+
 - **Data-centric infrastructure**:
-  - Always know what type and shape your tensors have, enforced with BearType and JaxTyping.
-  - Extensive visualizations for debugging data pipelines and closed-loop evaluation.
-  - Compact datasets with lower storage overhead (72h of driving fits in ~200GB).
-- **Scalable experiment management**:
-  - Built-in SLURM wrapper with unified naming across SLURM jobs, WandB runs, and output directories.
-  - Each training/evaluation is a versioned bash script, ensuring full reproducibility.
-- **Cross-dataset training**: 
-  - Training and evaluation support for NAVSIM and Waymo datasets. 
-  - Co-training on synthetic CARLA data.
+  - Comprehensive visualization suite.
+  - Runtime tensor shape and type validation.
+  - Efficient storage format, fitting 72 hours of driving in ~200GB.
+
+- **Multi-dataset training pipeline**:
+  - Support for real-world datasets: NAVSIM, Waymo Vision-based E2E, Waymo Perception.
+  - Domain adaptation through co-training on heterogeneous data sources.
 
 ## Table of Contents
 
 - [Roadmap](#roadmap)
 - [Updates](#updates)
-- [Setup Project](#setup-project)
-- [Quick Start](#quick-start)
+- [Setup Project (15 minutes)](#setup-project-15-minutes)
+- [Quick Start (5 minutes)](#quick-start-5-minutes)
 - [Bench2Drive Results](#bench2drive-results)
 - [Documentation and Resources](#documentation-and-resources)
 - [External Resources](#external-resources)
 - [Acknowledgements](#acknowledgements)
 - [Citation](#citation)
-- [License](#license)
 
 ## Roadmap
 
@@ -65,49 +62,49 @@ Status: Active development. Core code and checkpoints are released; remaining co
 
 - `2025/12/24` Arxiv paper and code release
 
-## Setup Project
+## Setup Project (15 minutes)
 
-> ⏱️ **15 minutes**
+**1. Setup repository**
 
-**1. Clone project**
+Clone repository
 
 ```bash
 git clone https://github.com/autonomousvision/lead.git
 cd lead
 ```
 
-**2. Setup environment variables**
-
 Set the project root directory and configure paths for CARLA, datasets, and dependencies.
 
 ```bash
 {
-  echo
-  echo "export LEAD_PROJECT_ROOT=$(pwd)"
-  echo "source $(pwd)/scripts/main.sh"
-} >> ~/.bashrc
+  echo -e "export LEAD_PROJECT_ROOT=$(pwd)"  # Set project root variable
+  echo "source $(pwd)/scripts/main.sh"       # Persist more environment variables
+} >> ~/.bashrc  # Append to bash config to persist across sessions
 
-source ~/.bashrc
+source ~/.bashrc  # Reload config to apply changes immediately
 ```
 
 <details>
-<summary>For Zsh</summary>
+<summary>In case you use Zsh, you can instead run:</summary>
 
 ```bash
 {
   echo
-  echo "export LEAD_PROJECT_ROOT=$(pwd)"
-  echo "source $(pwd)/scripts/main.sh"
-} >> ~/.zshrc
+  echo "export LEAD_PROJECT_ROOT=$(pwd)"  # Set project root variable
+  echo "source $(pwd)/scripts/main.sh"    # Persist more environment variables
+} >> ~/.zshrc  # Append to zsh config to persist across sessions
 
-source ~/.zshrc
+source ~/.zshrc  # Reload config to apply changes immediately
 ```
 
 </details>
 
-**3. Create python environment**
+> [!NOTE]
+> For some terminal (VSCode) you might need to manually edit `~/.bashrc` and `~/.zshrc` to ensure the lines are clean.
 
-We use [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install) for this project
+**2. Create python environment**
+
+We use [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install) for this project. First, create Conda environment
 
 ```bash
 # Install conda-lock
@@ -133,20 +130,18 @@ uv pip install -r requirements.txt
 uv pip install -e .
 ```
 
-<details>
-<summary>Alternative: vanilla pip</summary>
-
+Further dependencies
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# Set-up git hooks
+pre-commit install
 
-# Install project
-pip install -e . 
+# Install other tools needed for development
+conda install conda-forge::ffmpeg conda-forge::parallel conda-forge::tree conda-forge::gcc
 ```
 
-</details>
+While waiting for dependencies installation, we recommend CARLA setup on parallel.
 
-**4. Setup CARLA**
+**3. Setup CARLA**
 
 Install CARLA 0.9.15 at `3rd_party/CARLA_0915`
 
@@ -155,7 +150,7 @@ bash scripts/setup_carla.sh
 ```
 
 <details>
-<summary>Or softlink existing CARLA</summary>
+<summary>If you have an existing CARLA installation, you can softlink it by running:</summary>
 
 ```bash
 ln -s /your/carla/path $LEAD_PROJECT_ROOT/3rd_party/CARLA_0915
@@ -163,28 +158,27 @@ ln -s /your/carla/path $LEAD_PROJECT_ROOT/3rd_party/CARLA_0915
 
 </details>
 
-**5. Further setup**
+## Quick Start (5 minutes)
 
-```bash
-# Set-up git hooks
-pre-commit install
-
-# Install other tools
-conda install conda-forge::ffmpeg conda-forge::parallel conda-forge::tree
-```
-
-**Note**
-
-We also provide a minimal docker compose setup (not extensively tested yet) [here](docker-README.md).
-
-## Quick Start
-
-> ⏱️ **5 minutes**
+After setting up the project, you can evaluate the pre-trained checkpoints or expert (collecting data) to verify the pipeline.
 
 **1. Download model checkpoints**
 
-We provide pre-trained checkpoints on [HuggingFace](https://huggingface.co/ln2697/TFv6) for reproducibility.
+We provide pre-trained checkpoints on [HuggingFace](https://huggingface.co/ln2697/TFv6) for reproducibility. Fig. 1 shows the TFv6 network architecture. All checkpoints share the same structure but differ in their sensor configurations (e.g., with/without radar, different camera setups).
 
+<br>
+
+<p align="center">
+  <img src="https://ln2697.github.io/lead/static/images/tfv6.png" alt="TFv6 Architecture" width="90%">
+</p>
+
+<p align="center"><b>Figure 1:</b> TFv6 architecture.</p>
+
+<br>
+
+Tab. 1 shows available checkpoints with their performance on three major CARLA benchmarks. To verify the pipeline, we recommend downloading `tfv6_resnet34` as it provides a good balance between performance and resource usage.
+
+<br>
 <div align="center">
 
 | Checkpoint                                                                                    | Description               | Bench2Drive | Longest6 v2 |  Town13  |
@@ -196,15 +190,26 @@ We provide pre-trained checkpoints on [HuggingFace](https://huggingface.co/ln269
 | [visiononly_resnet34](https://huggingface.co/ln2697/TFv6/tree/main/visiononly_resnet34)       | Vision-only driving model |    91.6     |     43      |    -     |
 | [town13heldout_resnet34](https://huggingface.co/ln2697/TFv6/tree/main/town13heldout_resnet34) | Generalization evaluation |    93.1     |     52      |   2.65   |
 
+**Table 1:** Performance of pre-trained checkpoints. We report Driving Score where higher is better.
+
 </div>
+<br>
 
 To download one checkpoint:
 
 ```bash
+# Create checkpoint directory
 mkdir -p outputs/checkpoints/tfv6_resnet34
-wget https://huggingface.co/ln2697/TFv6/resolve/main/tfv6_resnet34/config.json -O outputs/checkpoints/tfv6_resnet34/config.json
-wget https://huggingface.co/ln2697/TFv6/resolve/main/tfv6_resnet34/model_0030_0.pth -O outputs/checkpoints/tfv6_resnet34/model_0030_0.pth
+
+# Download config
+wget https://huggingface.co/ln2697/TFv6/resolve/main/tfv6_resnet34/config.json \
+  -O outputs/checkpoints/tfv6_resnet34/config.json
+
+# Download one checkpoint
+wget https://huggingface.co/ln2697/TFv6/resolve/main/tfv6_resnet34/model_0030_0.pth \
+  -O outputs/checkpoints/tfv6_resnet34/model_0030_0.pth
 ```
+
 
 <details>
 <summary>Alternatively, to download all checkpoints at once with <a href="https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage">git lfs</a>:</summary>
@@ -219,8 +224,7 @@ git lfs pull
 
 **2. Run model evaluation**
 
-See evaluation configuration at [config_closed_loop](lead/inference/config_closed_loop.py). Turn off the options `produce_demo_video` and `produce_debug_video` for faster evaluation. By default, the pipeline loads all three seeds of a checkpoint as an ensemble. If memory is a problem,
-simply change prefix of two of the three seeds so only the first seed is loaded.
+To start the evaluation, follow those commands
 
 ```bash
 # Start CARLA server
@@ -246,8 +250,11 @@ outputs/local_evaluation
 ├── 23687_debug.mp4
 └── 23687_demo.mp4
 ```
-
 </details>
+
+> [!TIP]
+> 1. Disable video generation in [config_closed_loop](lead/inference/config_closed_loop.py) by turning off `produce_demo_video` and `produce_debug_video`.
+> 2. Modify the file prefixes to load only the first seed, if memory is limited. By default, the pipeline loads all three seeds as an ensemble.
 
 **3. Run expert evaluation**
 
@@ -294,61 +301,65 @@ data/expert_debug
 
 ## Bench2Drive Results
 
-We evaluate TFv6 on the [Bench2Drive](https://github.com/autonomousvision/Bench2Drive-Leaderboard/tree/ab8021b027fa9c4765f9a732355d3b2ae93736a0) benchmark, which consists of 220 routes across multiple towns with challenging weather conditions and traffic scenarios.
+We evaluate TFv6 on the [Bench2Drive](https://github.com/autonomousvision/Bench2Drive-Leaderboard/tree/ab8021b027fa9c4765f9a732355d3b2ae93736a0) benchmark, which consists of 220 routes across multiple towns with challenging weather conditions and traffic scenarios. Tab. 2 compares TFv6 with other recent methods.
+
+<br>
 
 <div align="center">
 
-| Method          |    DS     |    SR     |   Merge   | Overtake  | EmgBrake  | Give Way  | Traffsign | Venue    |
-| --------------- | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: | -------- |
-| TF++ (TFv5)     |   84.21   |   67.27   |   58.75   |   57.77   |   83.33   |   40.00   |   82.11   | ICCV23   |
-| SimLingo        |   85.07   |   67.27   |   54.01   |   57.04   |   88.33   | **53.33** |   82.45   | CVPR25   |
-| R2SE            |   86.28   |   69.54   |   53.33   |   61.25   |   90.00   |   50.00   |   84.21   | -        |
-| HiP-AD          |   86.77   |   69.09   |   50.00   |   84.44   |   83.33   |   40.00   |   72.10   | ICCV25   |
-| BridgeDrive     |   86.87   |   72.27   |   63.50   |   57.77   |   83.33   |   40.00   |   82.11   | -        |
-| DiffRefiner     |   87.10   |   71.40   |   63.80   |   60.00   |   85.00   |   50.00   |   86.30   | AAAI26   |
-| **TFv6 (Ours)** | **95.28** | **86.80** | **72.50** | **97.77** | **91.66** |   40.00   | **89.47** | -        |
+| Method          |    DS     |    SR     |   Merge   | Overtake  | EmgBrake  | Give Way  | Traffsign | Venue  |
+| --------------- | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: | ------ |
+| TF++ (TFv5)     |   84.21   |   67.27   |   58.75   |   57.77   |   83.33   |   40.00   |   82.11   | ICCV23 |
+| SimLingo        |   85.07   |   67.27   |   54.01   |   57.04   |   88.33   | **53.33** |   82.45   | CVPR25 |
+| R2SE            |   86.28   |   69.54   |   53.33   |   61.25   |   90.00   |   50.00   |   84.21   | -      |
+| HiP-AD          |   86.77   |   69.09   |   50.00   |   84.44   |   83.33   |   40.00   |   72.10   | ICCV25 |
+| BridgeDrive     |   86.87   |   72.27   |   63.50   |   57.77   |   83.33   |   40.00   |   82.11   | -      |
+| DiffRefiner     |   87.10   |   71.40   |   63.80   |   60.00   |   85.00   |   50.00   |   86.30   | AAAI26 |
+| **TFv6 (Ours)** | **95.28** | **86.80** | **72.50** | **97.77** | **91.66** |   40.00   | **89.47** | -      |
 
-<em>DS = Driving Score, SR = Success Rate; Metrics follow the CARLA Leaderboard 2.0 protocol. Higher is better.</em>
+**Table 2**: Bench2Drive Performance. DS = Driving Score, SR = Success Rate. Higher is better.
 
 </div>
+
+<br>
 
 ## Documentation and Resources
 
 For detailed training, data-collection, and large-scale experiment instructions, see the [full documentation](https://ln2697.github.io/lead/docs). In particular, we provide:
-- [Tutorial Notebooks](https://ln2697.github.io/lead/docs/jupyter_notebooks.html)
-- [Cross-dataset Training](https://ln2697.github.io/lead/docs/cross_dataset_training.html)
-- [Frequently Asked Questions](https://ln2697.github.io/lead/docs/faq)
-- [Known Issues](https://ln2697.github.io/lead/docs/known_issues.html)
+
+- [Tutorial notebooks](https://ln2697.github.io/lead/docs/jupyter_notebooks.html)
+- [Frequently asked questions](https://ln2697.github.io/lead/docs/faq)
+- [Known issues](https://ln2697.github.io/lead/docs/known_issues.html)
 
 We maintain custom forks of CARLA evaluation tools with our modifications:
-* [scenario_runner_autopilot](https://github.com/ln2697/scenario_runner_autopilot), [leaderboard_autopilot](https://github.com/ln2697/leaderboard_autopilot), [Bench2Drive](https://github.com/ln2697/Bench2Drive), [scenario_runner](https://github.com/ln2697/scenario_runner), [leaderboard](https://github.com/ln2697/leaderboard)
+
+- [scenario_runner_autopilot](https://github.com/ln2697/scenario_runner_autopilot), [leaderboard_autopilot](https://github.com/ln2697/leaderboard_autopilot), [Bench2Drive](https://github.com/ln2697/Bench2Drive), [scenario_runner](https://github.com/ln2697/scenario_runner), [leaderboard](https://github.com/ln2697/leaderboard)
 
 ## External Resources
 
 Useful documentations from other repositories:
-- [CARLA Coordinate Systems](https://github.com/autonomousvision/carla_garage/blob/leaderboard_2/docs/coordinate_systems.md)
-- [History of TransFuser](https://github.com/autonomousvision/carla_garage/blob/leaderboard_2/docs/history.md)
-- [Common Issues with CARLA](https://github.com/Thinklab-SJTU/Bench2Drive?tab=readme-ov-file#deal-with-carla)
-- [About Longest6 v2 Benchmark](https://github.com/autonomousvision/CaRL/tree/main/CARLA#longest6-v2)
-- [About Town13 Benchmark](https://github.com/autonomousvision/carla_garage?tab=readme-ov-file#carla-leaderboard-20-validation-routes)
-- [Random Scenario Generation](https://github.com/autonomousvision/CaRL/tree/main/CARLA#scenario-generation)
-- [Manual Scenario Labeling](https://github.com/autonomousvision/carla_route_generator)
+
+- A cheatsheat of [CARLA coordinate systems](https://github.com/autonomousvision/carla_garage/blob/leaderboard_2/docs/coordinate_systems.md)
+- About [Longest6 v2 benchmark](https://github.com/autonomousvision/CaRL/tree/main/CARLA#longest6-v2) and [Town13 benchmark](https://github.com/autonomousvision/carla_garage?tab=readme-ov-file#carla-leaderboard-20-validation-routes)
+- Generate scenario XML files [randomly](https://github.com/autonomousvision/CaRL/tree/main/CARLA#scenario-generation) and [manually](https://github.com/autonomousvision/carla_route_generator)
 
 Other helpful repositories:
-* [SimLingo](https://github.com/RenzKa/simlingo), [PlanT2](https://github.com/autonomousvision/plant2), [Bench2Drive Leaderboard](https://github.com/autonomousvision/Bench2Drive-Leaderboard), [Bench2Drive](https://github.com/Thinklab-SJTU/Bench2Drive/), [CaRL](https://github.com/autonomousvision/CaRL)
+
+- [SimLingo](https://github.com/RenzKa/simlingo), [PlanT2](https://github.com/autonomousvision/plant2), [Bench2Drive Leaderboard](https://github.com/autonomousvision/Bench2Drive-Leaderboard), [Bench2Drive](https://github.com/Thinklab-SJTU/Bench2Drive/), [CaRL](https://github.com/autonomousvision/CaRL)
 
 E2E self-driving research:
-* [Why study self-driving?](https://emergeresearch.substack.com/p/why-study-self-driving?triedRedirect=true)
-* [End-to-end Autonomous Driving: Challenges and Frontiers](https://arxiv.org/abs/2306.16927)
-* [Common Mistakes in Benchmarking Autonomous Driving](https://github.com/autonomousvision/carla_garage/blob/leaderboard_2/docs/common_mistakes_in_benchmarking_ad.md)
+
+- [Why study self-driving?](https://emergeresearch.substack.com/p/why-study-self-driving?triedRedirect=true) A timely perspective given recent commercial deployments of autonomous taxi services.
+- [End-to-end Autonomous Driving: Challenges and Frontiers](https://arxiv.org/abs/2306.16927) A comprehensive introductory survey of the field.
+- [Common Mistakes in Benchmarking Autonomous Driving](https://github.com/autonomousvision/carla_garage/blob/leaderboard_2/docs/common_mistakes_in_benchmarking_ad.md) Common pitfalls to avoid when evaluating autonomous driving systems.
 
 ## Acknowledgements
 
-Special thanks to [carla_garage](https://github.com/autonomousvision/carla_garage) for the foundational codebase. We also thank the creators of the numerous open-source projects we use.
+Special thanks to [carla_garage](https://github.com/autonomousvision/carla_garage) for the foundational codebase. We also thank the creators of the numerous open-source projects we use:
 
-* [PDM-Lite](https://github.com/OpenDriveLab/DriveLM/blob/DriveLM-CARLA/pdm_lite/docs/report.pdf), [leaderboard](https://github.com/carla-simulator/leaderboard), [scenario_runner](https://github.com/carla-simulator/scenario_runner), [NAVSIM](https://github.com/autonomousvision/navsim), [Waymo Open Dataset](https://github.com/waymo-research/waymo-open-dataset)
+- [PDM-Lite](https://github.com/OpenDriveLab/DriveLM/blob/DriveLM-CARLA/pdm_lite/docs/report.pdf), [leaderboard](https://github.com/carla-simulator/leaderboard), [scenario_runner](https://github.com/carla-simulator/scenario_runner), [NAVSIM](https://github.com/autonomousvision/navsim), [Waymo Open Dataset](https://github.com/waymo-research/waymo-open-dataset)
 
-Long Nguyen led development of the project. Kashyap Chitta, Bernhard Jaeger, and Andreas Geiger contributed through technical discussion and advisory feedback.
+Long Nguyen led development of the project. Kashyap Chitta, Bernhard Jaeger, and Andreas Geiger contributed through technical discussion and advisory feedback. Daniel Dauner provided guidance with NAVSIM.
 
 ## Citation
 

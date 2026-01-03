@@ -1,14 +1,15 @@
-import copy
 import logging
 import os
 import pathlib
-from collections import deque
 from functools import cached_property
 
 import carla
 import cv2
+import jaxtyping as jt
 import numpy as np
-from agents.navigation.local_planner import LocalPlanner, RoadOption
+import numpy.typing as npt
+from agents.navigation.local_planner import RoadOption
+from autoagents import autonomous_agent_local
 from beartype import beartype
 from leaderboard.autoagents import autonomous_agent
 from privileged_route_planner import PrivilegedRoutePlanner
@@ -16,183 +17,74 @@ from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
 
 import lead.common.common_utils as common_utils
 import lead.expert.expert_utils as pdm_lite_utils
-from lead.common import constants, ransac
 from lead.common.base_agent import BaseAgent
 from lead.common.constants import TransfuserSemanticSegmentationClass
-from lead.common.kinematic_bicycle_model import KinematicBicycleModel
-from lead.common.pid_controller import ExpertLateralPIDController, ExpertLongitudinalController
-from lead.common.route_planner import RoutePlanner
-from lead.common.sensor_setup import av_sensor_setup
+from lead.expert import expert_utils
 from lead.expert.expert_utils import step_cached_property
-from lead.expert.hdmap.chauffeurnet import ObsManager
-from lead.expert.hdmap.run_stop_sign import RunStopSign
 
 LOG = logging.getLogger(__name__)
 
 
-class ExpertBase(BaseAgent):
+class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
+    @beartype
     def expert_setup(
         self, path_to_conf_file: str, route_index: str | None = None, traffic_manager: carla.TrafficManager | None = None
     ):
-        """
-        Set up the autonomous agent for the CARLA simulation.
-
-        Args:
-            path_to_conf_file: Path to the configuration file.
-            route_index: Index of the route to follow.
-            traffic_manager: The traffic manager object.
-        """
         LOG.info("Setup")
+        self.initialized = False
 
         self.recording = False
-        self.track = autonomous_agent.Track.MAP
         self.config_path = path_to_conf_file
         self.step = -1
-        self.initialized = False
         self.save_path = None
         self.route_index = route_index
-        # Dynamics models
-        self.ego_model = KinematicBicycleModel(self.config_expert)
-        self.vehicle_model = KinematicBicycleModel(self.config_expert)
-
-        # To avoid failing the ActorBlockedTest, the agent has to move at least 0.1 m/s every 179 ticks
-        self.waiting_ticks_at_stop_sign = 0
-        self.ego_blocked_for_ticks = 0
-
-        # Controllers
-        self._turn_controller = ExpertLateralPIDController(self.config_expert)
-
+        self.scenario_name = pathlib.Path(path_to_conf_file).parent.name
         self.list_traffic_lights: list[tuple[carla.TrafficLight, carla.Location, list[carla.Waypoint]]] = []
-
-        # Initialize controls
-        self.steer = 0.0
-        self.throttle = 0.0
-        self.brake = 0.0
-
-        self.perturbation_translation = 0
-        self.perturbation_rotation = 0
-
-        # Angle to the next waypoint, normalized in [-1, 1] corresponding to [-90, 90]
-        self.remaining_route = None  # Remaining route
         self.close_traffic_lights: list[tuple[carla.TrafficLight, carla.BoundingBox, carla.TrafficLightState, int, bool]] = []
         self.close_stop_signs = []
-        self.was_at_stop_sign = False
-        self.cleared_stop_sign = False
-        self.visible_walker_ids = []
-        self.walker_past_pos = {}  # Position of walker in the last frame
 
-        self._vehicle_lights = carla.VehicleLightState.Position | carla.VehicleLightState.LowBeam
+        self.track = autonomous_agent.Track.MAP
+        # Privileged access
+        self.ego_vehicle: carla.Actor = CarlaDataProvider.get_hero_actor()
+        self.carla_world: carla.World = self.ego_vehicle.get_world()
+        self.carla_world_map: carla.Map = CarlaDataProvider.get_map()
 
-        # Get the world map and the ego vehicle
-        self.world_map = CarlaDataProvider.get_map()
-
-        # Set up the save path if specified
-        if os.environ.get("SAVE_PATH", None) is not None:
-            string = os.environ.get("TOWN", "999")
-            string += "_Rep" + os.environ.get("REPETITION", "-1")
-            string += f"_{self.route_index}"
-
-            self.save_path = pathlib.Path(os.environ["SAVE_PATH"]) / string
-            self.save_path.mkdir(parents=True, exist_ok=False)
-
-            if self.config_expert.datagen:
-                (self.save_path / "metas").mkdir()
-
-        # Store metas to update acceleration with forward difference after finishing route
-        self.metas = []
-        self.transform_queue = deque(maxlen=self.config_expert.ego_num_temporal_data_points_saved + 1)
-        self.pdm_lite_id = pdm_lite_utils.NegativeIdCounter()
-        self.tm = traffic_manager
-
-        self.scenario_name = pathlib.Path(path_to_conf_file).parent.name
-        self.cutin_vehicle_starting_position = None
-
-        if self.save_path is not None and self.config_expert.datagen:
-            (self.save_path / "lidar").mkdir()
-            (self.save_path / "rgb").mkdir()
-            if self.config_expert.save_camera_pc:
-                (self.save_path / "camera_pc").mkdir()
-                if self.config_expert.perturbate_sensors:
-                    (self.save_path / "camera_pc_perturbated").mkdir()
-            if self.config_expert.perturbate_sensors:
-                (self.save_path / "rgb_perturbated").mkdir()
-            (self.save_path / "semantics").mkdir()
-            if self.config_expert.perturbate_sensors:
-                (self.save_path / "semantics_perturbated").mkdir()
-            if self.config_expert.save_depth:
-                (self.save_path / "depth").mkdir()
-                if self.config_expert.perturbate_sensors:
-                    (self.save_path / "depth_perturbated").mkdir()
-            (self.save_path / "hdmap").mkdir()
-            if self.config_expert.perturbate_sensors:
-                (self.save_path / "hdmap_perturbated").mkdir()
-            (self.save_path / "bboxes").mkdir()
-            if self.config_expert.save_instance_segmentation:
-                (self.save_path / "instance").mkdir()
-                if self.config_expert.perturbate_sensors:
-                    (self.save_path / "instance_perturbated").mkdir()
-            if self.config_expert.use_radars:
-                (self.save_path / "radar").mkdir()
-                if self.config_expert.perturbate_sensors:
-                    (self.save_path / "radar_perturbated").mkdir()
-
-        self._active_traffic_light = None
-        self.weather_setting = "ClearNoon"
-        self.semantics_converter = np.uint8(list(constants.SEMANTIC_SEGMENTATION_CONVERTER.values()))
-
-    def expert_init(self, hd_map):
+    @beartype
+    def expert_init(self, hd_map: carla.Map | None):
         """
         Initialize the agent by setting up the route planner, longitudinal controller,
         command planner, and other necessary components.
 
         Args:
-            hd_map (carla.Map): The map object of the CARLA world.
+            hd_map: The map object of the CARLA world.
         """
         LOG.info("Init")
-        client = CarlaDataProvider.get_client()
-        if hd_map is None:
-            hd_map = client.get_world().get_map()
-        # Get the hero vehicle and the CARLA world
-        self._vehicle: carla.Actor = CarlaDataProvider.get_hero_actor()
-        self._world: carla.World = self._vehicle.get_world()
 
         # Check if the vehicle starts from a parking spot
-        distance_to_road = self.org_dense_route_world_coord[0][0].location.distance(self._vehicle.get_location())
+        distance_to_road = self.org_dense_route_world_coord[0][0].location.distance(self.ego_vehicle.get_location())
+
         # The first waypoint starts at the lane center, hence it's more than 2 m away from the center of the
         # ego vehicle at the beginning.
         starts_with_parking_exit = distance_to_road > 2
         LOG.info(f"Vehicle starts {'with' if starts_with_parking_exit else 'without'} parking exit.")
 
         # Set up the route planner and extrapolation
-        self._waypoint_planner = PrivilegedRoutePlanner(self.config_expert)
-        self._waypoint_planner.setup_route(
+        self.privileged_route_planner = PrivilegedRoutePlanner(self.config_expert)
+        self.privileged_route_planner.setup_route(
             self.org_dense_route_world_coord,
-            self._world,
-            self.world_map,
+            self.carla_world,
+            self.carla_world_map,
             starts_with_parking_exit,
-            self._vehicle.get_location(),
+            self.ego_vehicle.get_location(),
         )
-        self._waypoint_planner.save()
-        LOG.info(f"Route setup with {len(self._waypoint_planner.route_waypoints)} waypoints.")
-
-        # Set up the longitudinal controller and command planner
-        self._longitudinal_controller = ExpertLongitudinalController(self.config_expert)
-        self._command_planner = RoutePlanner(
-            self.config_expert.route_planner_min_distance, self.config_expert.route_planner_max_distance
-        )
-        self._command_planner.set_route(self._global_plan_world_coord)
-
-        self._command_planners_dict = {}
-        for dist in self.config_expert.tp_distances:
-            planner = RoutePlanner(dist, self.config_expert.route_planner_max_distance)
-            planner.set_route(self._global_plan_world_coord)
-            self._command_planners_dict[dist] = planner
+        self.privileged_route_planner.save()
+        LOG.info(f"Route setup with {len(self.privileged_route_planner.route_waypoints)} waypoints.")
 
         # Preprocess traffic lights
-        all_actors = self._world.get_actors()
+        all_actors = self.carla_world.get_actors()
         for actor in all_actors:
             if "traffic_light" in actor.type_id:
-                center, waypoints = pdm_lite_utils.get_traffic_light_waypoints(actor, self.world_map)
+                center, waypoints = expert_utils.get_traffic_light_waypoints(actor, self.carla_world_map)
                 self.list_traffic_lights.append((actor, center, waypoints))
 
         # Remove bugged 2-wheelers
@@ -203,205 +95,74 @@ class ExpertBase(BaseAgent):
                 if extent.x < 0.001 or extent.y < 0.001 or extent.z < 0.001:
                     actor.destroy()
 
-        # Use camera
-        if (
-            self.config_expert.save_3rd_person_camera
-            and (not self.config_expert.is_on_slurm or self.save_path is not None)
-            and not self.config_expert.eval_expert
-        ):
-            bp_lib = self._world.get_blueprint_library()
-            camera_bp = bp_lib.find("sensor.camera.rgb")
-            camera_bp.set_attribute("image_size_x", self.config_expert.camera_3rd_person_calibration["image_size_x"])
-            camera_bp.set_attribute("image_size_y", self.config_expert.camera_3rd_person_calibration["image_size_y"])
-            camera_bp.set_attribute("fov", self.config_expert.camera_3rd_person_calibration["fov"])
-            self._3rd_person_camera = self._world.spawn_actor(camera_bp, self.transform_3rd_person_camera)
+    @step_cached_property
+    def actors(self) -> carla.ActorList:
+        return self.carla_world.get_actors()
 
-            def _save_image(image):
-                frame = self.step // self.config_expert.data_save_freq
+    @step_cached_property
+    def leading_vehicle_ids(self):
+        return self.privileged_route_planner.compute_leading_vehicles(self.vehicles_inside_bev, self.ego_vehicle.id)
 
-                def _save(img, path):
-                    array = np.frombuffer(img.raw_data, dtype=np.uint8)
-                    array = copy.deepcopy(array)
-                    array = np.reshape(array, (img.height, img.width, 4))
-                    bgr = array[:, :, :3]
-                    cv2.imwrite(path, bgr)
+    @step_cached_property
+    def trailing_vehicle_ids(self):
+        return self.privileged_route_planner.compute_trailing_vehicles(self.vehicles_inside_bev, self.ego_vehicle.id)
 
-                if self.config_expert.is_on_slurm or self.save_path is not None:
-                    save_path_3rd_person = str(self.save_path / "3rd_person")
-                    os.makedirs(save_path_3rd_person, exist_ok=True)
-                    _save(image, os.path.join(save_path_3rd_person, f"{str(frame).zfill(4)}.jpg"))
+    @step_cached_property
+    def distance_to_next_traffic_light(self):
+        return self.privileged_route_planner.distances_to_next_traffic_lights[self.privileged_route_planner.route_index]
 
-                if not self.config_expert.is_on_slurm:
-                    save_path_3rd_person = self.config_expert.path_3rd_person_camera_save
-                    os.makedirs(save_path_3rd_person, exist_ok=True)
-                    _save(image, os.path.join(save_path_3rd_person, f"{str(self.step).zfill(4)}.png"))
+    @step_cached_property
+    def next_traffic_light(self):
+        return self.privileged_route_planner.next_traffic_lights[self.privileged_route_planner.route_index]
 
-            self._3rd_person_camera.listen(_save_image)
-        if self.config_expert.datagen:
-            self.shuffle_weather()
-        jpeg_storage_quality_distribution = self.config_expert.weather_jpeg_compression_quality[
-            self.weather_setting
-        ]  # key value: quality maps to probability
-        if self.config_expert.jpeg_compression:
-            self.jpeg_storage_quality = int(
-                np.random.choice(
-                    list(jpeg_storage_quality_distribution.keys()), p=list(jpeg_storage_quality_distribution.values())
-                )
-            )
-        else:
-            self.jpeg_storage_quality = 90
-        LOG.info(f"[DataAgent] Chose JPEG storage quality {self.jpeg_storage_quality}")
+    @step_cached_property
+    def distance_to_next_stop_sign(self):
+        return self.privileged_route_planner.distances_to_next_stop_signs[self.privileged_route_planner.route_index]
 
-        obs_config = {
-            "width_in_pixels": 256,  # self.config.lidar_resolution_width,
-            "pixels_ev_to_bottom": 32 * self.config_expert.pixels_per_meter,
-            "pixels_per_meter": self.config_expert.pixels_per_meter_collection,
-            "history_idx": [-1],
-            "scale_bbox": True,
-            "scale_mask_col": 1.0,
-            "map_folder": "maps_2ppm_cv",
-        }
-        if obs_config["width_in_pixels"] != self.config_expert.lidar_width_pixel:
-            LOG.warning("The BEV resolution is not the same as the LiDAR resolution. This might lead to unexpected results")
+    @step_cached_property
+    def next_stop_sign(self):
+        return self.privileged_route_planner.next_stop_signs[self.privileged_route_planner.route_index]
 
-        self.stop_sign_criteria = RunStopSign(self._world)
-        self.ss_bev_manager = ObsManager(obs_config, self.config_expert)
-        self.ss_bev_manager.attach_ego_vehicle(self._vehicle, criteria_stop=self.stop_sign_criteria)
+    @step_cached_property
+    def remaining_route(self):
+        return self.route_waypoints_np[self.config_expert.tf_first_checkpoint_distance :][
+            :: self.config_expert.points_per_meter
+        ]
 
-        if self.config_expert.perturbate_sensors:
-            self.ss_bev_manager_perturbated = ObsManager(obs_config, self.config_expert)
-            bb_copy = carla.BoundingBox(self._vehicle.bounding_box.location, self._vehicle.bounding_box.extent)
-            transform_copy = carla.Transform(
-                self._vehicle.get_transform().location,
-                self._vehicle.get_transform().rotation,
-            )
-            # Can't clone the carla vehicle object, so I use a dummy class with similar attributes.
-            self.perturbated_vehicle_dummy = pdm_lite_utils.CarlaActorDummy(
-                self._vehicle.get_world(), bb_copy, transform_copy, self._vehicle.id
-            )
-            self.ss_bev_manager_perturbated.attach_ego_vehicle(
-                self.perturbated_vehicle_dummy, criteria_stop=self.stop_sign_criteria
-            )
-
-        self._local_planner = LocalPlanner(self._vehicle, opt_dict={}, map_inst=self.world_map)
-        self.bounding_boxes = []
-        ransac.remove_ground(np.random.rand(1000, 3), self.config_expert, parallel=True)  # Pre-compile numba code
-
-        self.initialized = True
-
+    @step_cached_property
     @beartype
-    def is_actor_inside_bev(self, actor: carla.Actor) -> bool:
-        """
-        Check if actor is visible in TransFuser++'s planning visible range.
-        This is used to filter out actors that are not visible to TransFuser++'s
-        planning module even though they might be visible in the camera.
-        """
-        actor_in_ego = common_utils.get_relative_transform(self.ego_matrix, np.array(actor.get_transform().get_matrix()))
-        x_ego, y_ego, _ = actor_in_ego
-        return bool(
-            self.config_expert.min_x_meter - 2 < x_ego < self.config_expert.max_x_meter + 2
-            and self.config_expert.min_y_meter - 2 < y_ego < self.config_expert.max_y_meter + 2
-            and np.linalg.norm(actor_in_ego) < self.config_expert.bb_save_radius
+    def near_lane_change(self) -> bool:
+        route_points = self.route_waypoints_np
+        # Calculate the braking distance based on the ego velocity
+        braking_distance = (
+            ((self.ego_speed * 3.6) / 10.0) ** 2 / 2.0
+        ) + self.config_expert.braking_distance_calculation_safety_distance
+
+        # Determine the number of waypoints to look ahead based on the braking distance
+        look_ahead_points = max(
+            self.config_expert.minimum_lookahead_distance_to_compute_near_lane_change,
+            min(route_points.shape[0], self.config_expert.points_per_meter * int(braking_distance)),
         )
+        current_route_index = self.privileged_route_planner.route_index
+        max_route_length = len(self.privileged_route_planner.commands)
 
-    def update_3rd_person_camera(self):
-        """
-        Track ego with 3rd person camera.
-        """
-        if hasattr(self, "_3rd_person_camera") and self._3rd_person_camera.is_alive:
-            self._3rd_person_camera.set_transform(self.transform_3rd_person_camera)
+        from_index = max(0, current_route_index - self.config_expert.check_previous_distance_for_lane_change)
+        to_index = min(max_route_length - 1, current_route_index + look_ahead_points)
+        # Iterate over the points around the current position, checking for lane change commands
+        for i in range(from_index, to_index, 1):
+            if self.privileged_route_planner.commands[i] in (RoadOption.CHANGELANELEFT, RoadOption.CHANGELANERIGHT):
+                return True
 
-    def sensors(self):
-        """
-        Returns a list of sensor specifications for the ego vehicle.
-
-        Each sensor specification is a dictionary containing the sensor type,
-        reading frequency, position, and other relevant parameters.
-
-        Returns:
-            list: A list of sensor specification dictionaries.
-        """
-        result = []
-        if not self.config_expert.datagen:
-            result = [
-                {"type": "sensor.opendrive_map", "reading_frequency": 1e-6, "id": "hd_map"},
-                {
-                    "type": "sensor.other.imu",
-                    "x": 0.0,
-                    "y": 0.0,
-                    "z": 0.0,
-                    "roll": 0.0,
-                    "pitch": 0.0,
-                    "yaw": 0.0,
-                    "sensor_tick": 0.05,
-                    "id": "imu",
-                },
-                {"type": "sensor.speedometer", "reading_frequency": 20, "id": "speed"},
-                {
-                    "type": "sensor.other.gnss",
-                    "x": 0.0,
-                    "y": 0.0,
-                    "z": 0.0,
-                    "roll": 0.0,
-                    "pitch": 0.0,
-                    "yaw": 0.0,
-                    "sensor_tick": 0.01,
-                    "id": "gps",
-                },
-            ]
-
-        self.perturbation_translation, self.perturbation_rotation = pdm_lite_utils.sample_sensor_perturbation_parameters(
-            config=self.config_expert,
-            max_speed_limit_route=self.max_speed_limit_route,
-            min_lane_width_route=self.min_lane_width_route,
-        )
-
-        # --- Set up sensor rig ---
-        if self.save_path is not None and self.config_expert.datagen:
-            result += av_sensor_setup(
-                self.config_expert,
-                perturbation_rotation=self.perturbation_rotation,
-                perturbation_translation=self.perturbation_translation,
-                lidar=True,
-                perturbate=self.config_expert.perturbate_sensors,
-                sensor_agent=False,
-                radar=self.config_expert.use_radars,
-            )
-        else:
-            result.append(
-                {
-                    "type": "sensor.lidar.ray_cast",
-                    "x": self.config_expert.lidar_pos_1[0],
-                    "y": self.config_expert.lidar_pos_1[1],
-                    "z": self.config_expert.lidar_pos_1[2],
-                    "roll": self.config_expert.lidar_rot_1[0],
-                    "pitch": self.config_expert.lidar_rot_1[1],
-                    "yaw": self.config_expert.lidar_rot_1[2],
-                    "id": "lidar1",
-                },
-            )
-            if self.config_expert.use_two_lidars:
-                result.append(
-                    {
-                        "type": "sensor.lidar.ray_cast",
-                        "x": self.config_expert.lidar_pos_2[0],
-                        "y": self.config_expert.lidar_pos_2[1],
-                        "z": self.config_expert.lidar_pos_2[2],
-                        "roll": self.config_expert.lidar_rot_2[0],
-                        "pitch": self.config_expert.lidar_rot_2[1],
-                        "yaw": self.config_expert.lidar_rot_2[2],
-                        "id": "lidar2",
-                    },
-                )
-        return result
+        return False
 
     @cached_property
-    def min_lane_width_route(self):
-        self._vehicle = CarlaDataProvider.get_hero_actor()
-        self._world = self._vehicle.get_world()
+    @beartype
+    def min_lane_width_route(self) -> float:
+        self.ego_vehicle = CarlaDataProvider.get_hero_actor()
+        self.carla_world = self.ego_vehicle.get_world()
 
         global_plan = self.org_dense_route_world_coord
-        carla_map = self._world.get_map()
+        carla_map = self.carla_world.get_map()
         route_waypoints = [transform.location for transform, _ in global_plan]
         route_waypoints = [carla_map.get_waypoint(loc) for loc in route_waypoints]
         widths = []
@@ -411,21 +172,22 @@ class ExpertBase(BaseAgent):
         return max(min(widths), 2.75)
 
     @cached_property
-    def max_speed_limit_route(self):
-        self._vehicle = CarlaDataProvider.get_hero_actor()
-        self._world = self._vehicle.get_world()
+    @beartype
+    def max_speed_limit_route(self) -> float:
+        self.ego_vehicle = CarlaDataProvider.get_hero_actor()
+        self.carla_world = self.ego_vehicle.get_world()
         # Check if the vehicle starts from a parking spot
-        distance_to_road = self.org_dense_route_world_coord[0][0].location.distance(self._vehicle.get_location())
+        distance_to_road = self.org_dense_route_world_coord[0][0].location.distance(self.ego_vehicle.get_location())
         # The first waypoint starts at the lane center, hence it's more than 2 m away from the center of the
         # ego vehicle at the beginning.
         starts_with_parking_exit = distance_to_road > 2
         waypoint_planner = PrivilegedRoutePlanner(self.config_expert)
         waypoint_planner.setup_route(
             self.org_dense_route_world_coord,
-            self._world,
-            self.world_map,
+            self.carla_world,
+            self.carla_world_map,
             starts_with_parking_exit,
-            self._vehicle.get_location(),
+            self.ego_vehicle.get_location(),
         )
         way_point_planner = waypoint_planner
         waypoints = way_point_planner.route_waypoints
@@ -454,10 +216,15 @@ class ExpertBase(BaseAgent):
 
     @property
     def town(self):
-        return self._world.get_map().name.split("/")[-1]
+        return self.carla_world.get_map().name.split("/")[-1]
+
+    @cached_property
+    def rep(self):
+        return os.environ.get("REPETITION", "-1")
 
     @step_cached_property
-    def privileged_ego_past_positions(self):
+    @beartype
+    def privileged_ego_past_positions(self) -> list[list[float]]:
         ego_matrix_current = self.transform_queue[-1].get_matrix()
         T_world_to_current_ego = np.linalg.inv(ego_matrix_current)
         past_positions = []
@@ -469,60 +236,8 @@ class ExpertBase(BaseAgent):
         return past_positions
 
     @step_cached_property
-    def average_traffic_speed(self):
-        """
-        Average speed of traffic in the BEV.
-        """
-        if not self.initialized:
-            raise RuntimeError("Agent is not initialized. Call setup() first.")
-        speeds = []
-        for actor in self.vehicles_inside_bev:
-            if actor.id == self._vehicle.id:
-                continue
-            speed = self._get_actor_forward_speed(actor)
-            speeds.append(speed)
-        if len(speeds) > 0:
-            return np.mean(speeds)
-        return 0.0
-
-    @step_cached_property
-    def max_traffic_speed(self):
-        """
-        Maximum speed of traffic in the BEV.
-        """
-        if not self.initialized:
-            raise RuntimeError("Agent is not initialized. Call setup() first.")
-        speeds = []
-        for actor in self.vehicles_inside_bev:
-            if actor.id == self._vehicle.id:
-                continue
-            speed = self._get_actor_forward_speed(actor)
-            speeds.append(speed)
-        if len(speeds) > 0:
-            return np.max(speeds)
-        return 0.0
-
-    @step_cached_property
-    def max_adversarial_speed(self):
-        """
-        Maximum speed of adversarial actors in the BEV.
-        """
-        if not self.initialized:
-            raise RuntimeError("Agent is not initialized. Call setup() first.")
-        speeds = []
-        dangerous, safe, ignored = self.adversarial_actors_ids
-        for vehicle in self.vehicles_inside_bev:
-            if vehicle.id == self._vehicle.id:
-                continue
-            if vehicle.id in dangerous or vehicle.id in safe or vehicle.id in ignored:
-                speed = self._get_actor_forward_speed(vehicle)
-                speeds.append(speed)
-        if len(speeds) > 0:
-            return np.max(speeds)
-        return 0.0
-
-    @step_cached_property
-    def distance_to_intersection_index_ego(self):
+    @beartype
+    def distance_to_intersection_index_ego(self) -> float:
         """
         Returns the index of the intersection point in the route waypoints.
         If no intersection point is found, returns None.
@@ -540,26 +255,31 @@ class ExpertBase(BaseAgent):
                 "intersection_index_ego", None
             )
             if intersection_index_ego is not None:
-                return (intersection_index_ego - self._waypoint_planner.route_index) / self.config_expert.points_per_meter
+                return (
+                    intersection_index_ego - self.privileged_route_planner.route_index
+                ) / self.config_expert.points_per_meter
         return float("inf")
 
     @step_cached_property
-    def last_encountered_speed_limit_sign(self):
-        ret = self._vehicle.get_speed_limit()
+    @beartype
+    def last_encountered_speed_limit_sign(self) -> float:
+        ret = self.ego_vehicle.get_speed_limit()
         if ret is not None:
             ret /= 3.6
         return ret
 
     @step_cached_property
-    def speed_limit(self):
+    @beartype
+    def speed_limit(self) -> float:
         if self.last_encountered_speed_limit_sign is not None:
             return self.last_encountered_speed_limit_sign
         return 30.0 / 3.6
 
     @step_cached_property
-    def adversarial_actors_ids(self) -> None:
+    @beartype
+    def adversarial_actors_ids(self) -> tuple[list, list, list]:
         """
-        Return a list of:
+        Return a tuple of:
             - dangerous adversarial actors IDs: we should be very waried of them
             - safe adversarial actors IDs: we can treat their bounding boxes a bit smaller
             - ignored adversarial actors IDs: we can ignore them completely
@@ -569,7 +289,7 @@ class ExpertBase(BaseAgent):
             obstacle, direction = [
                 CarlaDataProvider.memory[self.current_active_scenario_type][key] for key in ["first_actor", "direction"]
             ]
-            source_lane = self.world_map.get_waypoint(
+            source_lane = self.carla_world_map.get_waypoint(
                 obstacle.get_location(), project_to_road=True, lane_type=carla.LaneType.Driving
             )
             target_lane = source_lane.get_right_lane() if direction == "left" else source_lane.get_left_lane()
@@ -583,7 +303,7 @@ class ExpertBase(BaseAgent):
                 source_lane = CarlaDataProvider.memory[self.current_active_scenario_type]["source_lane"]
                 if target_lane is None or source_lane is None:
                     bicycle_1 = CarlaDataProvider.memory[self.current_active_scenario_type]["bicycle_1"]
-                    source_lane = self.world_map.get_waypoint(
+                    source_lane = self.carla_world_map.get_waypoint(
                         bicycle_1.get_location(), project_to_road=True, lane_type=carla.LaneType.Driving
                     )
                     target_lane = source_lane.get_left_lane()
@@ -607,9 +327,9 @@ class ExpertBase(BaseAgent):
                 ):
                     target_lane = CarlaDataProvider.memory[scenario]["target_lane"]
                     for actor in self.vehicles_inside_bev:
-                        if actor.id == self._vehicle.id:
+                        if actor.id == self.ego_vehicle.id:
                             continue
-                        actor_lane = self.world_map.get_waypoint(
+                        actor_lane = self.carla_world_map.get_waypoint(
                             actor.get_location(), project_to_road=True, lane_type=carla.LaneType.Driving
                         )
                         if actor_lane and actor_lane.lane_id == target_lane.lane_id:
@@ -639,7 +359,7 @@ class ExpertBase(BaseAgent):
                 try:
                     if not self.is_actor_inside_bev(adversarial_actor):
                         continue
-                    adversarial_lane = self.world_map.get_waypoint(
+                    adversarial_lane = self.carla_world_map.get_waypoint(
                         adversarial_actor.get_location(), project_to_road=True, lane_type=carla.LaneType.Driving
                     )
                     if self.ego_lane_id != adversarial_lane.lane_id:
@@ -697,7 +417,7 @@ class ExpertBase(BaseAgent):
             opponent_traffic_route = CarlaDataProvider.memory[scenario]["opponent_traffic_route"]
             if opponent_traffic_route is None:
                 opponent_traffic_route = pdm_lite_utils.compute_global_route(
-                    world=self._world,
+                    world=self.carla_world,
                     source_location=source_wp.transform.location,
                     sink_location=sink_wp.transform.location,
                 )
@@ -712,7 +432,7 @@ class ExpertBase(BaseAgent):
                     points_b=opponent_traffic_route,
                 )
                 if intersection_index_ego is not None:
-                    intersection_index_ego += self._waypoint_planner.route_index
+                    intersection_index_ego += self.privileged_route_planner.route_index
                 CarlaDataProvider.memory[scenario]["intersection_index_ego"] = intersection_index_ego
                 CarlaDataProvider.memory[scenario]["intersection_point"] = intersection_point
 
@@ -725,7 +445,7 @@ class ExpertBase(BaseAgent):
                 ignored_adversarial_actors_ids = []
                 dangerous_adversarial_actors_ids = []
                 for adversarial_actor in CarlaDataProvider.memory[scenario]["adversarial_actors"]:
-                    if adversarial_actor.id == self._vehicle.id:
+                    if adversarial_actor.id == self.ego_vehicle.id:
                         continue
                     if adversarial_actor.id in safe_adversarial_actors_ids:
                         continue
@@ -853,7 +573,7 @@ class ExpertBase(BaseAgent):
         return [], [], []
 
     @step_cached_property
-    def rear_adversarial_actor(self):
+    def rear_adversarial_actor(self) -> carla.Actor | None:
         rear_adversarial_vehicle = None
         if (
             self.current_active_scenario_type
@@ -871,7 +591,7 @@ class ExpertBase(BaseAgent):
                 self.adversarial_actors_ids
             )
             for vehicle in self.vehicles_inside_bev:
-                if vehicle.id == self._vehicle.id:
+                if vehicle.id == self.ego_vehicle.id:
                     continue
                 if vehicle.id not in dangerous_adversarial_actors_ids and vehicle.id not in safe_adversarial_actors_ids:
                     continue
@@ -891,7 +611,7 @@ class ExpertBase(BaseAgent):
                 self.adversarial_actors_ids
             )
             for vehicle in self.vehicles_inside_bev:
-                if vehicle.id == self._vehicle.id:
+                if vehicle.id == self.ego_vehicle.id:
                     continue
                 if vehicle.id not in dangerous_adversarial_actors_ids:
                     continue
@@ -911,7 +631,7 @@ class ExpertBase(BaseAgent):
                 self.adversarial_actors_ids
             )
             for vehicle in self.vehicles_inside_bev:
-                if vehicle.id == self._vehicle.id:
+                if vehicle.id == self.ego_vehicle.id:
                     continue
                 if vehicle.id not in dangerous_adversarial_actors_ids:
                     continue
@@ -949,7 +669,7 @@ class ExpertBase(BaseAgent):
         return None
 
     @step_cached_property
-    def ego_lane_width(self):
+    def ego_lane_width(self) -> float:
         """
         Returns the width of the lane the ego vehicle is currently on.
         """
@@ -964,37 +684,44 @@ class ExpertBase(BaseAgent):
             y=self.config_expert.camera_3rd_person_calibration["y"],
             z=self.config_expert.camera_3rd_person_calibration["z"],
         )
-        world_camera_location = common_utils.get_world_coordinate_2d(self._vehicle.get_transform(), ego_camera_location)
+        world_camera_location = common_utils.get_world_coordinate_2d(self.ego_vehicle.get_transform(), ego_camera_location)
         return carla.Transform(
             world_camera_location,
             carla.Rotation(
                 pitch=self.config_expert.camera_3rd_person_calibration["pitch"],
-                yaw=self._vehicle.get_transform().rotation.yaw + self.config_expert.camera_3rd_person_calibration["yaw"],
+                yaw=self.ego_vehicle.get_transform().rotation.yaw + self.config_expert.camera_3rd_person_calibration["yaw"],
             ),
         )
 
     @step_cached_property
-    def ego_lane(self):
+    @beartype
+    def ego_lane(self) -> carla.Waypoint:
         """
         Returns the current lane of the ego vehicle as a CARLA waypoint.
         """
         if not self.initialized:
             raise RuntimeError("Agent is not initialized. Call setup() first.")
-        return self.world_map.get_waypoint(self._vehicle.get_location(), project_to_road=True, lane_type=carla.LaneType.Driving)
+        return self.carla_world_map.get_waypoint(
+            self.ego_vehicle.get_location(), project_to_road=True, lane_type=carla.LaneType.Driving
+        )
 
     @step_cached_property
-    def ego_lane_id(self):
+    def ego_lane_id(self) -> int:
         """
         Returns the current lane ID of the ego vehicle.
         """
         return self.ego_lane.lane_id
 
     @step_cached_property
-    def ego_location(self):
-        return self._vehicle.get_location()
+    def ego_transform(self) -> carla.Transform:
+        return self.ego_vehicle.get_transform()
+
+    @step_cached_property
+    def ego_location(self) -> carla.Location:
+        return self.ego_vehicle.get_location()
 
     @property
-    def ego_location_array(self):
+    def ego_location_array(self) -> jt.Float[npt.NDArray, " 3"]:
         """
         Returns the ego vehicle's location as a numpy array.
         """
@@ -1002,28 +729,29 @@ class ExpertBase(BaseAgent):
         return np.array([location.x, location.y, location.z])
 
     @step_cached_property
-    def ego_speed(self):
-        return self._vehicle.get_velocity().length()
+    def ego_speed(self) -> float:
+        return self.ego_vehicle.get_velocity().length()
 
     @step_cached_property
-    def ego_yaw_degree(self):
-        return self._vehicle.get_transform().rotation.yaw
+    def ego_yaw_degree(self) -> float:
+        return self.ego_vehicle.get_transform().rotation.yaw
 
     @step_cached_property
-    def ego_orientation_rad(self):
+    def ego_orientation_rad(self) -> float | None:
         return self.compass
 
     @property
-    def route_waypoints(self):
-        return self._waypoint_planner.route_waypoints[self._waypoint_planner.route_index :]
+    @beartype
+    def route_waypoints(self) -> list[carla.Waypoint]:
+        return self.privileged_route_planner.route_waypoints[self.privileged_route_planner.route_index :]
 
     @property
-    def route_waypoints_np(self):
-        return self._waypoint_planner.route_points[self._waypoint_planner.route_index :]
+    def route_waypoints_np(self) -> jt.Float[npt.NDArray, "N 3"]:
+        return self.privileged_route_planner.route_points[self.privileged_route_planner.route_index :]
 
     @property
-    def original_route_waypoints_np(self):
-        return self._waypoint_planner.original_route_points[self._waypoint_planner.route_index :]
+    def original_route_waypoints_np(self) -> jt.Float[npt.NDArray, "N 3"]:
+        return self.privileged_route_planner.original_route_points[self.privileged_route_planner.route_index :]
 
     @step_cached_property
     def signed_dist_to_lane_change(self) -> float:
@@ -1034,8 +762,8 @@ class ExpertBase(BaseAgent):
             float: Signed distance to the next lane change command. Positive if ahead, negative if behind.
             Inf if no lane change command found in proximity.
         """
-        route_points = self._waypoint_planner.route_points
-        current_index = self._waypoint_planner.route_index
+        route_points = self.privileged_route_planner.route_points
+        current_index = self.privileged_route_planner.route_index
         from_index = max(0, current_index - 250)
         to_index = min(len(route_points) - 1, current_index + 250)
         # Iterate over the points around the current position, checking for lane change commands
@@ -1054,7 +782,7 @@ class ExpertBase(BaseAgent):
 
         min_dist = np.inf
         for i in range(from_index, to_index, 1):
-            if self._waypoint_planner.commands[i] in (RoadOption.CHANGELANELEFT, RoadOption.CHANGELANERIGHT):
+            if self.privileged_route_planner.commands[i] in (RoadOption.CHANGELANELEFT, RoadOption.CHANGELANERIGHT):
                 considered_dist = dist(current_index, i)
                 if abs(considered_dist) < abs(min_dist):
                     min_dist = considered_dist
@@ -1062,29 +790,29 @@ class ExpertBase(BaseAgent):
         return min_dist / self.config_expert.points_per_meter
 
     @property
-    def ego_wp(self):
+    def ego_wp(self) -> carla.Waypoint:
         return self.route_waypoints[0]
 
     @step_cached_property
-    def ego_matrix(self):
-        return np.array(self._vehicle.get_transform().get_matrix())
+    def ego_matrix(self) -> jt.Float[npt.NDArray, "4 4"]:
+        return np.array(self.ego_vehicle.get_transform().get_matrix())
 
     @step_cached_property
-    def inv_ego_matrix(self):
+    def inv_ego_matrix(self) -> jt.Float[npt.NDArray, "4 4"]:
         return np.linalg.inv(self.ego_matrix)
 
     @property
-    def current_active_scenario_type(self):
+    def current_active_scenario_type(self) -> str | None:
         if len(CarlaDataProvider.active_scenarios) == 0:
             return None
         return CarlaDataProvider.active_scenarios[0][0]
 
     @property
-    def previous_active_scenario_type(self):
+    def previous_active_scenario_type(self) -> str | None:
         return CarlaDataProvider.previous_active_scenario
 
     @step_cached_property
-    def distance_to_construction_site(self):
+    def distance_to_construction_site(self) -> float:
         if self.current_active_scenario_type in [
             "ConstructionObstacle",
             "ConstructionObstacleTwoWays",
@@ -1102,11 +830,11 @@ class ExpertBase(BaseAgent):
             if num_cones > 0 and num_warning_traffic_signs > 0:
                 distances = np.array(distances)
                 distance = distances.mean()
-                return distance
+                return float(distance)
         return float("inf")
 
     @step_cached_property
-    def distance_to_scenario_obstacle(self):
+    def distance_to_scenario_obstacle(self) -> float:
         return min(
             [
                 self.distance_to_accident_site,
@@ -1117,7 +845,7 @@ class ExpertBase(BaseAgent):
         )
 
     @step_cached_property
-    def distance_to_accident_site(self):
+    def distance_to_accident_site(self) -> float:
         if self.current_active_scenario_type in ["Accident", "AccidentTwoWays"] or self.previous_active_scenario_type in [
             "Accident",
             "AccidentTwoWays",
@@ -1129,11 +857,11 @@ class ExpertBase(BaseAgent):
                     num_scenario_cars += 1
                     distances.append(actor.get_location().distance(self.ego_location))
             if num_scenario_cars > 0:
-                return np.mean(distances)
+                return float(np.mean(distances))
         return float("inf")
 
     @step_cached_property
-    def distance_to_parked_obstacle(self):
+    def distance_to_parked_obstacle(self) -> float:
         if self.current_active_scenario_type in [
             "ParkedObstacle",
             "ParkedObstacleTwoWays",
@@ -1145,11 +873,11 @@ class ExpertBase(BaseAgent):
                     num_scenario_cars += 1
                     distances.append(actor.get_location().distance(self.ego_location))
             if num_scenario_cars > 0:
-                return np.mean(distances)
+                return float(np.mean(distances))
         return float("inf")
 
     @step_cached_property
-    def distance_to_vehicle_opens_door(self):
+    def distance_to_vehicle_opens_door(self) -> float:
         if self.current_active_scenario_type in ["VehicleOpensDoorTwoWays"] or self.previous_active_scenario_type in [
             "VehicleOpensDoorTwoWays"
         ]:
@@ -1160,11 +888,11 @@ class ExpertBase(BaseAgent):
                     num_scenario_cars += 1
                     distances.append(actor.get_location().distance(self.ego_location))
             if num_scenario_cars > 0:
-                return np.mean(distances)
+                return float(np.mean(distances))
         return float("inf")
 
     @step_cached_property
-    def distance_to_cutin_vehicle(self):
+    def distance_to_cutin_vehicle(self) -> float:
         if not self.config_expert.datagen:
             return float("inf")
         if self.current_active_scenario_type in ["ParkingCutIn", "StaticCutIn", "HighwayCutIn"]:
@@ -1175,11 +903,11 @@ class ExpertBase(BaseAgent):
                     num_scenario_cars += 1
                     distances.append(actor.get_location().distance(self.ego_location))
             if num_scenario_cars > 0:
-                return np.mean(distances)
+                return float(np.mean(distances))
         return float("inf")
 
     @step_cached_property
-    def distance_to_pedestrian(self):
+    def distance_to_pedestrian(self) -> float:
         """
         Calculate the distance to the closest pedestrian within the BEV (Bird's Eye View) range.
 
@@ -1191,14 +919,14 @@ class ExpertBase(BaseAgent):
             return float("inf")
 
         # Get the location of the ego vehicle
-        ego_location = self._vehicle.get_location()
+        ego_location = self.ego_vehicle.get_location()
 
         # Find the closest pedestrian
         closest_pedestrian = min(pedestrians, key=lambda p: ego_location.distance(p.get_location()))
         return ego_location.distance(closest_pedestrian.get_location())
 
     @step_cached_property
-    def distance_to_biker(self):
+    def distance_to_biker(self) -> float:
         """
         Calculate the distance to the closest biker within the BEV (Bird's Eye View) range.
 
@@ -1210,14 +938,14 @@ class ExpertBase(BaseAgent):
             return float("inf")
 
         # Get the location of the ego vehicle
-        ego_location = self._vehicle.get_location()
+        ego_location = self.ego_vehicle.get_location()
 
         # Find the closest biker
         closest_biker = min(bikers, key=lambda b: ego_location.distance(b.get_location()))
         return ego_location.distance(closest_biker.get_location())
 
     @step_cached_property
-    def distance_to_road_discontinuity(self):
+    def distance_to_road_discontinuity(self) -> float:
         route_points = self.route_waypoints_np
         cumulative_dist = 0.0
         for i in range(min(len(route_points) - 1, self.config_expert.discontinuous_road_max_future_check) - 1):
@@ -1227,7 +955,7 @@ class ExpertBase(BaseAgent):
             cumulative_dist += dist
             if dist > self.config_expert.max_distance_between_future_route_points:
                 return cumulative_dist / self.config_expert.points_per_meter
-        return np.inf
+        return float(np.inf)
 
     @step_cached_property
     def route_left_length(self):
@@ -1261,8 +989,9 @@ class ExpertBase(BaseAgent):
         return total_curvature
 
     @step_cached_property
-    def vehicles_inside_bev(self):
-        vehicles = self._world.get_actors().filter("*vehicle*")
+    @beartype
+    def vehicles_inside_bev(self) -> list[carla.Actor]:
+        vehicles = self.carla_world.get_actors().filter("*vehicle*")
         vehicles = [vehicle for vehicle in vehicles if self.is_actor_inside_bev(vehicle)]
         if (
             self.config_expert.datagen and self.config_expert.vehicle_occlusion_check
@@ -1282,8 +1011,9 @@ class ExpertBase(BaseAgent):
         return vehicles
 
     @step_cached_property
-    def walkers_inside_bev(self):
-        walkers = self._world.get_actors().filter("*walker*")
+    @beartype
+    def walkers_inside_bev(self) -> list[carla.Actor]:
+        walkers = self.carla_world.get_actors().filter("*walker*")
         walkers = [walker for walker in walkers if self.is_actor_inside_bev(walker)]
         if self.config_expert.datagen:  # Can only perform occlusion check if we have sensor data
             walkers = [
@@ -1298,8 +1028,9 @@ class ExpertBase(BaseAgent):
         return walkers
 
     @step_cached_property
-    def bikers_inside_bev(self):
-        bikers = self._world.get_actors().filter("*vehicle*")
+    @beartype
+    def bikers_inside_bev(self) -> list[carla.Actor]:
+        bikers = self.carla_world.get_actors().filter("*vehicle*")
         bikers = [
             b
             for b in bikers
@@ -1321,7 +1052,7 @@ class ExpertBase(BaseAgent):
         return bikers
 
     @step_cached_property
-    def static_inside_bev(self):
+    def static_inside_bev(self) -> list[carla.Actor]:
         """
         Get static actors inside the BEV (Bird's Eye View) range.
         This includes traffic lights and other static objects that are not vehicles or walkers.
@@ -1329,14 +1060,15 @@ class ExpertBase(BaseAgent):
         Returns:
             list: A list of static actors inside the BEV.
         """
-        static_actors = self._world.get_actors().filter("*static*")
+        static_actors = self.carla_world.get_actors().filter("*static*")
         static_actors = [actor for actor in static_actors if self.is_actor_inside_bev(actor)]
         return static_actors
 
     @step_cached_property
-    def distance_to_next_junction(self):
-        ego_wp = self.world_map.get_waypoint(
-            self._vehicle.get_location(), project_to_road=True, lane_type=carla.libcarla.LaneType.Any
+    @beartype
+    def distance_to_next_junction(self) -> float:
+        ego_wp = self.carla_world_map.get_waypoint(
+            self.ego_vehicle.get_location(), project_to_road=True, lane_type=carla.libcarla.LaneType.Any
         )
         next_wps = pdm_lite_utils.wps_next_until_lane_end(ego_wp)
         try:
@@ -1353,10 +1085,11 @@ class ExpertBase(BaseAgent):
         else:
             distance_to_junction_ego = np.inf
 
-        return distance_to_junction_ego
+        return float(distance_to_junction_ego)
 
     @step_cached_property
-    def scenario_actors(self):
+    @beartype
+    def scenario_actors(self) -> list[carla.Actor]:
         ret = []
         for actor in self.vehicles_inside_bev + self.walkers_inside_bev + self.bikers_inside_bev:
             if "scenario" in actor.attributes["role_name"]:
@@ -1364,7 +1097,8 @@ class ExpertBase(BaseAgent):
         return ret
 
     @step_cached_property
-    def scenario_actors_ids(self):
+    @beartype
+    def scenario_actors_ids(self) -> list[int]:
         """
         Get the IDs of the scenario actors that are currently inside the BEV (Bird's Eye View) range.
 
@@ -1374,7 +1108,8 @@ class ExpertBase(BaseAgent):
         return [actor.id for actor in self.scenario_actors]
 
     @step_cached_property
-    def scenario_obstacles(self):
+    @beartype
+    def scenario_obstacles(self) -> list[carla.Actor]:
         ret = []
         scenarios = [
             "Accident",
@@ -1568,7 +1303,7 @@ class ExpertBase(BaseAgent):
     def second_highest_speed(self):
         speeds = []
         for vehicle in self.vehicles_inside_bev:
-            if vehicle.id == self._vehicle.id:
+            if vehicle.id == self.ego_vehicle.id:
                 continue
             speeds.append(vehicle.get_velocity().length())
         if len(speeds) == 0:
@@ -1582,7 +1317,7 @@ class ExpertBase(BaseAgent):
     def second_highest_speed_limit(self):
         speed_limits = []
         for vehicle in self.vehicles_inside_bev:
-            if vehicle.id == self._vehicle.id:
+            if vehicle.id == self.ego_vehicle.id:
                 continue
             speed_limits.append(vehicle.get_speed_limit() / 3.6)
         if len(speed_limits) == 0:

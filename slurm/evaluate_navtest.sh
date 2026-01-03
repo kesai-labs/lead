@@ -14,7 +14,7 @@ export NAVSIM_DEVKIT_ROOT="${LEAD_PROJECT_ROOT}/3rd_party/navsim_workspace/navsi
 export HYDRA_FULL_ERROR=1
 
 
-eval "$(../miniconda3/bin/conda shell.bash hook)"
+eval "$(conda shell.bash hook)"
 if [ -z "$CONDA_INTERPRETER" ]; then
     export CONDA_INTERPRETER="navsimv1.1" # Check if CONDA_INTERPRETER is not set, then set it to navsimv1.1
 fi

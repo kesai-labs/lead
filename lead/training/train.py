@@ -11,8 +11,8 @@ from tqdm import tqdm
 
 from lead.common.constants import SourceDataset
 from lead.common.logging_config import setup_logging
+from lead.data_loader.waymo_e2e_dataset import evaluate_waymo_e2e
 from lead.training import training_utils
-from lead.training.data_loader.waymo_e2e_dataset import evaluate_waymo_e2e
 from lead.training.logger import Logger
 
 matplotlib.use("Agg")  # non-GUI backend for headless servers
@@ -28,10 +28,9 @@ warnings.filterwarnings("ignore", category=ResourceWarning, message="Implicitly 
 
 class Trainer:
     def __init__(self):
-        # Loads the default values for the argparse so we have only one default
         self.config = training_utils.initialize_config()
 
-        self.ssd_cache = training_utils.initialize_cache(self.config)
+        self.ssd_cache = training_utils.initialize_training_session_cache(self.config)
         self.num_worker = training_utils.initialize_torch(self.config)
         self.model_wrapper, self.cur_epoch = training_utils.initialize_model(self.config)
         self.model = self.model_wrapper
@@ -75,6 +74,7 @@ class Trainer:
 
     @beartype
     def schedule_loss_weights(self, epoch: int):
+        """Schedule loss weights for different datasets based on the epoch."""
         self.detailed_loss_weights = {}
         if self.config.use_carla_data:
             carla_loss_weights = self.config.detailed_loss_weights(SourceDataset.CARLA, epoch)

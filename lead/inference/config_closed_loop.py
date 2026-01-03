@@ -44,14 +44,6 @@ class ClosedLoopConfig(OpenLoopConfig):
     # Adaptively reduce pop-distance if target points are dense
     sensor_agent_pop_distance_adaptive = True
 
-    # --- Stop Sign Heuristic ---
-    # If true enable stop sign controller
-    stop_sign_controller = True
-    # Distance threshold for stop sign controller activation
-    stop_sign_controller_dist_threshold = 1.0
-    # Cool down period for stop sign controller (frames)
-    stop_sign_controller_cool_down = 120
-
     # --- Creeping Heuristic ---
     # Number of frames after which the creep controller starts triggering (larger than red light wait time)
     sensor_agent_stuck_threshold = 1100
@@ -108,18 +100,6 @@ class ClosedLoopConfig(OpenLoopConfig):
     # If true use tuned aim distance for navigation
     tuned_aim_distance = False
 
-    # --- Evaluation Traffic Density Settings ---
-    # Amount of vehicles behind the ego
-    road_front_vehicles = 2
-    # Amount of vehicles behind the ego
-    road_back_vehicles = 2
-    # Distance between spawned vehicles [m]
-    opposite_spawn_dist = 40
-    # Distance from the ego to the opposite sources [m].
-    opposite_sources_dist = 80
-    # Maximum vehicles alive at the same time per source
-    junction_sources_max_actors = 6
-
     # --- Evaluation Visualization Settings ---
     # If true, set nice weather
     custom_weather = None  # e.g., "ClearNoon"
@@ -163,17 +143,6 @@ class ClosedLoopConfig(OpenLoopConfig):
         if self.is_on_slurm:
             return False
         return True
-
-    @property
-    def challenge_track(self):
-        """Get the challenge track type from environment."""
-        from leaderboard.autoagents import autonomous_agent
-
-        return (
-            autonomous_agent.Track.MAP
-            if os.environ.get("CHALLENGE_TRACK_CODENAME") == "MAP"
-            else autonomous_agent.Track.SENSORS
-        )
 
     @property
     def save_path(self):
@@ -225,14 +194,3 @@ class ClosedLoopConfig(OpenLoopConfig):
     def video_fps(self):
         """Calculate video FPS based on frame production frequency."""
         return 20 / self.produce_frame_frequency
-
-    def closed_loop_dict(self):
-        """Generate dictionary of all closed loop configuration properties."""
-        out = {}
-        for k, v in ClosedLoopConfig.__dict__.items():
-            if isinstance(v, property):
-                try:
-                    out[k] = getattr(self, k)
-                except Exception:
-                    pass
-        return out

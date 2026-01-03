@@ -1,7 +1,3 @@
-"""
-Config class that contains all the hyperparameters needed to build any model.
-"""
-
 from collections import defaultdict
 from functools import cached_property
 
@@ -22,6 +18,8 @@ def rgb(r, g, b):
 
 
 class ExpertConfig(BaseConfig):
+    """Configuration class for the expert driver in CARLA simulations."""
+
     def __init__(self):
         super().__init__()
         self.load_from_environment(
@@ -164,7 +162,7 @@ class ExpertConfig(BaseConfig):
         """If true shuffle weather conditions during training."""
         if self.is_on_slurm:
             return True
-        return False
+        return True
 
     @property
     def nice_weather(self):
@@ -178,7 +176,7 @@ class ExpertConfig(BaseConfig):
         """If true enable JPEG compression for image storage."""
         if self.is_on_slurm:
             return True
-        return False
+        return True
 
     @property
     def datagen(self):
@@ -512,20 +510,6 @@ class ExpertConfig(BaseConfig):
     # Transition smoothness distance for construction obstacle scenarios
     transition_smoothness_distance_construction_obstacle = int(10 * points_per_meter)
 
-    # --- Junction Scenarios ---
-    # If true use secured signalized junction left turn enter flow behavior
-    secured_signalized_junction_left_turn_enter_flow = True
-    # If true use secured non-signalized junction left turn enter flow behavior
-    secured_non_signalized_junction_left_turn_enter_flow = True
-    # If true use secured non-signalized junction left turn behavior
-    secured_non_signalized_junction_left_turn = True
-    # If true use secured signalized junction left turn behavior
-    secured_signalized_junction_left_turn = True
-    # If true use secured signalized junction right turn behavior
-    secured_signalized_junction_right_turn = True
-    # If true use secured non-signalized junction right turn behavior
-    secured_non_signalized_junction_right_turn = True
-
     # --- Privileged Route Planner ---
     # Maximum distance to search ahead for updating ego route index (meters)
     ego_vehicles_route_point_search_distance = 4 * points_per_meter
@@ -562,15 +546,15 @@ class ExpertConfig(BaseConfig):
 
     # --- Debug Configuration ---
     # If true allow any visualization during debugging
-    visualization_allowed = False
+    visualization_allowed = True
     # If true force debug visualization regardless of environment
-    forced_debug_visualization = False
+    forced_debug_visualization = True
     # Default bounding box size for traffic warning signs.
     traffic_warning_bb_size = [1.186714768409729, 1.4352929592132568]
     # Default bounding box size for construction cones.
     construction_cone_bb_size = [0.1720348298549652, 0.1720348298549652]
-    save_camera_pc = False
-    save_instance_segmentation = False
+    save_camera_pc = True
+    save_instance_segmentation = True
     eval_expert = False
 
     @property
@@ -650,81 +634,6 @@ class ExpertConfig(BaseConfig):
         }[DemoCameraOptions.PAPER_BEV]
 
     @property
-    def visualize_bb_ids(self):
-        """If true visualize bounding box IDs during debugging."""
-        if not self.visualization_allowed:
-            return False
-        if self.forced_debug_visualization:
-            return True
-        if self.is_on_slurm:
-            return False
-        return False
-
-    @property
-    def visualize_target_points(self):
-        """If true visualize target points during debugging."""
-        if not self.visualization_allowed:
-            return False
-        if self.forced_debug_visualization:
-            return True
-        if self.is_on_slurm:
-            return False
-        return False
-
-    @property
-    def visualize_route(self):
-        if not self.visualization_allowed:
-            return False
-        if self.forced_debug_visualization:
-            return True
-        if self.is_on_slurm:
-            return False
-        return False
-
-    @property
-    def visualize_original_route(self):
-        """If true visualize the original route."""
-        if not self.visualization_allowed:
-            return False
-        if self.forced_debug_visualization:
-            return True
-        if self.is_on_slurm:
-            return False
-        return False
-
-    @property
-    def visualize_internal_data(self):
-        if not self.visualization_allowed:
-            return False
-        if self.forced_debug_visualization:
-            return True
-        if self.is_on_slurm:
-            return False
-        return False
-
-    @property
-    def visualize_bounding_boxes(self):
-        """If true bounding boxes should be visualized."""
-        if not self.visualization_allowed:
-            return False
-        if self.forced_debug_visualization:
-            return True
-        if self.is_on_slurm:
-            return False
-        return False
-
-    @property
-    def visualize_traffic_lights_bounding_boxes(self):
-        """If true traffic light bounding boxes should be visualized."""
-        if not self.visualization_allowed:
-            return False
-        if self.forced_debug_visualization:
-            return True
-        if self.is_on_slurm:
-            return False
-        return False
-
-    @property
     def visualize_source_lane(self):
         """If true source lane should be visualized."""
         if not self.visualization_allowed:
@@ -779,6 +688,81 @@ class ExpertConfig(BaseConfig):
             return False
         return False
 
+    @property
+    def visualize_target_points(self):
+        """If true visualize target points during debugging."""
+        if not self.visualization_allowed:
+            return False
+        if self.forced_debug_visualization:
+            return True
+        if self.is_on_slurm:
+            return False
+        return False
+
+    @property
+    def visualize_route(self):
+        if not self.visualization_allowed:
+            return False
+        if self.forced_debug_visualization:
+            return True
+        if self.is_on_slurm:
+            return False
+        return False
+
+    @property
+    def visualize_original_route(self):
+        """If true visualize the original route."""
+        if not self.visualization_allowed:
+            return False
+        if self.forced_debug_visualization:
+            return True
+        if self.is_on_slurm:
+            return False
+        return False
+
+    @property
+    def visualize_bb_ids(self):
+        """If true visualize bounding box IDs during debugging."""
+        if not self.visualization_allowed:
+            return False
+        if self.forced_debug_visualization:
+            return True
+        if self.is_on_slurm:
+            return False
+        return False
+
+    @property
+    def visualize_internal_data(self):
+        if not self.visualization_allowed:
+            return False
+        if self.forced_debug_visualization:
+            return True
+        if self.is_on_slurm:
+            return False
+        return False
+
+    @property
+    def visualize_bounding_boxes(self):
+        """If true bounding boxes should be visualized."""
+        if not self.visualization_allowed:
+            return False
+        if self.forced_debug_visualization:
+            return True
+        if self.is_on_slurm:
+            return False
+        return False
+
+    @property
+    def visualize_traffic_lights_bounding_boxes(self):
+        """If true traffic light bounding boxes should be visualized."""
+        if not self.visualization_allowed:
+            return False
+        if self.forced_debug_visualization:
+            return True
+        if self.is_on_slurm:
+            return False
+        return False
+
     # --- Discontinuous Road Configuration ---
     # Handles scenarios where road continuity is interrupted
 
@@ -806,9 +790,6 @@ class ExpertConfig(BaseConfig):
     # Maximum future points to consider
     high_road_curvature_max_future_points = 20 * points_per_meter
 
-    # Curvature threshold for speed reduction
-    high_road_curvature_threshold = 0.8
-
     # Maximum speed in high curvature areas
     high_road_curvature_max_speed = 12.5
 
@@ -824,11 +805,6 @@ class ExpertConfig(BaseConfig):
         return False
 
     @property
-    def path_3rd_person_camera_save(self):
-        """Path where 3rd person camera images are saved."""
-        return "data/carla_today/3rd_person/"
-
-    @property
     def save_depth(self):
         """If true depth images should be saved."""
         if self.is_on_slurm:
@@ -842,21 +818,6 @@ class ExpertConfig(BaseConfig):
 
     # Use instance segmentation instead of semantic
     replace_semantics_segmentation_with_instance_segmentation = True
-
-    # Avoid rear collisions when entering actor flow
-    avoid_rear_collision_enter_actor_flow = True
-
-    # Enhanced rear collision avoidance v2
-    avoid_rear_collision_enter_actor_flow_v2 = True
-
-    # Rear collision avoidance for interurban scenarios
-    avoid_rear_collision_interurban_advanced_actor_flow = True
-
-    # Avoid collisions with red light runners
-    avoid_rear_collision_opposite_vehicle_running_red_light = True
-
-    # Avoid collisions with priority vehicles
-    avoid_rear_collision_opposite_vehicle_taking_priority = True
 
     # JPEG quality for 3rd person camera images
     jpg_quality_3rd_person = 100

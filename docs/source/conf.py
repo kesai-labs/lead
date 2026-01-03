@@ -34,12 +34,33 @@ source_suffix = {
     ".md": "markdown",
 }
 
+# MyST Parser configuration
+myst_enable_extensions = [
+    "colon_fence",
+    "deflist",
+    "dollarmath",
+    "amsmath",
+]
+
+# Enable line numbers for code blocks
+myst_number_code_blocks = ["bash", "python", "yaml", "json"]
+
+# Enable section numbering
+html_secnumber_suffix = " "
+numfig = True
+numfig_secnum_depth = 2
+
 templates_path = ["_templates"]
 exclude_patterns = []
 
 # -- Options for HTML output -------------------------------------------------
 html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static", "../assets"]
+
+# Theme options for section numbering
+html_theme_options = {
+    "navigation_depth": 4,
+}
 
 # -- Extension configuration -------------------------------------------------
 

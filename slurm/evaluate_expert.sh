@@ -12,7 +12,7 @@ shopt -s globstar
 set -e
 
 # Set up interpreter
-eval "$(../miniconda3/bin/conda shell.bash hook)"
+eval "$(conda shell.bash hook)"
 if [ -z "$CONDA_INTERPRETER" ]; then
     export CONDA_INTERPRETER="lead" # Check if CONDA_INTERPRETER is not set, then set it to lead
 fi

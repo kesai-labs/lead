@@ -24,6 +24,8 @@ from lead.common.logging_config import setup_logging
 from lead.common.route_planner import RoutePlanner
 from lead.common.sensor_setup import av_sensor_setup
 from lead.common.visualizer import Visualizer
+from lead.data_loader import carla_dataset_utils, training_cache
+from lead.data_loader.carla_dataset_utils import rasterize_lidar
 from lead.expert import expert_utils
 from lead.inference.closed_loop_inference import (
     ClosedLoopInference,
@@ -31,8 +33,6 @@ from lead.inference.closed_loop_inference import (
 )
 from lead.inference.config_closed_loop import ClosedLoopConfig
 from lead.training.config_training import TrainingConfig
-from lead.training.data_loader import carla_dataset_utils
-from lead.training.data_loader.carla_dataset_utils import rasterize_lidar
 
 matplotlib.use("Agg")  # non-GUI backend for headless servers
 
@@ -75,7 +75,7 @@ DEMO_CAMERAS = [
 assert len(DEMO_CAMERAS) == 2, "Expected exactly two demo cameras."
 
 
-def get_entry_point():
+def get_entry_point():  # dead: disable
     return "SensorAgent"
 
 
@@ -445,6 +445,7 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
 
         Args:
             input_data: The input data containing sensor information and state. Will be fed into model.
+            pop_distance: Distance threshold to pop waypoints from the route planner.
         """
         planner: RoutePlanner = self.gps_waypoint_planners_dict[pop_distance]
 
@@ -549,10 +550,10 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         input_data["rasterized_lidar"] = rasterize_lidar(config=self.training_config, lidar=lidar[:, :3])[..., None]
 
         # Simulate training time compression to avoid train-test mismatch
-        input_data["rasterized_lidar"] = carla_dataset_utils.compress_float_image(
+        input_data["rasterized_lidar"] = training_cache.compress_float_image(
             input_data["rasterized_lidar"], self.training_config
         )
-        input_data["rasterized_lidar"] = carla_dataset_utils.decompress_float_image(input_data["rasterized_lidar"]).squeeze()[
+        input_data["rasterized_lidar"] = training_cache.decompress_float_image(input_data["rasterized_lidar"]).squeeze()[
             None, None
         ]
 
@@ -754,6 +755,7 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
             temp_path: Path to the uncompressed video.
             final_path: Path to save the compressed video.
             crf: Constant Rate Factor for ffmpeg compression (lower is better quality).
+            preset: Preset for ffmpeg compression speed/quality trade-off.
         """
         # Check if ffmpeg is installed
         command = f"ffmpeg -i {final_path} -c:v libx264 -crf {crf} -preset {preset} -an {temp_path} -y"

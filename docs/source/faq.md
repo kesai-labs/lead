@@ -1,40 +1,52 @@
 # FAQ
 
-## I reproduced the results with the provided checkpoints but get different results
+Additional documentation:
 
-CARLA evaluation can be volatile, and results may differ between runs. Based on our empirical observations, typical variations are around 1-2 DS on Bench2Drive, 5-7 DS on Longest6 v2, and 1.0 DS on Town13. These are rough estimates from our experience and not strict guarantees—actual variation depends on many factors including randomness.
+- [scenario_runner](https://scenario-runner.readthedocs.io/en/latest/FAQ/)
+- [carla](https://carla.readthedocs.io/en/latest/build_faq/)
+- [leaderboard](https://leaderboard.carla.org/help/)
 
-## Why do we have so many version of `leaderboard` and `scenario_runner`?
+## I get different results when reproducing the provided checkpoints
 
-Each benchmark has its own evaluation protocol and needs its own forks of those two repositories. Expert data collector also needs its own fork.
+CARLA evaluation results vary between runs. Typical variations we observe: ~1-2 DS on Bench2Drive, ~5-7 DS on Longest6 v2, ~1.0 DS on Town13. These are empirical estimates and actual variance depends on system configuration and randomness.
+
+## Why are there multiple versions of `leaderboard` and `scenario_runner`?
+
+Each benchmark requires its own evaluation protocol, which means separate forks of those repositories. The expert data collector also uses its own fork.
 
 ## How do I create more routes?
 
-See [carla_route_generator](https://github.com/autonomousvision/carla_route_generator). Also, see Section 5 of [LEAD's supplemental](https://ln2697.github.io/assets/pdf/Nguyen2026LEADSUPP.pdf).
+See [carla_route_generator](https://github.com/autonomousvision/carla_route_generator) and [LEAD's supplemental](https://ln2697.github.io/assets/pdf/Nguyen2026LEADSUPP.pdf).
 
-## Can I see a list of modifications applied to `leaderboard` and `scenario_runner`?
+## Where can I see the modifications to `leaderboard` and `scenario_runner`?
 
-We maintain custom forks of CARLA evaluation tools with our modifications:
-* [scenario_runner_autopilot](https://github.com/ln2697/scenario_runner_autopilot), [leaderboard_autopilot](https://github.com/ln2697/leaderboard_autopilot), [Bench2Drive](https://github.com/ln2697/Bench2Drive), [scenario_runner](https://github.com/ln2697/scenario_runner), [leaderboard](https://github.com/ln2697/leaderboard)
+Our forks with modifications:
 
-## Which TransFuser versions are there?
+- [scenario_runner_autopilot](https://github.com/ln2697/scenario_runner_autopilot)
+- [leaderboard_autopilot](https://github.com/ln2697/leaderboard_autopilot)
+- [Bench2Drive](https://github.com/ln2697/Bench2Drive)
+- [scenario_runner](https://github.com/ln2697/scenario_runner)
+- [leaderboard](https://github.com/ln2697/leaderboard)
 
-See this [list](https://github.com/autonomousvision/carla_garage/blob/main/docs/history.md).
+## Which TransFuser versions are available?
 
-## How often does CARLA crash or fail to start?
+See [this list](https://github.com/autonomousvision/carla_garage/blob/main/docs/history.md).
 
-In our experience, roughly 10% of CARLA launch attempts may fail, though this varies by system. Common issues include startup hangs, port conflicts, or GPU initialization problems. This is normal behavior with CARLA.
+## How often does CARLA fail to start?
 
-**What to do:**
-- Use `bash scripts/clean_carla.sh` to clean up zombie processes
-- Restart CARLA with `bash scripts/start_carla.sh`
-- Check that ports 2000-2002 aren't in use
-- For Docker: `docker compose restart carla`
+Roughly 10% of launch attempts may fail due to startup hangs, port conflicts, or GPU initialization issues. This is typical CARLA behavior.
 
-## How to add custom scenarios to CARLA?
+**Recovery steps:**
 
-See [this](https://github.com/autonomousvision/lead/tree/main/3rd_party/scenario_runner_autopilot/srunner/scenarios).
+- Clean zombie processes: `bash scripts/clean_carla.sh`
+- Restart: `bash scripts/start_carla.sh`
+- Verify ports 2000-2002 are available
+- Docker: `docker compose restart carla`
 
-## How does expert access to scenario's specific data?
+## How do I add custom scenarios?
 
-See [this](https://github.com/autonomousvision/lead/blob/main/3rd_party/scenario_runner_autopilot/srunner/scenariomanager/carla_data_provider.py).
+See [3rd_party/scenario_runner_autopilot/srunner/scenarios](https://github.com/autonomousvision/lead/tree/main/3rd_party/scenario_runner_autopilot/srunner/scenarios).
+
+## How does the expert access scenario-specific data?
+
+See [3rd_party/scenario_runner_autopilot/srunner/scenariomanager/carla_data_provider.py](https://github.com/autonomousvision/lead/blob/main/3rd_party/scenario_runner_autopilot/srunner/scenariomanager/carla_data_provider.py).

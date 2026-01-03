@@ -16,31 +16,10 @@ from gym import spaces
 from lead.expert.hdmap.obs_manager import ObsManagerBase
 from lead.expert.hdmap.traffic_light import TrafficLightHandler
 
-COLOR_BLACK = (0, 0, 0)
-COLOR_RED = (255, 0, 0)
-COLOR_GREEN = (0, 255, 0)
-COLOR_BLUE = (0, 0, 255)
-COLOR_CYAN = (0, 255, 255)
 COLOR_MAGENTA = (255, 0, 255)
 COLOR_MAGENTA_2 = (255, 140, 255)
-COLOR_YELLOW = (255, 255, 0)
-COLOR_YELLOW_2 = (160, 160, 0)
 COLOR_WHITE = (255, 255, 255)
-COLOR_GREY = (128, 128, 128)
-COLOR_ALUMINIUM_0 = (238, 238, 236)
-COLOR_ALUMINIUM_3 = (136, 138, 133)
 COLOR_ALUMINIUM_5 = (46, 52, 54)
-
-
-def tint(color, factor):
-    r, g, b = color
-    r = int(r + (255 - r) * factor)
-    g = int(g + (255 - g) * factor)
-    b = int(b + (255 - b) * factor)
-    r = min(r, 255)
-    g = min(g, 255)
-    b = min(b, 255)
-    return (r, g, b)
 
 
 class ObsManager(ObsManagerBase):
@@ -103,27 +82,6 @@ class ObsManager(ObsManagerBase):
         self._distance_threshold = np.ceil(self._width / self._pixels_per_meter)
 
         TrafficLightHandler.reset(self._world)
-
-    def get_road(self):
-        """
-        :return: Return an image of the road in LiDAR coordinates with alpha channel for visualization
-        """
-        ev_transform = self.vehicle.get_transform()
-        ev_loc = ev_transform.location
-        ev_rot = ev_transform.rotation
-        m_warp = self._get_warp_transform(ev_loc, ev_rot)
-        # road_mask, lane_mask
-        road_mask = cv.warpAffine(self._road, m_warp, (self._width, self._width)).astype(bool)
-        lane_mask_all = cv.warpAffine(self._lane_marking_all, m_warp, (self._width, self._width)).astype(bool)
-        lane_mask_broken = cv.warpAffine(self._lane_marking_white_broken, m_warp, (self._width, self._width)).astype(bool)
-        image = np.zeros([self._width, self._width, 4], dtype=np.float32)
-        alpha = 0.33
-        image[road_mask] = (40, 40, 40, 0.1)
-        image[lane_mask_all] = (255, 255, 0, alpha)
-        image[lane_mask_broken] = (255, 255, 0, alpha)
-        image = np.rot90(image, k=-1)  # Align with LiDAR coordinate system
-
-        return image
 
     def get_observation(self, close_traffic_lights=None):
         ev_transform = self.vehicle.get_transform()
@@ -209,12 +167,3 @@ class ObsManager(ObsManagerBase):
         else:
             p = np.array([x, y], dtype=np.float32)
         return p
-
-    def _world_to_pixel_width(self, width):
-        """Converts the world units to pixel units"""
-        return self._pixels_per_meter * width
-
-    def clean(self):
-        self.vehicle = None
-        self._world = None
-        self._history_queue.clear()

@@ -8,8 +8,6 @@ from collections import deque
 import carla
 import numpy as np
 
-import lead.expert.hdmap.transforms as trans_utils
-
 
 def _get_traffic_light_waypoints(traffic_light, carla_map):
     """
@@ -121,98 +119,3 @@ class TrafficLightHandler:
                 TrafficLightHandler.list_junction_paths.append(junction_paths)
 
                 TrafficLightHandler.num_tl += 1
-
-    @staticmethod
-    def get_light_state(vehicle, offset=0.0, dist_threshold=15.0):
-        """
-        vehicle: carla.Vehicle
-        """
-        vec_tra = vehicle.get_transform()
-        veh_dir = vec_tra.get_forward_vector()
-
-        hit_loc = vec_tra.transform(carla.Location(x=offset))
-        hit_wp = TrafficLightHandler.carla_map.get_waypoint(hit_loc)
-
-        light_loc = None
-        light_state = None
-        light_id = None
-        for i in range(TrafficLightHandler.num_tl):
-            traffic_light = TrafficLightHandler.list_tl_actor[i]
-            tv_loc = (
-                0.5 * TrafficLightHandler.list_stopline_wps[i][0].transform.location
-                + 0.5 * TrafficLightHandler.list_stopline_wps[i][-1].transform.location
-            )
-
-            distance = np.sqrt((tv_loc.x - hit_loc.x) ** 2 + (tv_loc.y - hit_loc.y) ** 2)
-            if distance > dist_threshold:
-                continue
-
-            for wp in TrafficLightHandler.list_stopline_wps[i]:
-                wp_dir = wp.transform.get_forward_vector()
-                dot_ve_wp = veh_dir.x * wp_dir.x + veh_dir.y * wp_dir.y + veh_dir.z * wp_dir.z
-
-                wp_1 = wp.previous(4.0)[0]
-                same_road = (hit_wp.road_id == wp.road_id) and (hit_wp.lane_id == wp.lane_id)
-                same_road_1 = (hit_wp.road_id == wp_1.road_id) and (hit_wp.lane_id == wp_1.lane_id)
-
-                # if (wp.road_id != wp_1.road_id) or (wp.lane_id != wp_1.lane_id):
-                #     print(f'Traffic Light Problem: {wp.road_id}={wp_1.road_id}, {wp.lane_id}={wp_1.lane_id}')
-
-                if (same_road or same_road_1) and dot_ve_wp > 0:
-                    # This light is red and is affecting our lane
-                    loc_in_ev = trans_utils.loc_global_to_ref(wp.transform.location, vec_tra)
-                    light_loc = np.array([loc_in_ev.x, loc_in_ev.y, loc_in_ev.z], dtype=np.float32)
-                    light_state = traffic_light.state
-                    light_id = traffic_light.id
-                    break
-
-        return light_state, light_loc, light_id
-
-    @staticmethod
-    def get_junctoin_paths(veh_loc, color=0, dist_threshold=50.0):
-        if color == 0:
-            tl_state = carla.TrafficLightState.Green
-        elif color == 1:
-            tl_state = carla.TrafficLightState.Yellow
-        elif color == 2:
-            tl_state = carla.TrafficLightState.Red
-
-        junctoin_paths = []
-        for i in range(TrafficLightHandler.num_tl):
-            traffic_light = TrafficLightHandler.list_tl_actor[i]
-            tv_loc = TrafficLightHandler.list_tv_loc[i]
-            if tv_loc.distance(veh_loc) > dist_threshold:
-                continue
-            if traffic_light.state != tl_state:
-                continue
-
-            junctoin_paths += TrafficLightHandler.list_junction_paths[i]
-
-        return junctoin_paths
-
-    @staticmethod
-    def get_stopline_vtx(veh_loc, color, dist_threshold=50.0, close_traffic_lights=None):
-        if color == 0:
-            tl_state = carla.TrafficLightState.Green
-        elif color == 1:
-            tl_state = carla.TrafficLightState.Yellow
-        elif color == 2:
-            tl_state = carla.TrafficLightState.Red
-
-        stopline_vtx = []
-        for i in range(TrafficLightHandler.num_tl):
-            traffic_light = TrafficLightHandler.list_tl_actor[i]
-            tv_loc = TrafficLightHandler.list_tv_loc[i]
-            if tv_loc.distance(veh_loc) > dist_threshold:
-                continue
-            if traffic_light.state != tl_state:
-                continue
-            if close_traffic_lights is not None:
-                for close_tl in close_traffic_lights:
-                    if traffic_light.id == int(close_tl[2]) and close_tl[3]:
-                        stopline_vtx += TrafficLightHandler.list_stopline_vtx[i]
-                        break
-            else:
-                stopline_vtx += TrafficLightHandler.list_stopline_vtx[i]
-
-        return stopline_vtx

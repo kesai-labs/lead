@@ -1,4 +1,4 @@
-from lead.training.data_loader.carla_dataset import CARLAData
+from lead.data_loader.carla_dataset import CARLAData
 from lead.training.config_training import TrainingConfig
 
 config = TrainingConfig()

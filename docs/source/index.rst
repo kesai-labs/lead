@@ -1,6 +1,11 @@
 Documentation
 =============
 
+.. note::
+   This documentation is maintained with best effort. If you find any inconsistencies or issues, please report them on our issue tracker.
+.. warning::
+   The documentation is updated regularly, some browser caching may cause you to see an older version. If you suspect this, please try a hard refresh (Ctrl+F5).
+
 This documentation is organized into three sections.
 **Basic:** Quickstart guides to get you started.
 **SLURM:** Infrastructure for large-scale experiments.
@@ -14,9 +19,12 @@ The basic section is sufficient to get started with the local data collection, t
 
 |
 
+
+
 .. toctree::
    :maxdepth: 2
    :caption: Basic
+   :numbered:
 
    data_collection
    carla_training
@@ -26,6 +34,7 @@ The basic section is sufficient to get started with the local data collection, t
 .. toctree::
    :maxdepth: 2
    :caption: SLURM
+   :numbered:
 
    slurm_overview
    slurm_data_collection
@@ -35,16 +44,21 @@ The basic section is sufficient to get started with the local data collection, t
 .. toctree::
    :maxdepth: 1
    :caption: In-Depth
+   :numbered:
 
-   inspecting_pickle_files
+   debug_expert
    cross_dataset_training
    config_system
-   debug_expert
+   inspecting_pickle_files
+   carla_typing_stubs
 
 .. toctree::
    :maxdepth: 1
    :caption: Miscellaneous
+   :numbered:
 
+   transfuser_versions
    faq
    glossary
    known_issues
+   safe_warnings

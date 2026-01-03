@@ -536,7 +536,7 @@ NUPLAN_CAMERA_CALIBRATION = {
 }
 
 
-class NavSimBEVSemanticClass(IntEnum):
+class NavSimBEVSemanticClass(IntEnum):  # dead: disable
     """Indicies to access BEV semantic map produced by NavSim.
 
     See: https://github.com/autonomousvision/navsim/blob/main/navsim/agents/transfuser/transfuser_config.py#L83
@@ -570,7 +570,7 @@ class NavSimBBClass(IntEnum):
     GENERIC_CLASS = 0
 
 
-class NavSimStatusFeature(IntEnum):
+class NavSimStatusFeature(IntEnum):  # dead: disable
     """Status feature indices used in NavSim.
 
     See: https://github.com/OpenDriveLab/OpenScene/blob/main/DriveEngine/process_data/helpers/driving_command.py#L40"""
@@ -690,19 +690,6 @@ WAYMO_E2E_2025_CAMERA_SETTING = {
         "cropped_height": 1080,
     },
 }
-
-
-class WaymoE2EIntrinsicIndex(IntEnum):
-    # https://github.com/waymo-research/waymo-open-dataset/blob/d16af5cf112a2498d659f87e614ad19f20ca2f56/src/waymo_open_dataset/dataset.proto#L98
-    F_U = 0  # Focal length in x direction
-    F_V = 1  # Focal length in y direction
-    C_U = 2  # Center of the image in x direction
-    C_V = 3  # Center of the image in y direction
-    K_1 = 4  # Radial distortion coefficient
-    K_2 = 5  # Radial distortion coefficient
-    P_1 = 6  # Tangential distortion coefficient
-    P_2 = 7  # Tangential distortion coefficient
-    K_3 = 8  # Radial distortion coefficient
 
 
 class CarlaImageCroppingType(IntEnum):

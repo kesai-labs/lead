@@ -1,6 +1,6 @@
-import json
 import logging
 import os
+from typing import Any
 
 import torch
 from beartype import beartype
@@ -35,36 +35,19 @@ class TrainingConfig(BaseConfig):
             raise_error_on_missing_key=raise_error_on_missing_key,
         )
 
-    @classmethod
-    def load_from_file(cls, file_path: str, raise_error_on_missing_key: bool = False) -> "TrainingConfig":
-        with open(file_path, encoding="utf-8") as f:
-            json_config = f.read()
-            json_config = json.loads(json_config)
-        return TrainingConfig(json_config, raise_error_on_missing_key=raise_error_on_missing_key)
-
     @property
     def target_dataset(self):
         if "expert_debug" in self.carla_root:
             return TargetDataset.CARLA_LEADERBOARD2_3CAMERAS
         elif "carla_leaderboard2" in self.carla_root:
             return TargetDataset.CARLA_LEADERBOARD2_3CAMERAS
+        elif "carla_leaderboad2_v8" in self.carla_root:
+            return TargetDataset.CARLA_LEADERBOARD2_3CAMERAS
         elif self.use_waymo_e2e_data and not self.mixed_data_training:
             return TargetDataset.WAYMO_E2E_2025_3CAMERAS
         elif self.use_navsim_data and not self.use_carla_data:
             return TargetDataset.NAVSIM_4CAMERAS
-        elif "carla_leaderboad2_v3" in self.carla_root:
-            return TargetDataset.CARLA_LEADERBOARD2_3CAMERAS
-        elif "carla_leaderboad2_v8" in self.carla_root:
-            return TargetDataset.CARLA_LEADERBOARD2_3CAMERAS
-        elif "carla_leaderboad2_v10" in self.carla_root:
-            return TargetDataset.CARLA_LEADERBOARD2_6CAMERAS
-        elif "carla_leaderboad2_v12" in self.carla_root:
-            return TargetDataset.NAVSIM_4CAMERAS
-        elif "carla_leaderboad2_v14" in self.carla_root:
-            return TargetDataset.WAYMO_E2E_2025_3CAMERAS
-        elif "data/carla_today/results/data/garage_v2_2025_06_23" in self.carla_root:
-            return TargetDataset.NAVSIM_4CAMERAS
-        raise ValueError(f"Unknown CARLA root path: {self.carla_root}")
+        raise ValueError(f"Unknown CARLA root path: {self.carla_root}. Please register it in the config.")
 
     @property
     def num_available_cameras(self):
@@ -89,7 +72,6 @@ class TrainingConfig(BaseConfig):
         return sum(int(use) for use in self.used_cameras)
 
     # --- Planning Area ---
-    # Maximum planning area coordinate in x direction (meters)
     # How many pixels make up 1 meter in BEV grids.
     pixels_per_meter = 4.0
 
@@ -166,7 +148,7 @@ class TrainingConfig(BaseConfig):
         return "lead_posttrain"
 
     # Description of the experiment.
-    description = "TFv6"
+    description = "An example experiment description."
     # Produce images while training
     visualize_training = True
     # Unique experiment identifier.
@@ -210,7 +192,7 @@ class TrainingConfig(BaseConfig):
         )
 
     @property
-    def ssd_cache_path(self):
+    def training_session_cache_path(self):
         """Path to SSD cache directory."""
         tmp_folder = "/scratch/" + str(os.environ.get("SLURM_JOB_ID"))
         if not self.is_on_tcml:
@@ -267,7 +249,7 @@ class TrainingConfig(BaseConfig):
             return 61
         if self.target_dataset == TargetDataset.WAYMO_E2E_2025_3CAMERAS:
             return 20
-        raise ValueError("Unknown target dataset")
+        raise ValueError("Unknown target dataset. Not sure how many epochs to train for.")
 
     @overridable_property
     def batch_size(self):
@@ -345,7 +327,7 @@ class TrainingConfig(BaseConfig):
             TargetDataset.NAVSIM_4CAMERAS,
         ]:
             return self.num_way_points_prediction * 2
-        raise ValueError("Unknown target dataset")
+        raise ValueError("Unknown target dataset. Not sure how many frames to skip at the end of sequences.")
 
     # --- RaDAR ---
     @property
@@ -380,8 +362,6 @@ class TrainingConfig(BaseConfig):
     radar_classification_loss_weight = 1.0
     # Loss weight for radar regression.
     radar_regression_loss_weight = 5.0
-    # Number of sine features for radar positional encoding.
-    radar_sine_features = 128
     # Total number of radar sensors.
     num_radar_sensors = 4
 
@@ -396,17 +376,13 @@ class TrainingConfig(BaseConfig):
     @property
     def carla_bucket_collection(self):
         """Name of the bucket collection to use for training data."""
-        from lead.training.data_loader.buckets.failed_bucket_collection import FailedBucketCollection
-        from lead.training.data_loader.buckets.full_posttrain_bucket_collection import FullPosttrainBucketCollection
-        from lead.training.data_loader.buckets.full_pretrain_bucket_collection import FullPretrainBucketCollection
-        from lead.training.data_loader.buckets.navsim_bucket_collection import NavSimBucketCollection
-        from lead.training.data_loader.buckets.town13_heldout_posttrain_bucket_collection import (
-            Town13HeldoutPosttrainBucketCollection,
-        )
-        from lead.training.data_loader.buckets.town13_heldout_pretrain_bucket_collection import (
-            Town13HeldOutPretrainBucketCollection,
-        )
-        from lead.training.data_loader.buckets.waymo_bucket_collection import WaymoBucketCollection
+        from lead.data_buckets.failed_bucket_collection import FailedBucketCollection
+        from lead.data_buckets.full_posttrain_bucket_collection import FullPosttrainBucketCollection
+        from lead.data_buckets.full_pretrain_bucket_collection import FullPretrainBucketCollection
+        from lead.data_buckets.navsim_bucket_collection import NavSimBucketCollection
+        from lead.data_buckets.town13_heldout_posttrain_bucket_collection import Town13HeldoutPosttrainBucketCollection
+        from lead.data_buckets.town13_heldout_pretrain_bucket_collection import Town13HeldOutPretrainBucketCollection
+        from lead.data_buckets.waymo_bucket_collection import WaymoBucketCollection
 
         if (
             self.use_carla_data
@@ -459,10 +435,6 @@ class TrainingConfig(BaseConfig):
 
     # Weight decay for regularization.
     weight_decay = 0.01
-    # Quantile value for gradient norm clipping.
-    grad_quantile = 0.99
-    # Maximum  gradient norm for gradient clipping.
-    grad_history_length = 1000
 
     # If true use cosine learning rate scheduler with restart, else only one cycle
     @overridable_property
@@ -503,15 +475,12 @@ class TrainingConfig(BaseConfig):
     # --- Bounding boxes detection ---
     # If true use the bounding box auxiliary task.
     detect_boxes = True
-    # If true use global average factor for CenterNet.
-    center_net_global_avg_factor = False
     # List of static object types to include in bounding box detection.
     data_bb_static_types_white_list = ["static.prop.constructioncone", "static.prop.trafficwarning"]
     # Confidence of a bounding box that is needed for the detection to be accepted.
     bb_confidence_threshold = 0.3
     # Maximum number of bounding boxes our system can detect.
     max_num_bbs = 90
-    # CenterNet parameters
     # Number of direction bins for object orientation.
     num_dir_bins = 12
     # Top K center keypoints to consider during detection.
@@ -546,7 +515,7 @@ class TrainingConfig(BaseConfig):
             TargetDataset.WAYMO_E2E_2025_3CAMERAS,
         ]:
             return 4
-        raise ValueError("Unknown target dataset")
+        raise ValueError("Unknown target dataset. Not sure how many discrete commands there are.")
 
     # If true add noise to target points for robustness.
     use_noisy_tp = False
@@ -566,7 +535,7 @@ class TrainingConfig(BaseConfig):
             TargetDataset.WAYMO_E2E_2025_3CAMERAS,
         ]:
             return 33.33
-        raise ValueError("Unknown target dataset")
+        raise ValueError("Unknown target dataset. Not sure what max speed to use.")
 
     @property
     def use_acceleration(self):
@@ -686,18 +655,18 @@ class TrainingConfig(BaseConfig):
     def num_way_points_prediction(self):
         """Number of waypoints to predict."""
         if self.carla_leaderboard_mode:
-            return 8  # 2 seconds
+            return 8  # 4Hz and 2 seconds
         elif self.target_dataset in [
             TargetDataset.NAVSIM_4CAMERAS,
         ]:
-            return 8  # 4 seconds
+            return 8  # 2Hz and 4 seconds
         elif self.target_dataset in [TargetDataset.WAYMO_E2E_2025_3CAMERAS]:
-            return 10  # 5 seconds
-        raise ValueError("Unknown target dataset")
+            return 10  # 2Hz and 5 seconds
+        raise ValueError("Unknown target dataset. Not sure how long is the planning horizon.")
 
-    # Spacing between waypoints in the prediction. For example: spacing 5 = 4Hz prediction.
     @property
     def waypoints_spacing(self):
+        """Spacing between predicted waypoints. For example: spacing 5 = 4Hz prediction."""
         if self.carla_leaderboard_mode:
             return 5  # 4Hz
         elif self.target_dataset in [
@@ -706,7 +675,7 @@ class TrainingConfig(BaseConfig):
             return 10  # 2Hz
         elif self.target_dataset in [TargetDataset.WAYMO_E2E_2025_3CAMERAS]:
             return 10  # 2Hz
-        raise ValueError("Unknown target dataset")
+        raise ValueError("Unknown target dataset. Not sure which planning frequency to use.")
 
     # --- Image config ---
     @property
@@ -725,7 +694,7 @@ class TrainingConfig(BaseConfig):
             return CarlaImageCroppingType.BOTTOM
         elif self.target_dataset in [TargetDataset.WAYMO_E2E_2025_3CAMERAS]:
             return CarlaImageCroppingType.NONE
-        raise ValueError("Unknown target dataset")
+        raise ValueError("Unknown target dataset. Not sure how to crop the images.")
 
     @property
     def image_width_before_camera_subselection(self):
@@ -966,13 +935,6 @@ class TrainingConfig(BaseConfig):
             return 100
 
     @property
-    def slurm_job_id(self):
-        """Current SLURM job ID if running on SLURM cluster."""
-        if self.is_on_slurm:
-            return os.environ.get("SLURM_JOB_ID", "0")
-        return None
-
-    @property
     def log_wandb(self):
         """If true log metrics to Weights & Biases."""
         if self.is_on_slurm:
@@ -998,7 +960,7 @@ class TrainingConfig(BaseConfig):
             elif "rtx 3080" in name:
                 return "rtx3080"
             else:
-                raise Exception(f"Unknown GPU name: {name}")
+                raise Exception(f"Unknown GPU name: {name}. Please register it in the config.")
         except RuntimeError:
             return ""
 
@@ -1038,7 +1000,8 @@ class TrainingConfig(BaseConfig):
             return 1  # Use more workers for mixed data training. CARLA loader is slow.
         return 1
 
-    def training_dict(self):
+    def training_dict(self) -> dict[str, Any]:
+        """Convert training configuration to a dictionary for serialization and logging."""
         out = {}
         cls = self.__class__
         for k, v in cls.__dict__.items():

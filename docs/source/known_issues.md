@@ -1,33 +1,31 @@
 # Known Issues
 
-We report some issues that are well-known for our pipeline.
+Known issues in the evaluation pipeline and models.
 
-## Bugs on Town13 Evaluation
+## Town13 Evaluation Has Target Point Bugs
 
-As the Town13 videos show on the [project's official website](https://ln2697.github.io/lead), our evaluation pipeline is currently not bug-free yielding to some problems with target points on Town13.
+The evaluation pipeline has bugs affecting target points on Town13, visible in videos on the [project website](https://ln2697.github.io/lead). This degrades policy performance, so Town13 numbers don't reflect true capability.
 
-This issue degrades policy's performance so the numbers on Town13 does not mirror the policy's true capability.
+## Multi-GPU Training Can Slightly Degrade Performance
 
-## Multi-GPU Training Can Slightly Degrade Policy Performance
+Training on 4 GPUs sometimes yields marginally lower closed-loop performance than single-GPU training. The effect is small and doesn't change qualitative conclusions, but appears consistently in certain runs.
 
-In some settings, training on 4 GPUs yields marginally lower closed-loop performance compared to single-GPU training. While the effect is small and does not change qualitative conclusions, it is consistently observable in certain runs.
+## Static Graph Can Degrade Performance
 
-## Static Graph Can Also Worsen Performance
+We avoid [static_graph](https://docs.pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html) in the pipeline due to observed performance issues.
 
-We try to avoid `static_graph` in our pipeline.
+## CARLA Waypoint PID Controller Needs Better Tuning
 
-## CARLA Waypoint PID Controller Is Not Well-Tuned
+A well-tuned controller (e.g., MPC) can significantly improve performance. Preliminary experiments showed ~5-7 DS improvement on Bench2Drive for TFv5, though these numbers are approximate since controller tuning wasn't the focus.
 
-A well-tuned controller (MPC) can improve the performance quite significantly. In preliminary experiments, we observed improvements of approximately 5–7 DS on Bench2Drive; however, these numbers should be interpreted cautiously as controller tuning was not the focus of this work.
+## CARLA 0.9.16 Has Goal-Point Issues
 
-## CARLA 0.9.16 Is Not Working Properly Right Now
+CARLA 0.9.16 currently has problems with the goal-point pipeline that degrade policy behavior. We don't recommend evaluating models on this version.
 
-At the time of writing, CARLA 0.9.16 exhibits issues in the goal-point pipeline, leading to degraded policy behavior. As a result, we do not recommend evaluating the current models on this version.
+## Expert Performance Drops on Town13
 
-## Expert Performance on Town13
+The expert performs reliably on short and medium routes but shows notable performance degradation on Town13. The causes are under investigation.
 
-The current expert performs reliably on short and medium routes but exhibits a notable performance drop on Town13. The underlying causes are under investigation.
+## Expert Is Designed for Simplicity, Not Optimality
 
-## Expert Optimality
-
-The provided expert is intentionally designed to be simple and extensible rather than optimal. We explicitly encourage future work to improve the expert and to explore alternative designs within the LEAD framework.
+The provided expert prioritizes simplicity and extensibility over optimal performance. We encourage future work to improve the expert or explore alternative designs within the LEAD framework.

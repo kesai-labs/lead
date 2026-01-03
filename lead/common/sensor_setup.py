@@ -2,7 +2,6 @@ import copy
 
 import numpy as np
 from beartype import beartype
-from numpy.typing import NDArray
 from scipy.spatial.transform import Rotation as R
 
 from lead.common import config_base
@@ -20,6 +19,20 @@ def av_sensor_setup(
     sensor_agent: bool,
     radar: bool = False,
 ) -> list[dict]:
+    """
+    Function to set up sensors for an autonomous vehicle (AV) simulation.
+
+    Args:
+        config: Configuration object containing sensor parameters
+        perturbation_rotation: Rotation perturbation in degrees
+        perturbation_translation: Translation perturbation in meters
+        lidar: Whether to include LiDAR sensors
+        perturbate: Whether to create perturbated sensor variants
+        sensor_agent: Whether this is for a sensor agent (affects which sensors are created)
+        radar: Whether to include Radar sensors
+    Returns:
+        List of sensor configurations
+    """
     result = camera_sensor_setup(config, perturbation_rotation, perturbation_translation, perturbate, sensor_agent)
     if lidar:
         result.append(
@@ -216,21 +229,6 @@ def camera_sensor_setup(
                     )
 
     return result
-
-
-@beartype
-def euler_to_matrix(roll: float, pitch: float, yaw: float) -> NDArray:
-    """Convert Euler angles (roll, pitch, yaw) into a 3D rotation matrix.
-
-    Args:
-        roll: Rotation angle around the X-axis, in degrees.
-        pitch: Rotation angle around the Y-axis, in degrees.
-        yaw: Rotation angle around the Z-axis, in degrees.
-
-    Returns:
-        NDArray: A (3, 3) NumPy array representing the rotation matrix.
-    """
-    return R.from_euler("xyz", [roll, pitch, yaw], degrees=True).as_matrix()
 
 
 @beartype

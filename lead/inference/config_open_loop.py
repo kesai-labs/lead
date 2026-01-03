@@ -17,14 +17,3 @@ class OpenLoopConfig(BaseConfig):
     brake_threshold = 0.9
     # If true be strict when load weight
     strict_weight_load = True
-
-    def open_loop_dict(self):
-        """Generate dictionary of all open loop configuration properties."""
-        out = {}
-        for k, v in OpenLoopConfig.__dict__.items():
-            if isinstance(v, property):
-                try:
-                    out[k] = getattr(self, k)
-                except Exception:
-                    pass
-        return out

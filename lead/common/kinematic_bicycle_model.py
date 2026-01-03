@@ -1,18 +1,17 @@
-"""Kinematic bicycle model describing the motion of a car given its state and action."""
-
-from typing import Any
-
 import jaxtyping as jt
 import numpy as np
 from beartype import beartype
 from numpy.typing import NDArray
 
+from lead.common.config_base import BaseConfig
+
 
 class KinematicBicycleModel:
-    """Tuned parameters are taken from World on Rails."""
+    """Kinematic bicycle model describing the motion of a car given its state and action.
+    Tuned parameters are taken from World on Rails."""
 
     @beartype
-    def __init__(self, config: Any) -> None:
+    def __init__(self, config: BaseConfig) -> None:
         """Initialize the kinematic bicycle model with configuration parameters.
 
         Args:

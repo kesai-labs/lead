@@ -4,12 +4,19 @@ simulation environment. The class provides functionalities to create a smooth an
 compute distances to traffic lights and stop signs, handle lane changes, and identify leading and trailing vehicles.
 """
 
+import logging
+import numbers
+
 import carla
 import numpy as np
 from agents.navigation.local_planner import RoadOption
 from beartype import beartype
 from scipy.interpolate import interp1d
 from scipy.spatial import cKDTree
+
+from lead.expert.config_expert import ExpertConfig
+
+LOG = logging.getLogger(__name__)
 
 
 class PrivilegedRoutePlanner:
@@ -18,12 +25,13 @@ class PrivilegedRoutePlanner:
     information like the next stop sign and the next traffic light.
     """
 
-    def __init__(self, config):
+    @beartype
+    def __init__(self, config: ExpertConfig):
         """
         Initialize the RoutePlanner object.
 
         Args:
-            config (GlobalConfig): Object of the config for hyperparameters.
+            config: Object of the config for hyperparameters.
         """
 
         self.config = config
@@ -74,12 +82,23 @@ class PrivilegedRoutePlanner:
         """
         self.route_index = self.last_route_index
 
-    def run_step(self, agent_position):
+    @beartype
+    def run_step(self, agent_position: np.ndarray) -> tuple:
         """
         Update the route index based on the agent's current position and retrieve relevant information at that index.
 
         Args:
-            agent_position (numpy.ndarray): Current location of the agent.
+            agent_position: Current location of the agent.
+
+        Returns:
+            A tuple containing:
+                - The remaining route points from the current index.
+                - The corresponding waypoints for the remaining route points.
+                - The commands for the remaining route points.
+                - The distances to the next traffic lights from the current index.
+                - The next traffic lights from the current index.
+                - The distances to the next stop signs from the current index.
+                - The next stop signs from the current index.
         """
         till = self.ego_vehicles_route_point_search_distance
         search_range = min(self.route_index + till, self.route_points.shape[0])
@@ -99,16 +118,19 @@ class PrivilegedRoutePlanner:
             self.next_stop_signs[self.route_index],
         )
 
-    def extend_lane_shift_transition_for_yield_to_emergency_vehicle(self, shift_to_left_lane, previous_shift_end_index):
+    @beartype
+    def extend_lane_shift_transition_for_yield_to_emergency_vehicle(
+        self, shift_to_left_lane: bool, previous_shift_end_index: int
+    ) -> int:
         """
         Extend the lane shift transition to yield to an emergency vehicle.
 
         Args:
-            shift_to_left_lane (bool): Whether to route was initially shifted to the left lane.
-            previous_shift_end_index (int): The index of the route waypoint where the initial lane shift started.
+            shift_to_left_lane: Whether to route was initially shifted to the left lane.
+            previous_shift_end_index: The index of the route waypoint where the initial lane shift started.
 
         Returns:
-            int: The index of the route waypoint after which the extended lane shift transition is complete.
+            The index of the route waypoint after which the extended lane shift transition is complete.
         """
         # Calculate the end index for the extended lane shift transition
         end_shift_index = self.route_index + self.lane_shift_extension_length_for_yield_to_emergency_vehicle
@@ -146,16 +168,18 @@ class PrivilegedRoutePlanner:
 
         return transition_end_index - self.transition_smoothness_distance
 
-    def extend_lane_shift_transition_for_hazard_at_side_lane(self, last_bicycle, previous_shift_end_index):
-        """
-        Extend the lane shift transition to ensure the vehicle can safely pass the bicycles in HazardAtSideLane.
+    @beartype
+    def extend_lane_shift_transition_for_hazard_at_side_lane(
+        self, last_bicycle: carla.Actor, previous_shift_end_index: int
+    ) -> int:
+        """Extend the lane shift transition to ensure the vehicle can safely pass the bicycles in HazardAtSideLane.
 
         Args:
-            last_bicycle (carla.Actor): The actor representing the side obstacle.
-            previous_shift_end_index (int): The index of the route waypoint where the previous lane shift ended.
+            last_bicycle: The actor representing the side obstacle.
+            previous_shift_end_index: The index of the route waypoint where the previous lane shift ended.
 
         Returns:
-            int: The index of the route waypoint after which the extended lane shift transition is complete.
+            The index of the route waypoint after which the extended lane shift transition is complete.
         """
         # Find the closest route index to the bicycle
         obstacle_route_index = self.get_closest_route_index(int(self.route_index), last_bicycle.get_location())
@@ -196,37 +220,41 @@ class PrivilegedRoutePlanner:
 
         return transition_end_index - self.transition_smoothness_distance
 
-    def _smooth_transition(self, value):
+    @beartype
+    def _smooth_transition(self, value: float) -> float:
         """
         Transforms the linear transition between 0 to 1 into a cosine one.
 
         Args:
-            value (float): The input value between 0 and 1.
+            value: The input value between 0 and 1.
 
         Returns:
-            float: The smoothed transition value between 0 and 1.
+            The smoothed transition value between 0 and 1.
         """
 
         smoothed_value = -np.cos(value * np.pi) / 2.0 + 0.5
         return smoothed_value
 
+    @beartype
     def shift_route_smoothly(
-        self, start_index, end_index, shift_to_left_lane, transition_length=120.0, lane_transition_factor=1.0
+        self,
+        start_index: int,
+        end_index: int,
+        shift_to_left_lane: bool,
+        transition_length: float = 120.0,
+        lane_transition_factor: float = 1.0,
     ):
-        """
-        Shift the route smoothly to the left or right lane between the specified start and end indices.
+        """Shift the route smoothly to the left or right lane between the specified start and end indices.
 
         Args:
-            start_index (int): The index of the route waypoint where the shift should start.
-            end_index (int): The index of the route waypoint where the shift should end.
-            shift_to_left_lane (bool): Whether to shift the route to the left lane.
-            transition_length (int): The length of the transition in waypoints.
-            lane_transition_factor (float): A factor between 0 and 1 that controls the amount of shift towards
-                                                the neighboring lane.
-                                            A value of 1.0 means the route will be shifted to the center of
-                                                the neighboring lane,
-                                            while a value of 0.0 means the route will stay in the center of
-                                                the current lane.
+            start_index: The index of the route waypoint where the shift should start.
+            end_index: The index of the route waypoint where the shift should end.
+            shift_to_left_lane: Whether to shift the route to the left lane.
+            transition_length: The length of the transition in waypoints.
+            lane_transition_factor: A factor between 0 and 1 that controls the amount of shift towards
+                the neighboring lane. A value of 1.0 means the route will be shifted to the center of
+                the neighboring lane, while a value of 0.0 means the route will stay in the center of
+                the current lane.
         """
         for idx in range(start_index, end_index):
             # Get the location of the left / right center lane
@@ -296,14 +324,15 @@ class PrivilegedRoutePlanner:
 
             index += direction
 
-    def shift_route_for_invading_turn(self, first_cone, last_cone, lateral_offset):
+    @beartype
+    def shift_route_for_invading_turn(self, first_cone: carla.Actor, last_cone: carla.Actor, lateral_offset: numbers.Real):
         """
         Shift the route laterally to overcome the InvadingTurn scenario.
 
         Args:
-            first_cone (carla.Actor): The first cone marking the start of the invading turn scenario.
-            last_cone (carla.Actor): The last cone marking the end of the invading turn scenario.
-            lateral_offset (float): The lateral offset distance (in meters) to shift the route.
+            first_cone: The first cone marking the start of the invading turn scenario.
+            last_cone: The last cone marking the end of the invading turn scenario.
+            lateral_offset: The lateral offset distance (in meters) to shift the route.
         """
         # Find the route indices corresponding to the first and last cones
         first_cone_index = self.get_closest_route_index(int(self.route_index), first_cone.get_location())
@@ -332,37 +361,38 @@ class PrivilegedRoutePlanner:
             shift_vector = shift_vector / np.linalg.norm(shift_vector) * np.abs(adjusted_offset)
             self.route_points[idx, :2] += shift_vector
 
+    @beartype
     def shift_route_around_actors(
         self,
-        first_actor,
-        last_actor=None,
-        obstacle_direction="right",
-        transition_length=120.0,
-        lane_transition_factor=1.0,
-        extra_length_before=0.0,
-        extra_length_after=0.0,
-    ):
+        first_actor: carla.Actor,
+        last_actor: carla.Actor | None = None,
+        obstacle_direction: str = "right",
+        transition_length: numbers.Real = 120.0,
+        lane_transition_factor: numbers.Real = 1.0,
+        extra_length_before: numbers.Real = 0.0,
+        extra_length_after: numbers.Real = 0.0,
+    ) -> tuple[int, int]:
         """
         Shift the route smoothly to the left or right lane around the specified actors.
 
         Args:
-            first_actor (carla.Actor): The first actor around which the route should be shifted.
-            last_actor (carla.Actor, optional): The last actor around which the route should be shifted. If None,
+            first_actor: The first actor around which the route should be shifted.
+            last_actor: The last actor around which the route should be shifted. If None,
                         the shift will end after a certain distance from the first actor.
-            obstacle_direction (str): The direction in which the obstacle is located. If it is to the left, we shift
+            obstacle_direction: The direction in which the obstacle is located. If it is to the left, we shift
                         the route to the right and vice versa.
-            transition_length (int): The length of the transition in waypoints.
-            lane_transition_factor (float): A factor between 0 and 1 that controls the amount of shift
+            transition_length: The length of the transition in waypoints.
+            lane_transition_factor: A factor between 0 and 1 that controls the amount of shift
                                                 towards the neighboring lane.
                                             A value of 1.0 means the route will be shifted to the center of
                                                 the neighboring lane,
                                             while a value of 0.0 means the route will stay in the center of
                                                 the current lane.
-            extra_length_before (float): Additional length (in meters) to be added before the first actor for the shift.
-            extra_length_after (float): Additional length (in meters) to be added after the last actor for the shift.
+            extra_length_before: Additional length (in meters) to be added before the first actor for the shift.
+            extra_length_after: Additional length (in meters) to be added after the last actor for the shift.
 
         Returns:
-            tuple: A tuple containing the start and end indices of the route shift.
+            A tuple containing the start and end indices of the route shift.
         """
         # Find the closest route index to the first actor
         tree = cKDTree(self.original_route_points[self.route_index :, :2])
@@ -401,17 +431,26 @@ class PrivilegedRoutePlanner:
 
         return shift_start_index, shift_end_index
 
-    def setup_route(self, global_plan, carla_world, carla_map, starts_with_parking_exit, vehicle_loc):
+    @beartype
+    def setup_route(
+        self,
+        global_plan: list,
+        carla_world: carla.World,
+        carla_map: carla.Map,
+        starts_with_parking_exit: bool,
+        vehicle_loc: carla.Location,
+    ):
         """
         Set up the route for the autonomous vehicle based on the given global plan.
 
         Args:
-            global_plan (list): A list of (carla.Transform, carla.RoadOption) tuples representing the global plan.
-            carla_world (carla.World): The CARLA world object.
-            carla_map (carla.Map): The CARLA map object.
-            starts_with_parking_exit (bool): A flag indicating if the route starts with a parking exit scenario.
-            vehicle_location (carla.Location): The initial location of the vehicle.
+            global_plan: A list of (carla.Transform, carla.RoadOption) tuples representing the global plan.
+            carla_world: The CARLA world object.
+            carla_map: The CARLA map object.
+            starts_with_parking_exit: A flag indicating if the route starts with a parking exit scenario.
+            vehicle_loc: The initial location of the vehicle.
         """
+        LOG.info("Setting up the privileged route planner.")
         self.route_index = self.extra_route_length * self.points_per_meter
         self.last_route_index = self.route_index
 
@@ -467,15 +506,16 @@ class PrivilegedRoutePlanner:
 
         self.compute_route_info(carla_world, carla_map)
 
-    def compute_rotation_angles(self, route_points):
+    @beartype
+    def compute_rotation_angles(self, route_points: np.ndarray) -> np.ndarray:
         """
         Computes the yaw angles corresponding to the ego vehicle's orientation at individual route points in degrees.
 
         Args:
-            route_points (numpy.ndarray): Array containing the route points.
+            route_points: Array containing the route points.
 
         Returns:
-            numpy.ndarray: Array containing the yaw angles at each route point.
+            Array containing the yaw angles at each route point.
         """
 
         # Compute differences between consecutive route points
@@ -490,16 +530,17 @@ class PrivilegedRoutePlanner:
 
         return yaws
 
-    def smooth_and_supersample(self, original_route_points, commands):
+    @beartype
+    def smooth_and_supersample(self, original_route_points: np.ndarray, commands: list) -> tuple:
         """
         Smooths and supersamples the given route to increase density and matches commands accordingly.
 
         Args:
-            original_route_points (numpy.ndarray): Array containing the original route points.
-            commands (list): List of commands corresponding to the route points.
+            original_route_points: Array containing the original route points.
+            commands: List of commands corresponding to the route points.
 
         Returns:
-            tuple: A tuple containing the smoothed and supersampled route points, and the updated commands.
+            A tuple containing the smoothed and supersampled route points, and the updated commands.
         """
 
         num_supersample_per_point = 10  # sample x points per number of route points for later
@@ -539,7 +580,8 @@ class PrivilegedRoutePlanner:
 
         return smoothed_points, smoothed_commands
 
-    def compute_route_info(self, carla_world, carla_map):
+    @beartype
+    def compute_route_info(self, carla_world: carla.World, carla_map: carla.Map):
         """
         Computes additional information for the route such as distances to traffic lights and stop signs,
         speed limits, and prevents too early lane changes and computes yaw angles corresponding to the ego
@@ -632,7 +674,8 @@ class PrivilegedRoutePlanner:
         self.distances_to_next_traffic_lights = np.concatenate([self.distances_to_next_traffic_lights[:-40], 40 * [np.inf]])
         self.next_traffic_lights = self.next_traffic_lights[:-40] + (40 * [None])
 
-    def compute_distances_to_stop_signs(self, carla_world, carla_map):
+    @beartype
+    def compute_distances_to_stop_signs(self, carla_world: carla.World, carla_map: carla.Map):
         """
         Compute the distance to the next stop sign from each individual route location.
         We use the official implementation that is used to test whether we ran a stop sign
@@ -753,16 +796,16 @@ class PrivilegedRoutePlanner:
                 self.next_stop_signs[i] = next_stop_signs
                 self.distances_to_next_stop_signs[i] = float(distance_idx) / self.points_per_meter
 
-    def compute_leading_vehicles(self, list_vehicles, ego_vehicle_id):
+    def compute_leading_vehicles(self, list_vehicles: list, ego_vehicle_id: int) -> list:
         """
         Computes the IDs of vehicles leading ahead of the ego vehicle.
 
         Args:
-            list_vehicles (list): List of all vehicles.
-            ego_vehicle_id (int): ID of the ego vehicle.
+            list_vehicles: List of all vehicles.
+            ego_vehicle_id: ID of the ego vehicle.
 
         Returns:
-            list: IDs of vehicles leading ahead of the ego vehicle.
+            IDs of vehicles leading ahead of the ego vehicle.
         """
         # Get IDs of all vehicles except the ego vehicle
         vehicle_ids = np.array([vehicle.id for vehicle in list_vehicles if vehicle.id != ego_vehicle_id])
@@ -807,16 +850,16 @@ class PrivilegedRoutePlanner:
         else:
             return []
 
-    def compute_trailing_vehicles(self, list_vehicles, ego_vehicle_id):
+    def compute_trailing_vehicles(self, list_vehicles: list, ego_vehicle_id: int) -> list:
         """
         Computes the IDs of vehicles trailing behind the ego vehicle.
 
         Args:
-            list_vehicles (list): List of all vehicles.
-            ego_vehicle_id (int): ID of the ego vehicle.
+            list_vehicles: List of all vehicles.
+            ego_vehicle_id: ID of the ego vehicle.
 
         Returns:
-            list: IDs of vehicles trailing behind the ego vehicle
+            IDs of vehicles trailing behind the ego vehicle
         """
         # Get IDs of all vehicles except the ego vehicle
         vehicle_ids = np.array([vehicle.id for vehicle in list_vehicles if vehicle.id != ego_vehicle_id])

@@ -55,8 +55,8 @@ export PYTHONPATH=$LEADERBOARD_ROOT:$PYTHONPATH
 export PLANNER_TYPE=only_traj
 export SAVE_PATH=$EVALUATION_OUTPUT_DIR/{route_id}
 export BENCHMARK_ROUTE_ID={route_id}
-export PORT=$(91_random_free_port.sh)
-export TM_PORT=$(91_random_free_port.sh)
+export PORT=$(random_free_port.sh)
+export TM_PORT=$(random_free_port.sh)
 export PYTHONUNBUFFERED=1
 
 # Before timer
@@ -76,11 +76,11 @@ python -c "import torch; print('PyTorch CUDA is available?', torch.cuda.is_avail
 nvidia-smi
 
 # Kill current carla running on the same GPU instance
-90_clean_carla.sh
+clean_carla.sh
 
 set -x
-export PORT=$(91_random_free_port.sh)
-export TM_PORT=$(91_random_free_port.sh)
+export PORT=$(random_free_port.sh)
+export TM_PORT=$(random_free_port.sh)
 bash $CARLA_ROOT/CarlaUE4.sh --world-port=$PORT -nosound -graphicsadapter=0 -RenderOffScreen &
 sleep 180
 nvidia-smi
@@ -131,7 +131,7 @@ fi
 nvidia-smi
 
 # Kill only the Carla at the GPU we used
-90_clean_carla.sh
+clean_carla.sh
 
 # After timer
 date

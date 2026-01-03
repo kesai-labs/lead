@@ -1,5 +1,6 @@
 import logging
 import math
+import typing
 from numbers import Real
 
 import carla
@@ -22,7 +23,7 @@ LOG = logging.getLogger(__name__)
 
 class CarlaActorDummy:
     """
-    Actor dummy structure used to simulate a CARLA actor for data perturbation
+    Actor dummy structure used to simulate a CARLA actor for HD-Map perturbation
     """
 
     world = None
@@ -46,13 +47,14 @@ class CarlaActorDummy:
         return self.bounding_box
 
 
-def step_cached_property(func):
+@beartype
+def step_cached_property(func: typing.Callable) -> property:
     """Decorator to cache the result of a method based on the current step.
     This is useful for properties that are expensive to compute and
     should only be recalculated when the step changes.
 
     Args:
-        Function to be decorated.
+        func: Function to be decorated.
 
     Returns:
         A property that caches its value based on the step attribute of the instance.
@@ -113,8 +115,8 @@ def distance_location_to_route(route: npt.NDArray, location: npt.NDArray) -> flo
 
 @beartype
 def compute_global_route(
-    world: carla.World, source_location: carla.Location, sink_location: carla.Location, resolution=1.0
-) -> npt.NDArray:
+    world: carla.World, source_location: carla.Location, sink_location: carla.Location, resolution: float = 1.0
+) -> jt.Float[npt.NDArray, "n 3"]:
     """
     Args:
         world: carla.World instance
@@ -122,7 +124,7 @@ def compute_global_route(
         sink_location: carla.Location of the sink point
         resolution: resolution for the global route planner
     Returns:
-        npt.NDArray: (N, 3) array of waypoints in the format [[x, y, z], ...]
+        array of waypoints in the format [[x, y, z], ...]
     """
     grp = GlobalRoutePlanner(world.get_map(), resolution)
     route = grp.trace_route(source_location, sink_location)
@@ -131,7 +133,7 @@ def compute_global_route(
 
 @beartype
 def intersection_of_routes(
-    points_a: npt.NDArray, points_b: npt.NDArray, epsilon=0.5
+    points_a: npt.NDArray, points_b: npt.NDArray, epsilon: float = 0.5
 ) -> tuple[carla.Location | None, int | None]:
     """
     Args:
@@ -139,7 +141,7 @@ def intersection_of_routes(
         points_b: (M, 3) np.array of route points for the second route
         epsilon: threshold distance to consider two points as intersecting
     Returns:
-        tuple[carla.Location | None, int | None]: The intersection point and its index if found, otherwise None.
+        The intersection point and its index if found, otherwise None.
     """
     points_a = np.array(points_a, dtype=np.float32)
     points_b = np.array(points_b, dtype=np.float32)
@@ -165,11 +167,11 @@ def dot_product(vector1: carla.Vector3D, vector2: carla.Vector3D) -> float:
     Calculate the dot product of two vectors.
 
     Args:
-        vector1 (carla.Vector3D): The first vector.
-        vector2 (carla.Vector3D): The second vector.
+        vector1: The first vector.
+        vector2: The second vector.
 
     Returns:
-        float: The dot product of the two vectors.
+        The dot product of the two vectors.
     """
     return vector1.x * vector2.x + vector1.y * vector2.y + vector1.z * vector2.z
 
@@ -180,11 +182,11 @@ def cross_product(vector1: carla.Vector3D, vector2: carla.Vector3D) -> carla.Vec
     Calculate the cross product of two vectors.
 
     Args:
-        vector1 (carla.Vector3D): The first vector.
-        vector2 (carla.Vector3D): The second vector.
+        vector1: The first vector.
+        vector2: The second vector.
 
     Returns:
-        carla.Vector3D: The cross product of the two vectors.
+        The cross product of the two vectors.
     """
     x = vector1.y * vector2.z - vector1.z * vector2.y
     y = vector1.z * vector2.x - vector1.x * vector2.z
@@ -201,13 +203,13 @@ def get_separating_plane(
     Check if there is a separating plane between two oriented bounding boxes (OBBs).
 
     Args:
-        relative_position (carla.Vector3D): The relative position between the two OBBs.
-        plane_normal (carla.Vector3D): The normal vector of the plane.
-        obb1 (carla.BoundingBox): The first oriented bounding box.
-        obb2 (carla.BoundingBox): The second oriented bounding box.
+        relative_position: The relative position between the two OBBs.
+        plane_normal: The normal vector of the plane.
+        obb1: The first oriented bounding box.
+        obb2: The second oriented bounding box.
 
     Returns:
-        bool: True if there is a separating plane, False otherwise.
+        True if there is a separating plane, False otherwise.
     """
     # Calculate the projection of the relative position onto the plane normal
     projection_distance = abs(dot_product(relative_position, plane_normal))
@@ -235,11 +237,11 @@ def check_obb_intersection(obb1: carla.BoundingBox, obb2: carla.BoundingBox) -> 
     Check if two 3D oriented bounding boxes (OBBs) intersect.
 
     Args:
-        obb1 (carla.BoundingBox): The first oriented bounding box.
-        obb2 (carla.BoundingBox): The second oriented bounding box.
+        obb1: The first oriented bounding box.
+        obb2: The second oriented bounding box.
 
     Returns:
-        bool: True if the two OBBs intersect, False otherwise.
+        True if the two OBBs intersect, False otherwise.
     """
     relative_position = obb2.location - obb1.location
 
@@ -376,6 +378,7 @@ def get_steer(
     return steering_angle
 
 
+@beartype
 def compute_target_speed_idm(
     config: ExpertConfig,
     desired_speed: float,
@@ -383,8 +386,8 @@ def compute_target_speed_idm(
     ego_speed: float,
     leading_actor_speed: float,
     distance_to_leading_actor: float,
-    s0=4.0,
-    T=0.5,
+    s0: float = 4.0,
+    T: float = 0.5,
 ):
     """
     Compute the target speed for the ego vehicle using the Intelligent Driver Model (IDM).
@@ -413,16 +416,17 @@ def compute_target_speed_idm(
 
     t_bound = config.idm_t_bound
 
-    def idm_equations(t, x):
+    @beartype
+    def idm_equations(t: float, x: jt.Float[npt.NDArray, " 2"]) -> list[float]:
         """
         Differential equations for the Intelligent Driver Model.
 
         Args:
-            t (float): Time.
-            x (list): State variables [position, speed].
+            t: Time.
+            x: State variables [position, speed].
 
         Returns:
-            list: Derivatives of the state variables.
+            Derivatives of the state variables.
         """
         ego_position, ego_speed = x
 
@@ -449,15 +453,16 @@ def compute_target_speed_idm(
     return np.clip(target_speed, 0, np.inf)
 
 
-def get_previous_road_lane_ids(config: ExpertConfig, starting_waypoint):
+@beartype
+def get_previous_road_lane_ids(config: ExpertConfig, starting_waypoint: carla.Waypoint) -> list[tuple[int, int]]:
     """
     Retrieves the previous road and lane IDs for a given starting waypoint.
 
     Args:
-        starting_waypoint (carla.Waypoint): The starting waypoint.
-
+        config: Configuration object containing parameters.
+        starting_waypoint: The starting waypoint.
     Returns:
-        list: A list of tuples containing road IDs and lane IDs.
+        A list of tuples containing road IDs and lane IDs.
     """
     current_waypoint = starting_waypoint
     previous_lane_ids = [(current_waypoint.road_id, current_waypoint.lane_id)]
@@ -477,43 +482,19 @@ def get_previous_road_lane_ids(config: ExpertConfig, starting_waypoint):
     return previous_lane_ids
 
 
-def get_next_road_lane_ids(config: ExpertConfig, starting_waypoint):
-    """
-    Retrieves the next road and lane IDs for a given starting waypoint.
-    Args:
-        starting_waypoint (carla.Waypoint): The starting waypoint.
-    Returns:
-        list: A list of tuples containing road IDs and lane IDs.
-    """
-    current_waypoint = starting_waypoint
-    next_lane_ids = [(current_waypoint.road_id, current_waypoint.lane_id)]
-
-    # Traverse forward up to 100 waypoints to find next lane IDs
-    for _ in range(config.next_road_lane_retrieve_distance):
-        next_waypoints = current_waypoint.next(1)
-
-        # Check if the road ends and no next route waypoints exist
-        if len(next_waypoints) == 0:
-            break
-        current_waypoint = next_waypoints[0]
-
-        if (current_waypoint.road_id, current_waypoint.lane_id) not in next_lane_ids:
-            next_lane_ids.append((current_waypoint.road_id, current_waypoint.lane_id))
-
-    return next_lane_ids
-
-
-def compute_min_time_for_distance(config: ExpertConfig, distance, target_speed, ego_speed) -> float:
+@beartype
+def compute_min_time_for_distance(config: ExpertConfig, distance: float, target_speed: float, ego_speed: float) -> float:
     """
     Computes the minimum time the ego vehicle needs to travel a given distance.
 
     Args:
-        distance (float): The distance to be traveled.
-        target_speed (float): The target speed of the ego vehicle.
-        ego_speed (float): The current speed of the ego vehicle.
+        config: Configuration object containing vehicle dynamics parameters.
+        distance: The distance to be traveled.
+        target_speed: The target speed of the ego vehicle.
+        ego_speed: The current speed of the ego vehicle.
 
     Returns:
-        float: The minimum time needed to travel the given distance.
+        The minimum time needed to travel the given distance.
     """
     min_time_needed = 0.0
     remaining_distance = distance
@@ -829,8 +810,8 @@ def match_unreal_engine_ids_to_carla_bounding_boxes_ids(
         carla_boxes: list of CARLA bounding boxes
         ego_camera_pc: Nx5 array with x,y,z,semantic_id,unreal_id
         penalize_points_outside: If True, points outside the bounding box are penalized in the cost matrix.
-    Return:
-        dict: Mapping from Unreal Engine instance IDs to CARLA actor IDs
+    Returns:
+        Mapping from Unreal Engine instance IDs to CARLA actor IDs
     """
     if len(carla_boxes) == 0:
         return {}
@@ -890,8 +871,8 @@ def match_unreal_engine_ids_to_carla_actors_ids(
         actors_original_semantic_id: Semantic ID to be replaced (e.g., CONE_AND_TRAFFIC_WARNING_SEMANTIC_ID)
         carla_actors: list of CARLA bounding boxes
         ego_camera_pc: Nx5 array with x,y,z,semantic_id,unreal_id
-    Return:
-        dict: Mapping from Unreal Engine instance IDs to CARLA actor IDs
+    Returns:
+        Mapping from Unreal Engine instance IDs to CARLA actor IDs
     """
     carla_boxes = [
         {
@@ -1358,7 +1339,7 @@ def get_stop_waypoints(ego_waypoint: carla.Waypoint, traffic_light: carla.Traffi
         traffic_light: The traffic light to get stop waypoints from
 
     Returns:
-        list[carla.Waypoint]: List of waypoints at the intersection in the same direction
+        List of waypoints at the intersection in the same direction
     """
     waypoints = traffic_light.get_stop_waypoints()
 
@@ -1463,7 +1444,8 @@ def convert_depth(data: jt.UInt8[npt.NDArray, "h w 3"]) -> jt.Float[npt.NDArray,
     return in_meters
 
 
-def convert_instance_segmentation(data: np.array) -> np.array:
+@beartype
+def convert_instance_segmentation(data: jt.UInt8[npt.NDArray, "H W 3"]) -> jt.Int32[npt.NDArray, "H W 2"]:
     """
     Args:
         data: Instance segmentation map from CARLA of shape (H, W, 3) with values in range [0, 255].
@@ -1478,6 +1460,37 @@ def convert_instance_segmentation(data: np.array) -> np.array:
     )
     instance_id = data[:, :, 1].astype(np.int32) + (data[:, :, 2].astype(np.int32) << 8)
     return np.stack([semantic_id, instance_id], axis=-1)
+
+
+@beartype
+def enhance_depth(
+    depth: jt.Float[npt.NDArray, "H W"],
+    semantic_segmentation: jt.UInt8[npt.NDArray, "H W"],
+    instance_semantic_segmentation: jt.Int32[npt.NDArray, "H W 2"],
+) -> jt.Float[npt.NDArray, "H W"]:
+    """
+    Make car windows not transparent in depth images.
+    This function could be extended further for less noisy depth map but it's good for now.
+
+    Args:
+        depth: Metric depth
+        semantic_segmentation: Semantic segmentation of the image
+        instance_semantic_segmentation: First channel is semantic id and second channel is unreal engine instance id
+    Returns:
+        Repaired depth image where car windows are not transparent
+    """
+    CAR_SEMANTIC_ID = 14
+    instance_id = instance_semantic_segmentation[..., 1]
+    semantic_id = instance_semantic_segmentation[..., 0]
+    instance_ids = np.unique(instance_id[semantic_id == CAR_SEMANTIC_ID])
+
+    depth_repaired = depth.copy()
+    for inst_id in instance_ids:
+        inst_mask = instance_id == inst_id
+        window_mask = inst_mask & (semantic_segmentation != CAR_SEMANTIC_ID)
+        depth_repaired[window_mask] = depth_repaired[inst_mask].min()
+
+    return depth_repaired
 
 
 if __name__ == "__main__":

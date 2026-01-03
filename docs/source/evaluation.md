@@ -1,118 +1,155 @@
-# Evaluation
+# Evaluation (10 minutes)
 
-This guide covers basic local evaluation for getting started. For large-scale evaluation (running many routes parallely), see the [SLURM Evaluation Guide](slurm_evaluation.md).
+This guide covers local evaluation for getting started. For large-scale evaluation (running many routes in parallel), see the [SLURM Evaluation Guide](slurm_evaluation.md).
+
+```{note}
+Dataset download is not required for CARLA evaluation—only a trained model checkpoint is needed.
+```
 
 ## Overview
 
-We provided in the [Quick Start](https://github.com/autonomousvision/lead?tab=readme-ov-file#quick-start) tutorial how to evaluate a trained policy 
-on a single Bench2Drive route. Currently we support scripts to evaluate the three most popular benchmarks locally:
+The [Quick Start](https://github.com/autonomousvision/lead?tab=readme-ov-file#quick-start) tutorial demonstrates evaluating a trained policy on a single Bench2Drive route. We provide scripts for the three most popular benchmarks:
 
-* [Bench2Drive script](https://github.com/autonomousvision/lead/blob/main/scripts/eval_bench2drive.sh) - 220 routes
-* [Longest6 v2 script](https://github.com/autonomousvision/lead/blob/main/scripts/eval_longest6.sh) - 36 routes
-* [Town13 script](https://github.com/autonomousvision/lead/blob/main/scripts/eval_town13.sh) - 20 routes
+- **[Bench2Drive](https://github.com/autonomousvision/lead/blob/main/scripts/eval_bench2drive.sh)**: See [official repository](https://github.com/Thinklab-SJTU/Bench2Drive) for benchmark details
+- **[Longest6 v2](https://github.com/autonomousvision/lead/blob/main/scripts/eval_longest6.sh)**: See [carla_garage](https://github.com/autonomousvision/carla_garage?tab=readme-ov-file#longest6-v2) for benchmark details
+- **[Town13](https://github.com/autonomousvision/lead/blob/main/scripts/eval_town13.sh)**: See [CARLA Leaderboard 2.0 validation routes](https://github.com/autonomousvision/carla_garage?tab=readme-ov-file#carla-leaderboard-20-validation-routes)
+
+```{warning}
+Do not evaluate Longest6 v2 or Town13 routes using Bench2Drive's evaluation repository—the metrics definitions differ.
+```
 
 ## Running Evaluations
 
-**1. Start CARLA Server**
+### Start CARLA Server
 
-Before running any evaluation, start the CARLA server:
+Start the CARLA server before any evaluation:
 
 ```bash
 bash scripts/start_carla.sh
 ```
 
-**2. Customize Checkpoint and Route**
+### Configure Checkpoint and Route
 
-Each evaluation script contains these key variables you can modify:
+Each evaluation script contains configurable variables:
 
 ```bash
 export BENCHMARK_ROUTE_ID=23687  # Route ID to evaluate
 export CHECKPOINT_DIR=outputs/checkpoints/tfv6_resnet34/  # Path to model checkpoint
 ```
 
-For Bench2Drive, route IDs range from 0-219. For Longest6, use 00-35. For Town13, use 0-19.
+Route ID ranges:
+- **Bench2Drive**: 0-219 (220 routes)
+- **Longest6 v2**: 0-35 (36 routes)
+- **Town13**: 0-19 (20 routes)
 
-**3. Configuration Options**
+### Configuration Options
 
 Evaluation behavior is controlled by [config_closed_loop.py](https://github.com/autonomousvision/lead/blob/main/lead/inference/config_closed_loop.py). Key settings:
 
-* `produce_demo_video` - Generate bird's-eye view visualization videos
-* `produce_debug_video` - Generate detailed debug videos with sensor data
-* `produce_demo_image` - Save individual demo frames
-* `produce_debug_image` - Save individual debug frames
+- `produce_demo_video` - Generate bird's-eye view visualization videos
+- `produce_debug_video` - Generate detailed debug videos with sensor data
+- `produce_demo_image` - Save individual demo frames
+- `produce_debug_image` - Save individual debug frames
 
-Turn off video generation for faster evaluation:
+Disable video generation for faster evaluation:
 
-```python
-# In your environment or config override
-produce_demo_video = False
-produce_debug_video = False
+```bash
+export LEAD_CLOSED_LOOP_CONFIG="produce_demo_video=false produce_debug_video=false produce_demo_image=false produce_debug_image=false"
 ```
 
-The evaluation configuration can be changed for each progress individually with the environment variable `LEAD_CLOSED_LOOP_CONFIG`.
+The `LEAD_CLOSED_LOOP_CONFIG` environment variable allows per-run configuration overrides without modifying the config file.
 
-**4. Output Structure**
+### Output Structure
 
-Each evaluation creates:
+Each evaluation produces:
 
 ```
 outputs/local_evaluation/<route_id>/
-├── checkpoint_endpoint.json      # Metrics and results
-├── metric_info.json              # Detailed evaluation metrics
+├── checkpoint_endpoint.json      # Leaderboard 2.0 metrics and results
+├── metric_info.json              # Bench2Drive extended metrics (Bench2Drive only)
 ├── demo_images/                  # Bird's-eye view frames
 ├── debug_images/                 # Debug visualization frames
 └── debug_checkpoint/             # Debug checkpoints
 ```
 
 If video generation is enabled:
+
 ```
 outputs/local_evaluation/
 ├── <route_id>_demo.mp4          # Bird's-eye view video
 └── <route_id>_debug.mp4         # Debug video with sensor data
 ```
 
-## Summarize Leaderboard 2.0 Results for Longest6 v2 and Town13
+## Summarizing Results
 
-After completing all routes in a benchmark, aggregate results using the result parser:
+### Longest6 v2 and Town13
 
+After completing all routes, aggregate results using the [result parser](https://github.com/autonomousvision/lead/blob/main/scripts/tools/result_parser.py):
+
+**Longest6 v2:**
 ```bash
 python3 scripts/tools/result_parser.py \
-    --xml data/benchmark_routes/bench2drive220.xml \
-    --results outputs/local_evaluation/
+    --xml data/benchmark_routes/longest6.xml \
+    --results <directory_with_route_jsons>
 ```
 
-This generates a summary CSV with:
-- Driving score
-- Route completion percentage
-- Infraction breakdown (collisions, traffic violations, etc.)
+**Town13:**
+```bash
+python3 scripts/tools/result_parser.py \
+    --xml data/benchmark_routes/Town13.xml \
+    --results <directory_with_route_jsons>
+```
+
+This generates a summary CSV containing:
+- Driving score (DS)
+- Route completion (RC) percentage
+- Infraction breakdown (collisions, traffic violations, red lights, etc.)
 - Per-kilometer statistics
 
-## Summarize Bench2Drive Results
+### Bench2Drive
 
-Bench2Drive provides some more metrics beyond the official Leaderboard 2.0 metrics of Longest6 v2 and Town13. See [official guide](https://github.com/Thinklab-SJTU/Bench2Drive?tab=readme-ov-file#eval-tools).
+Bench2Drive provides extended metrics beyond standard Leaderboard 2.0 metrics. See the [official evaluation guide](https://github.com/Thinklab-SJTU/Bench2Drive?tab=readme-ov-file#eval-tools).
 
-The tools for Bench2Drive in our repo can be found [here](https://github.com/autonomousvision/lead/blob/main/3rd_party/Bench2Drive/tools/).
+Bench2Drive evaluation tools are located at [3rd_party/Bench2Drive/tools/](https://github.com/autonomousvision/lead/blob/main/3rd_party/Bench2Drive/tools/).
 
 ## Best Practices
 
-**Turn off production of videos and images for Longest6 v2 and Town13**: With enough compute (16-32 GTX 1080ti), evaluation can take up to 1 day for 3 seeds on Longest6 v2 and up to 2 days for 3 seeds on Town13. About 90% of the routes will be finished within a few hours.
+### 1. Disable Visualization for Long Benchmarks
 
-**Restart CARLA between routes**: Running multiple routes on the same CARLA instance can lead to rendering bugs (see image, taken from Bench2Drive paper).
+With sufficient compute (16-32 GTX 1080 Ti GPUs):
+- **Longest6 v2**: ~1 day for 3 seeds (36 routes × 3 = 108 evaluations)
+- **Town13**: ~2 days for 3 seeds (20 routes × 3 = 60 evaluations)
+
+Approximately 90% of routes complete within a few hours. Disable video/image generation to accelerate evaluation.
+
+### 2. Restart CARLA Between Routes
+
+Running multiple routes on the same CARLA instance can cause rendering bugs (example from Bench2Drive paper):
 
 ![](../assets/buggy_rendering.png)
 
+Restart CARLA between routes:
+
 ```bash
 bash scripts/clean_carla.sh  # Kill CARLA processes
-bash scripts/start_carla.sh  # Restart fresh instance
+bash scripts/start_carla.sh  # Start fresh instance
 ```
 
-**Memory management**: By default, the pipeline loads all three checkpoint seeds as an ensemble. If memory is limited, rename two of the checkpoint files so only one seed loads.
+### 3. Memory Management
 
-**Use correct leaderboard and scenario_runner**: Longest6 v2 and Town13 should be evaluated on the normal leaderboard setup. Bench2Drive must be evaluated on [code of their repo](https://github.com/autonomousvision/lead/tree/main/3rd_party/Bench2Drive), otherwise the results are not valid.
+The pipeline loads all three checkpoint seeds as an ensemble by default. If GPU memory is limited, rename two checkpoint files temporarily so only one seed loads.
 
-**Evaluation variance**: CARLA is highly stochastic, even with fixed seeds. Results can vary significantly between runs due to traffic randomness and other non-deterministic factors. Our recommended evaluation protocol:
+### 4. Use Correct Evaluation Tools
 
-- Minimum (standard practice): Train 3 models with different seeds, evaluate each once → 3 evaluation runs total
-- Optimal (for publications): Train 3 models with different seeds, evaluate each 3 times → 9 evaluation runs total
+- **Longest6 v2 and Town13**: Evaluate using standard leaderboard setup
+- **Bench2Drive**: Must evaluate using [Bench2Drive's code](https://github.com/autonomousvision/lead/tree/main/3rd_party/Bench2Drive)—otherwise results are invalid
 
-We use the minimum protocol in our group.
+### 5. Account for Evaluation Variance
+
+CARLA is highly stochastic despite fixed seeds. Results vary between runs due to traffic randomness and non-deterministic simulation factors.
+
+**Recommended evaluation protocols:**
+- **Minimum (standard practice)**: Train 3 models with different seeds, evaluate each once → 3 evaluation runs total
+- **Optimal (for publications)**: Train 3 models with different seeds, evaluate each 3 times → 9 evaluation runs total
+
+Our research group uses the minimum protocol.

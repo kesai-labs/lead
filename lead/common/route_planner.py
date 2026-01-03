@@ -206,47 +206,6 @@ def interpolate_trajectory(
     return gps_route, route
 
 
-def extrapolate_waypoint_route(waypoint_route: deque, route_points: int) -> deque:
-    """Extrapolate waypoints beyond the current route endpoint.
-
-    Extends the route by adding waypoints in a straight line beyond the
-    current endpoint, useful for ensuring sufficient planning horizon.
-
-    Args:
-        waypoint_route: Current waypoint route as a deque.
-        route_points: Number of points to extrapolate.
-
-    Returns:
-        Extended route with extrapolated waypoints.
-    """
-    # guard against inplace mutation
-    route = deepcopy(waypoint_route)
-
-    # determine length of route before extrapolation
-    remaining_waypoints = len(route)
-
-    # we start at the end of the unextrapolated route and move linearly
-    heading_vector = route[-1][0] - route[-2][0]
-    heading_vector = heading_vector / (np.linalg.norm(heading_vector) + 1.0e-7)
-
-    # we extrapolate 2 meters ahead for each point and skip the first two
-    extrapolation = []
-    for i in range(2, route_points + 2):
-        next_wp = route[-1][0] + i * 2 * heading_vector
-        extrapolation.append((next_wp, route[-1][1]))
-    route.extend(extrapolation)
-
-    # the waypoint_planner does not pop the last (few) waypoints in its
-    # route. We manually pop those when they are the only remaining points
-    # in the original route and only pass the extrapolation to the cost.
-    if remaining_waypoints == 2:
-        route.popleft()
-        route.popleft()
-    elif remaining_waypoints == 1:
-        route.popleft()
-    return route
-
-
 def _get_latlon_ref(world_map: carla.Map) -> tuple[float, float]:
     """Extract latitude and longitude reference from CARLA map.
 
