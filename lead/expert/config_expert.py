@@ -32,24 +32,6 @@ class ExpertConfig(BaseConfig):
     def target_dataset(self):
         return TargetDataset.CARLA_LEADERBOARD2_3CAMERAS
 
-    @property
-    def crop_height(self):
-        """The amount of pixels cropped from the bottom of the image."""
-        return self.camera_calibration[1]["height"] - self.camera_calibration[1]["cropped_height"]
-
-    @property
-    def carla_crop_height_type(self):
-        """Type of cropping applied to CARLA images."""
-        if self.target_dataset in [TargetDataset.CARLA_LEADERBOARD2_3CAMERAS, TargetDataset.CARLA_LEADERBOARD2_6CAMERAS]:
-            return CarlaImageCroppingType.NONE
-        elif self.target_dataset in [
-            TargetDataset.NAVSIM_4CAMERAS,
-        ]:
-            return CarlaImageCroppingType.NONE
-        elif self.target_dataset in [TargetDataset.WAYMO_E2E_2025_3CAMERAS]:
-            return CarlaImageCroppingType.BOTTOM
-        raise ValueError("Unknown target dataset")
-
     # --- Planning Area ---
     # Maximum planning area coordinate in x direction (meters)
     # How many pixels make up 1 meter in BEV grids.
@@ -391,7 +373,6 @@ class ExpertConfig(BaseConfig):
     draw_future_route_till_distance = 500 * points_per_meter
     # Default minimum distance to process the route obstacle scenarios
     default_max_distance_to_process_scenario = 50
-    safe_crossing_bicycle_flow = True
     # --- expert V1.1 Changes: HazardAtSideLane ---
     # If true enable smooth HazardAtSideLane merging
     hazard_at_side_lane_smooth_merging = True
@@ -399,14 +380,8 @@ class ExpertConfig(BaseConfig):
     max_distance_to_process_hazard_at_side_lane = 25
     # Minimum distance to process HazardAtSideLaneTwoWays scenarios
     max_distance_to_process_hazard_at_side_lane_two_ways = 10
-    # If true use the safe InterurbanActorFlow behavior
-    safe_interurban_actor_flow = True
-    # If true avoid colliding with the actor in EnterActorFlow
-    avoid_rear_collision = True
 
     # --- TwoWays Scenarios with Obstacles ---
-    # If true use shorter acceleration way for obstacle two ways scenarios
-    shorter_acceleration_way_obstacle_two_ways = True
     # Maximum distance to start the overtaking maneuver
     max_distance_to_overtake_two_way_scnearios = int(8 * points_per_meter)
     # Default overtaking speed in m/s for all route obstacle scenarios
@@ -423,21 +398,16 @@ class ExpertConfig(BaseConfig):
     factor_construction_obstacle_two_ways = 1.08
 
     # --- AccidentTwoWays ---
-    # If true use shorter acceleration way for accident two ways scenarios
-    shorter_acceleration_way_accident_two_ways = True
     # Increase overtaking maneuver by distance in meters after the obstacle in AccidentTwoWays
     add_after_accident_two_ways = int(-1.0 * points_per_meter)
     # Transition length for scenario AccidentTwoWays to change lanes
     transition_length_accident_two_ways = int(4.5 * points_per_meter)
     # Increase overtaking maneuver by distance in meters before the obstacle in AccidentTwoWays
     add_before_accident_two_ways = int(-1.0 * points_per_meter)
-
     # How much to drive to the center of the opposite lane while handling AccidentTwoWays
     factor_accident_two_ways = 1.0
 
     # --- ParkedObstacleTwoWays ---
-    # If true use secured parked obstacle two ways behavior
-    secured_parked_obstacle_two_ways = True
     # Transition length for scenario ParkedObstacleTwoWays to change lanes
     transition_length_parked_obstacle_two_ways = int(4 * points_per_meter)
     # Increase overtaking maneuver by distance in meters after the obstacle in ParkedObstacleTwoWays
@@ -448,8 +418,6 @@ class ExpertConfig(BaseConfig):
     add_before_parked_obstacle_two_ways = int(-0.5 * points_per_meter)
 
     # --- VehicleOpensDoorTwoWays ---
-    # If true use secured vehicle opens door two ways behavior
-    secured_vehicle_opens_door_two_ways = True
     # How much to drive to the center of the opposite lane while handling VehicleOpensDoorTwoWays
     factor_vehicle_opens_door_two_ways = 0.7
     # Overtaking speed in m/s for vehicle opens door two ways scenarios
@@ -462,11 +430,6 @@ class ExpertConfig(BaseConfig):
     transition_length_vehicle_opens_door_two_ways = int(5 * points_per_meter)
 
     # --- OppositeVehicleTakingPriority ---
-    # Whether we will brake when other vehicles come from the side
-    brake_on_side_emergency_vehicle = True
-
-    # If true apply emergency brake for pedestrians and crossing bikers
-    pedestrians_and_crossing_brikers_emergency_brake = True
     # Minimum visible pixels for pedestrian occlusion check
     pedestrian_occlusion_check_min_visible_pixels = 10
     # If true enable bikers occlusion check
@@ -481,8 +444,6 @@ class ExpertConfig(BaseConfig):
     vehicle_occlusion_check_min_num_points = 1
 
     # --- Accident ---
-    # If true enable smooth merging for accident scenarios
-    accident_smooth_merging = True
     # Distance to add before accident for smooth merging
     add_before_accident = int(1.5 * points_per_meter)
     # Distance to add after accident for smooth merging
@@ -491,8 +452,6 @@ class ExpertConfig(BaseConfig):
     transition_smoothness_distance_accident = int(10 * points_per_meter)
 
     # --- ParkedObstacle ---
-    # If true enable smooth merging for parked obstacle scenarios
-    parked_obstacle_smooth_merging = True
     # Distance to add before parked obstacle for smooth merging
     add_before_parked_obstacle = int(1.0 * points_per_meter)
     # Distance to add after parked obstacle for smooth merging
@@ -501,8 +460,6 @@ class ExpertConfig(BaseConfig):
     transition_smoothness_distance_parked_obstacle = int(10 * points_per_meter)
 
     # --- ConstructionObstacle ---
-    # If true enable smooth merging for construction obstacle scenarios
-    construction_obstacle_smooth_merging = True
     # Distance to add before construction obstacle for smooth merging
     add_before_construction_obstacle = int(1.5 * points_per_meter)
     # Distance to add after construction obstacle for smooth merging
@@ -553,8 +510,11 @@ class ExpertConfig(BaseConfig):
     traffic_warning_bb_size = [1.186714768409729, 1.4352929592132568]
     # Default bounding box size for construction cones.
     construction_cone_bb_size = [0.1720348298549652, 0.1720348298549652]
+    # If true  save camera point clouds
     save_camera_pc = True
+    # If true save instance segmentation images
     save_instance_segmentation = True
+    # If true run expert evaluation
     eval_expert = False
 
     @property
@@ -766,9 +726,6 @@ class ExpertConfig(BaseConfig):
     # --- Discontinuous Road Configuration ---
     # Handles scenarios where road continuity is interrupted
 
-    # Activate for all scenarios
-    discontinuous_road_reduce_speed = False
-
     # Maximum distance between route points
     max_distance_between_future_route_points = 0.25
 
@@ -782,11 +739,6 @@ class ExpertConfig(BaseConfig):
     discontinuous_road_max_future_check = 10 * points_per_meter
 
     # --- High Road Curvature Configuration ---
-    # Handles sharp curves found in some Leaderboard towns
-
-    # Activate for all scenarios
-    high_road_curvature_reduce_speed = False
-
     # Maximum future points to consider
     high_road_curvature_max_future_points = 20 * points_per_meter
 
@@ -810,8 +762,6 @@ class ExpertConfig(BaseConfig):
         if self.is_on_slurm:
             return True
         return True
-
-    # Storage and collision avoidance parameters
 
     # PNG compression level for storing images
     png_storage_compression_level = 6

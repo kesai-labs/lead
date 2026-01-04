@@ -318,7 +318,7 @@ class LeaderboardEvaluator(object):
             route_date_string = route_string + '_' + '_'.join(
                 map(lambda x: '%02d' % x, (now.month, now.day, now.hour, now.minute, now.second))
             )
-            os.environ["ROUTE_INDEX"] = route_date_string # PDM-LiteV1.1
+            os.environ["ROUTE_INDEX"] = route_date_string
 
             self._agent_watchdog = Watchdog(args.timeout)
             self._agent_watchdog.start()

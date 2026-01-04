@@ -46,7 +46,7 @@ class BaseAgent:
         if sensor_agent:
             route_planner_config = self.config_closed_loop
 
-        self.gps_waypoint_planners_dict = {}
+        self.gps_waypoint_planners_dict: dict[float, RoutePlanner] = {}
         for dist in route_planner_config.tp_distances:
             planner = RoutePlanner(dist, route_planner_config.route_planner_max_distance)
             planner.set_route(self._global_plan, True, lat_ref=self.noisy_lat_ref, lon_ref=self.noisy_lon_ref)
@@ -80,6 +80,7 @@ class BaseAgent:
             {
                 "theta": self.compass,
                 "filtered_state": self.filtered_state,
+                "noisy_state": noisy_gps_pos,
                 "accel_x": input_data["imu"][1][0],
                 "accel_y": input_data["imu"][1][1],
                 "accel_z": input_data["imu"][1][2],

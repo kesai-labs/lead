@@ -519,6 +519,8 @@ class TrainingConfig(BaseConfig):
 
     # If true add noise to target points for robustness.
     use_noisy_tp = False
+    # If true, use the Kalman filter for less noisy ego state estimation.
+    use_kalman_filter_for_gps = True
     # If true use the velocity as input to the network.
     use_velocity = True
 

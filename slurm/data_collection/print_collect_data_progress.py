@@ -53,7 +53,7 @@ def is_failed(json_path):
     return condition1 or condition2 or condition3 or condition4 or condition5
 
 
-root = "data/carla_leaderboard2"
+root = "data/carla_leaderboard2_debug"
 results_root = f"{root}/results"
 ignore_empty = True
 scenario_stats = {}

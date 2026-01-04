@@ -80,7 +80,7 @@ class PrivilegedRoutePlanner:
         """
         Load the previously saved route index location, which could be used for forecasting the ego vehicle.
         """
-        self.route_index = self.last_route_index
+        self.route_index = int(self.last_route_index)
 
     @beartype
     def run_step(self, agent_position: np.ndarray) -> tuple:
@@ -451,7 +451,7 @@ class PrivilegedRoutePlanner:
             vehicle_loc: The initial location of the vehicle.
         """
         LOG.info("Setting up the privileged route planner.")
-        self.route_index = self.extra_route_length * self.points_per_meter
+        self.route_index = int(self.extra_route_length * self.points_per_meter)
         self.last_route_index = self.route_index
 
         # Get all waypoint objects of the route and add extra waypoints at the end

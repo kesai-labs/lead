@@ -864,8 +864,6 @@ class Visualizer:
             "angular_velocity_y",
             "angular_velocity_z",
             "target_speed",
-            "land_mark_speed_limit",
-            "last_encountered_speed_limit_sign",
             "theta",
             "privileged_yaw",
             "second_highest_speed",

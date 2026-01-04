@@ -1,5 +1,6 @@
 import logging
 import math
+import numbers
 import typing
 from numbers import Real
 
@@ -381,13 +382,13 @@ def get_steer(
 @beartype
 def compute_target_speed_idm(
     config: ExpertConfig,
-    desired_speed: float,
-    leading_actor_length: float,
-    ego_speed: float,
-    leading_actor_speed: float,
-    distance_to_leading_actor: float,
-    s0: float = 4.0,
-    T: float = 0.5,
+    desired_speed: numbers.Real,
+    leading_actor_length: numbers.Real,
+    ego_speed: numbers.Real,
+    leading_actor_speed: numbers.Real,
+    distance_to_leading_actor: numbers.Real,
+    s0: numbers.Real = 4.0,
+    T: numbers.Real = 0.5,
 ):
     """
     Compute the target speed for the ego vehicle using the Intelligent Driver Model (IDM).
@@ -1066,7 +1067,7 @@ def get_weather_name(weather_parameter: carla.WeatherParameters, config: ExpertC
     Return the name of the weather preset matching the given CARLA WeatherParameters.
     Args:
         weather_parameter: The CARLA WeatherParameters object describing current weather.
-        config: A PDMLiteConfig containing a dictionary of known weather presets.
+        config: An expert config containing a dictionary of known weather presets.
 
     Returns:
         str: The name of the matched preset if found, otherwise the name of the nearest preset.

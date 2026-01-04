@@ -1,4 +1,5 @@
 import logging
+import numbers
 import typing
 
 import carla
@@ -17,7 +18,7 @@ from lead.common.constants import (
 )
 from lead.common.logging_config import setup_logging
 from lead.common.pid_controller import ExpertLateralPIDController
-from lead.expert.expert_visualizer import ExpertVisualizer
+from lead.expert.expert_data import ExpertData
 
 matplotlib.use("Agg")  # non-GUI backend for headless servers
 
@@ -30,7 +31,7 @@ def get_entry_point() -> str:
     return "Expert"
 
 
-class Expert(ExpertVisualizer):
+class Expert(ExpertData):
     """Actor class for the expert autonomous agent in CARLA simulations.
 
     Consists driving logic, sensor configurations, and utility functions for expert driving behavior.
@@ -156,8 +157,6 @@ class Expert(ExpertVisualizer):
                     * (3 / self.config_expert.num_cameras)
                 )
                 if 0 < num_visible_pixel / (actor_height**2) < threshold:
-                    continue
-                if not self.config_expert.pedestrians_and_crossing_brikers_emergency_brake:
                     continue
                 actor_velocity = actor.get_velocity().length()
                 if (
@@ -292,27 +291,6 @@ class Expert(ExpertVisualizer):
             )
 
         target_speed = min(target_speed, target_speed_route_obstacle)
-        # Reduce target speed if the ego vehicle is close to road discontinuity
-        self.reduce_speed_discontinuous_road = False
-        if (
-            not obstacle_override
-            and self.config_expert.discontinuous_road_reduce_speed
-            and self.distance_to_road_discontinuity < self.config_expert.discontinuous_road_max_future_points
-        ):
-            target_speed = min(self.config_expert.discontinuous_road_max_speed, target_speed)
-            self.reduce_speed_discontinuous_road = True
-            LOG.info("Future road is discontinuous, reducing target speed.")
-
-        # Reduce target speed if the ego vehicle is close to a very sharp curve
-        self.reduce_speed_high_route_curvature = False
-        if (
-            not obstacle_override
-            and self.config_expert.high_road_curvature_reduce_speed
-            and self.route_curvature > self.config_expert.high_road_curvature_max_speed
-        ):
-            target_speed = min(self.config_expert.high_road_curvature_max_speed, target_speed)
-            self.reduce_speed_high_route_curvature = True
-            LOG.info("Future road has high curvature, reducing target speed.")
 
         self.emergency_brake_for_special_vehicle = False
         if self.current_active_scenario_type in ["OppositeVehicleTakingPriority", "OppositeVehicleRunningRedLight"]:
@@ -460,10 +438,9 @@ class Expert(ExpertVisualizer):
         self,
         from_index: int,
         to_index: int,
-        target_speed: float,
-        ego_speed: float,
+        target_speed: numbers.Real,
         previous_lane_ids: list,
-        min_speed: float = 50.0 / 3.6,
+        min_speed: numbers.Real = 50.0 / 3.6,
     ) -> bool:
         """
         Checks if the path between two route indices is clear for the ego vehicle to overtake in two ways scenarios.
@@ -472,7 +449,6 @@ class Expert(ExpertVisualizer):
             from_index: The starting route index.
             to_index: The ending route index.
             target_speed: The target speed of the ego vehicle.
-            ego_speed: The current speed of the ego vehicle.
             previous_lane_ids: A list of tuples containing previous road IDs and lane IDs.
             min_speed: The minimum speed to consider for overtaking. Defaults to 50/3.6 km/h.
 
@@ -493,7 +469,7 @@ class Expert(ExpertVisualizer):
             + self.config_expert.check_path_free_safety_distance
         )
         ego_time = expert_utils.compute_min_time_for_distance(
-            self.config_expert, ego_distance, min(min_speed, target_speed), ego_speed
+            self.config_expert, ego_distance, min(min_speed, target_speed), self.ego_speed
         )
 
         path_clear = True
@@ -937,7 +913,6 @@ class Expert(ExpertVisualizer):
                     path_clear = self.is_two_ways_overtaking_path_clear(
                         int(from_index),
                         int(to_index),
-                        ego_location,
                         target_speed,
                         prev_road_lane_ids,
                         min_speed=self.two_way_overtake_speed,
@@ -1001,14 +976,13 @@ class Expert(ExpertVisualizer):
 
                     # Assume the bicycles don't drive too much during the overtaking process
                     to_index += 170
-                    from_index = self.privileged_route_planner.route_index
+                    from_index = int(self.privileged_route_planner.route_index)
 
                     starting_wp = self.route_waypoints[0].get_left_lane()
                     prev_road_lane_ids = expert_utils.get_previous_road_lane_ids(self.config_expert, starting_wp)
                     path_clear = self.is_two_ways_overtaking_path_clear(
                         int(from_index),
                         int(to_index),
-                        ego_location,
                         target_speed,
                         prev_road_lane_ids,
                         min_speed=self.config_expert.default_overtake_speed,
@@ -1016,13 +990,15 @@ class Expert(ExpertVisualizer):
 
                     if path_clear:
                         transition_length = self.config_expert.transition_smoothness_distance
-                        self.privileged_route_planner.shift_route_smoothly(from_index, to_index, True, transition_length)
+                        self.privileged_route_planner.shift_route_smoothly(
+                            int(from_index), int(to_index), True, transition_length
+                        )
                         changed_route = True
                         CarlaDataProvider.memory[self.current_active_scenario_type].update(
                             {
                                 "changed_route": changed_route,
-                                "from_index": from_index,
-                                "to_index": to_index,
+                                "from_index": int(from_index),
+                                "to_index": int(to_index),
                                 "path_clear": path_clear,
                             }
                         )
@@ -1086,15 +1062,17 @@ class Expert(ExpertVisualizer):
 
                     transition_length = self.config_expert.transition_smoothness_distance
                     to_left = self.route_waypoints[from_index].lane_change != carla.LaneChange.Right
-                    self.privileged_route_planner.shift_route_smoothly(from_index, to_index, to_left, transition_length)
+                    self.privileged_route_planner.shift_route_smoothly(
+                        int(from_index), int(to_index), to_left, transition_length
+                    )
 
                     changed_route = True
                     to_index -= transition_length
                     CarlaDataProvider.memory[self.current_active_scenario_type].update(
                         {
                             "changed_route": changed_route,
-                            "from_index": from_index,
-                            "to_index": to_index,
+                            "from_index": int(from_index),
+                            "to_index": int(to_index),
                             "to_left": to_left,
                         }
                     )

@@ -30,7 +30,6 @@ def calculate_velocity(actor):
     velocity_squared += actor.get_velocity().y**2
     return math.sqrt(velocity_squared)
 
-# PDM-LiteV1.1
 def DEFAULT_MEMORY():
     ret = defaultdict(dict)
     ret.update({
@@ -76,8 +75,8 @@ def DEFAULT_MEMORY():
         "BlockedIntersection": {"obstacles": []},
         "EnterActorFlow": {"adversarial_actors": [], "source_wp": None, "sink_wp": None, "intersection_point": None,  "dangerous_adversarial_actor_ids": [],  "safe_adversarial_actors_ids": [],  "ignored_adversarial_actors_ids": [], "opponent_traffic_route": None},
         "EnterActorFlowV2": {"adversarial_actors": [], "source_wp": None, "sink_wp": None, "intersection_point": None,  "dangerous_adversarial_actor_ids": [],  "safe_adversarial_actors_ids": [],  "ignored_adversarial_actors_ids": [], "opponent_traffic_route": None},
-        "allow_new_actors": True,  # PDM-LiteV1.1
-        "next_traffic_light": None,  # PDM-LiteV1.1
+        "allow_new_actors": True, 
+        "next_traffic_light": None, 
     })
     return ret
 
@@ -100,9 +99,9 @@ class CarlaDataProvider(object):  # pylint: disable=too-many-public-methods
     # Saves, which type of scenario is currently runninng. That's necessary since some scenarios can't be detected / distinguished.
     # the key saves the scenario type and the value all relevant data
     active_scenarios = []
-    previous_active_scenario = None # PDM-LiteV1.1
-    memory = DEFAULT_MEMORY() # PDM-LiteV1.1
-    previous_memory = DEFAULT_MEMORY() # PDM-LiteV1.1
+    previous_active_scenario = None 
+    memory = DEFAULT_MEMORY()
+    previous_memory = DEFAULT_MEMORY()
     _actor_velocity_map = {}
     _actor_location_map = {}
     _actor_transform_map = {}
@@ -131,8 +130,6 @@ class CarlaDataProvider(object):  # pylint: disable=too-many-public-methods
             return CarlaDataProvider.active_scenarios[0][0]
         return None
 
-
-    # PDM-LiteV1.1
     @staticmethod
     def clean_current_active_scenario():
         if len(CarlaDataProvider.active_scenarios) > 0:

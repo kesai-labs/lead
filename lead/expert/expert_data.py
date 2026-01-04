@@ -938,15 +938,11 @@ class ExpertData(ExpertBase):
             self.adversarial_actors_ids
         )
         data = {
-            "target_dataset": int(self.config_expert.target_dataset),
             "num_dangerous_adversarial": len(dangerous_adversarial_actors_ids),
             "num_safe_adversarial": len(safe_adversarial_actors_ids),
             "num_ignored_adversarial": len(ignored_adversarial_actors_ids),
             "rear_adversarial_id": -1 if self.rear_adversarial_actor is None else self.rear_adversarial_actor.id,
             "town": self.town,
-            "slower_bad_visibility": self.slower_bad_visibility,
-            "slower_clutterness": self.slower_clutterness,
-            "slower_occluded_junction": self.slower_occluded_junction,
             "privileged_past_positions": np.array(self.privileged_ego_past_positions, dtype=np.float32)[::-1],
             "past_positions": np.array(self.ego_past_positions, dtype=np.float32)[::-1],
             "past_filtered_state": np.array(self.ego_past_filtered_state, dtype=np.float32)[::-1],
@@ -960,11 +956,11 @@ class ExpertData(ExpertBase):
             "angular_velocity_y": tick_data["angular_velocity_y"],
             "angular_velocity_z": tick_data["angular_velocity_z"],
             "pos_global": self.ego_location_array.tolist(),
-            "noisy_pos_global": tick_data["filtered_state"][:2].tolist(),
+            "filtered_pos_global": tick_data["filtered_state"][:2].tolist(),
+            "noisy_pos_global": tick_data["noisy_state"][:2].tolist(),
             "theta": self.ego_orientation_rad,
             "privileged_yaw": privileged_yaw,
             "target_speed": target_speed,
-            "target_speed_limit": self.target_speed_limit,
             "speed_limit": self.speed_limit,
             "last_encountered_speed_limit_sign": self.last_encountered_speed_limit_sign,
             "previous_target_points": previous_target_points,
@@ -979,15 +975,6 @@ class ExpertData(ExpertBase):
             "steer": control.steer,
             "throttle": control.throttle,
             "brake": bool(control.brake),
-            "vehicle_hazard": bool(self.vehicle_hazard),
-            "vehicle_affecting_id": self.vehicle_affecting_id,
-            "light_hazard": bool(self.traffic_light_hazard),
-            "walker_hazard": bool(self.walker_hazard),
-            "walker_affecting_id": self.walker_affecting_id,
-            "stop_sign_hazard": bool(self.stop_sign_hazard),
-            "stop_sign_close": bool(self.stop_sign_close),
-            "walker_close": bool(self.walker_close),
-            "walker_close_id": self.walker_close_id,
             "perturbation_translation": self.perturbation_translation,
             "perturbation_rotation": self.perturbation_rotation,
             "ego_matrix": np.array(self.ego_vehicle.get_transform().get_matrix(), dtype=np.float32),
@@ -1009,9 +996,6 @@ class ExpertData(ExpertBase):
             "right_lane_marking_color_str": str(ego_wp.right_lane_marking.color),
             "right_lane_marking_type_str": str(ego_wp.right_lane_marking.type),
             "route_curvature": self.route_curvature,
-            "dist_to_road_discontinuity": self.distance_to_road_discontinuity,
-            "reduce_speed_discontinuous_road": self.reduce_speed_discontinuous_road,
-            "reduce_speed_high_route_curvature": self.reduce_speed_high_route_curvature,
             "dist_to_construction_site": self.distance_to_construction_site,
             "dist_to_accident_site": self.distance_to_accident_site,
             "dist_to_parked_obstacle": self.distance_to_parked_obstacle,
@@ -1022,11 +1006,6 @@ class ExpertData(ExpertBase):
             "dist_to_junction": distance_to_junction_ego,
             "current_active_scenario_type": self.current_active_scenario_type,
             "previous_active_scenario_type": self.previous_active_scenario_type,
-            "does_emergency_brake_for_pedestrians": self.does_emergency_brake_for_pedestrians,
-            "construction_obstacle_two_ways_stuck": self.construction_obstacle_two_ways_stuck,
-            "accident_two_ways_stuck": self.accident_two_ways_stuck,
-            "parked_obstacle_two_ways_stuck": self.parked_obstacle_two_ways_stuck,
-            "vehicle_opens_door_two_ways_stuck": self.vehicle_opens_door_two_ways_stuck,
             "scenario_obstacles_ids": self.scenario_obstacles_ids,
             "scenario_actors_ids": self.scenario_actors_ids,
             "vehicle_opened_door": self.vehicle_opened_door,
@@ -1036,22 +1015,62 @@ class ExpertData(ExpertBase):
             "distance_to_intersection_index_ego": self.distance_to_intersection_index_ego,
             "ego_lane_width": self.ego_lane_width,
             "target_lane_width": self.target_lane_width,
-            "rear_danger_8": self.rear_danger_8,
-            "rear_danger_16": self.rear_danger_16,
-            "brake_cutin": self.brake_cutin,
             "weather_setting": self.weather_setting,
             "jpeg_storage_quality": self.jpeg_storage_quality,
-            "emergency_brake_for_special_vehicle": self.emergency_brake_for_special_vehicle,
             "route_left_length": self.route_left_length,
             "distance_ego_to_route": self.distance_ego_to_route,
             "weather_parameters": self.weather_parameters,
             "signed_dist_to_lane_change": self.signed_dist_to_lane_change,
             "visual_visibility": int(self.visual_visibility),
             "num_parking_vehicles_in_proximity": self.num_parking_vehicles_in_proximity,
-            "europe_traffic_light": self.europe_traffic_light,
-            "over_head_traffic_light": self.over_head_traffic_light,
             "second_highest_speed": self.second_highest_speed,
             "second_highest_speed_limit": self.second_highest_speed_limit,
+            "dataset_information": {
+                "save_depth_lower_resolution": self.config_expert.save_depth_lower_resolution,
+                "save_depth_resolution_ratio": self.config_expert.save_depth_resolution_ratio,
+                "save_depth_bits": self.config_expert.save_depth_bits,
+                "save_only_non_ground_lidar": self.config_expert.save_only_non_ground_lidar,
+                "target_dataset": int(self.config_expert.target_dataset),
+                "replace_semantics_segmentation_with_instance_segmentation": self.config_expert.replace_semantics_segmentation_with_instance_segmentation,
+                "data_save_freq": self.config_expert.data_save_freq,
+                "save_grouped_semantic": self.config_expert.save_grouped_semantic,
+                
+            },
+            "sensor_information": {
+                "lidar_pos_1": self.config_expert.lidar_pos_1,
+                "lidar_rot_1": self.config_expert.lidar_rot_1,
+                "lidar_pos_2": self.config_expert.lidar_pos_2,
+                "lidar_rot_2": self.config_expert.lidar_rot_2,
+                "lidar_accumulation": self.config_expert.lidar_accumulation,
+                "num_cameras": self.config_expert.num_cameras,
+                "camera_calibration": self.config_expert.camera_calibration,
+                "num_radar_sensors": self.config_expert.num_radar_sensors,
+                "radar_calibration": self.config_expert.radar_calibration,
+            },
+            "europe_traffic_light": self.europe_traffic_light,
+            "over_head_traffic_light": self.over_head_traffic_light,
+            "emergency_brake_for_special_vehicle": self.emergency_brake_for_special_vehicle,
+            "vehicle_hazard": bool(self.vehicle_hazard),
+            "vehicle_affecting_id": self.vehicle_affecting_id,
+            "light_hazard": bool(self.traffic_light_hazard),
+            "walker_hazard": bool(self.walker_hazard),
+            "walker_affecting_id": self.walker_affecting_id,
+            "stop_sign_hazard": bool(self.stop_sign_hazard),
+            "stop_sign_close": bool(self.stop_sign_close),
+            "walker_close": bool(self.walker_close),
+            "walker_close_id": self.walker_close_id,
+            "target_speed_limit": self.target_speed_limit,
+            "slower_bad_visibility": self.slower_bad_visibility,
+            "slower_clutterness": self.slower_clutterness,
+            "slower_occluded_junction": self.slower_occluded_junction,
+            "does_emergency_brake_for_pedestrians": self.does_emergency_brake_for_pedestrians,
+            "construction_obstacle_two_ways_stuck": self.construction_obstacle_two_ways_stuck,
+            "accident_two_ways_stuck": self.accident_two_ways_stuck,
+            "parked_obstacle_two_ways_stuck": self.parked_obstacle_two_ways_stuck,
+            "vehicle_opens_door_two_ways_stuck": self.vehicle_opens_door_two_ways_stuck,
+            "rear_danger_8": self.rear_danger_8,
+            "rear_danger_16": self.rear_danger_16,
+            "brake_cutin": self.brake_cutin,
         }
 
         previous_gps_target_points_dict = {}
@@ -1780,3 +1799,152 @@ class ExpertData(ExpertBase):
         filtered_bounding_boxes = sorted(filtered_bounding_boxes, key=lambda x: x["distance"])
 
         return filtered_bounding_boxes
+
+    @beartype
+    def visualize_ego_bb(self, ego_bb_global: carla.BoundingBox):
+        ego_vehicle_transform = self.ego_vehicle.get_transform()
+        # Calculate the global bounding box of the ego vehicle
+        center_ego_bb_global = ego_vehicle_transform.transform(self.ego_vehicle.bounding_box.location)
+        ego_bb_global = carla.BoundingBox(center_ego_bb_global, self.ego_vehicle.bounding_box.extent)
+        ego_bb_global.rotation = ego_vehicle_transform.rotation
+
+        if self.config_expert.visualize_bounding_boxes:
+            self.carla_world.debug.draw_box(
+                box=ego_bb_global,
+                rotation=ego_bb_global.rotation,
+                thickness=0.1,
+                color=self.config_expert.ego_vehicle_bb_color,
+                life_time=self.config_expert.draw_life_time,
+            )
+
+    @beartype
+    def visualize_lead_and_trailing_vehicles(self):
+        if self.config_expert.visualize_internal_data:
+            vehicle_list = ...
+
+            leading_vehicle_ids = self.privileged_route_planner.compute_leading_vehicles(vehicle_list, self.ego_vehicle.id)
+            trailing_vehicle_ids = self.privileged_route_planner.compute_trailing_vehicles(vehicle_list, self.ego_vehicle.id)
+
+            for vehicle in vehicle_list:
+                if vehicle.id in leading_vehicle_ids:
+                    self.carla_world.debug.draw_string(
+                        vehicle.get_location(),
+                        f"Leading Vehicle: {vehicle.get_velocity().length():.2f} m/s",
+                        life_time=self.config_expert.draw_life_time,
+                        color=self.config_expert.leading_vehicle_color,
+                    )
+                elif vehicle.id in trailing_vehicle_ids:
+                    self.carla_world.debug.draw_string(
+                        vehicle.get_location(),
+                        f"Trailing Vehicle: {vehicle.get_velocity().length():.2f} m/s",
+                        life_time=self.config_expert.draw_life_time,
+                        color=self.config_expert.trailing_vehicle_color,
+                    )
+
+    @beartype
+    def visualize_forecasted_bounding_boxes(
+        self,
+        predicted_bounding_boxes: dict[int, list[carla.BoundingBox]],
+    ):
+        if self.config_expert.visualize_bounding_boxes:
+            dangerous_adversarial_actors_ids, safe_adversarial_actors_ids, ignored_adversarial_actors_ids = (
+                self.adversarial_actors_ids
+            )
+            for _actor_idx, actors_forecasted_bounding_boxes in predicted_bounding_boxes.items():
+                for bb in actors_forecasted_bounding_boxes:
+                    color = self.config_expert.other_vehicles_forecasted_bbs_color
+                    if _actor_idx in dangerous_adversarial_actors_ids or _actor_idx in safe_adversarial_actors_ids:
+                        color = self.config_expert.adversarial_color
+                    self.carla_world.debug.draw_box(
+                        box=bb,
+                        rotation=bb.rotation,
+                        thickness=0.1,
+                        color=color,
+                        life_time=self.config_expert.draw_life_time,
+                    )
+
+                for vehicle_id in predicted_bounding_boxes.keys():
+                    # check if vehicle is in front of the ego vehicle
+                    if vehicle_id in self.leading_vehicle_ids and not self.near_lane_change:
+                        vehicle = self.carla_world.get_actor(vehicle_id)
+                        extent = vehicle.bounding_box.extent
+                        bb = carla.BoundingBox(vehicle.get_location(), extent)
+                        bb.rotation = carla.Rotation(pitch=0, yaw=vehicle.get_transform().rotation.yaw, roll=0)
+                        self.carla_world.debug.draw_box(
+                            box=bb,
+                            rotation=bb.rotation,
+                            thickness=0.5,
+                            color=self.config_expert.leading_vehicle_color,
+                            life_time=self.config_expert.draw_life_time,
+                        )
+                    elif vehicle_id in self.trailing_vehicle_ids:
+                        vehicle = self.carla_world.get_actor(vehicle_id)
+                        extent = vehicle.bounding_box.extent
+                        bb = carla.BoundingBox(vehicle.get_location(), extent)
+                        bb.rotation = carla.Rotation(pitch=0, yaw=vehicle.get_transform().rotation.yaw, roll=0)
+                        self.carla_world.debug.draw_box(
+                            box=bb,
+                            rotation=bb.rotation,
+                            thickness=0.5,
+                            color=self.config_expert.trailing_vehicle_color,
+                            life_time=self.config_expert.draw_life_time,
+                        )
+
+    @beartype
+    def visualize_pedestrian_bounding_boxes(self, nearby_pedestrians_bbs: list[list[carla.BoundingBox]]):
+        # Visualize the future bounding boxes of pedestrians (if enabled)
+        if self.config_expert.visualize_bounding_boxes:
+            for bbs in nearby_pedestrians_bbs:
+                for bbox in bbs:
+                    self.carla_world.debug.draw_box(
+                        box=bbox,
+                        rotation=bbox.rotation,
+                        thickness=0.1,
+                        color=self.config_expert.pedestrian_forecasted_bbs_color,
+                        life_time=self.config_expert.draw_life_time,
+                    )
+
+    @beartype
+    def visualize_traffic_lights(self, traffic_light: carla.TrafficLight, wp: carla.Waypoint, bounding_box: carla.BoundingBox):
+        if self.config_expert.visualize_traffic_lights_bounding_boxes:
+            if traffic_light.state == carla.TrafficLightState.Red:
+                color = self.config_expert.red_traffic_light_color
+            elif traffic_light.state == carla.TrafficLightState.Yellow:
+                color = self.config_expert.yellow_traffic_light_color
+            elif traffic_light.state == carla.TrafficLightState.Green:
+                color = self.config_expert.green_traffic_light_color
+            elif traffic_light.state == carla.TrafficLightState.Off:
+                color = self.config_expert.off_traffic_light_color
+            else:  # unknown
+                color = self.config_expert.unknown_traffic_light_color
+
+            self.carla_world.debug.draw_box(
+                box=bounding_box, rotation=bounding_box.rotation, thickness=0.1, color=color, life_time=0.051
+            )
+
+            self.carla_world.debug.draw_point(
+                wp.transform.location + carla.Location(z=traffic_light.trigger_volume.location.z),
+                size=0.1,
+                color=color,
+                life_time=(1.0 / self.config_expert.carla_fps) + 1e-6,
+            )
+
+            self.carla_world.debug.draw_box(
+                box=traffic_light.bounding_box,
+                rotation=traffic_light.bounding_box.rotation,
+                thickness=0.1,
+                color=color,
+                life_time=0.051,
+            )
+
+    @beartype
+    def visualize_stop_signs(self, bounding_box_stop_sign: carla.BoundingBox, affects_ego: bool):
+        if self.config_expert.visualize_bounding_boxes:
+            color = carla.Color(0, 1, 0) if affects_ego else carla.Color(1, 0, 0)
+            self.carla_world.debug.draw_box(
+                box=bounding_box_stop_sign,
+                rotation=bounding_box_stop_sign.rotation,
+                thickness=0.1,
+                color=color,
+                life_time=(1.0 / self.config_expert.carla_fps) + 1e-6,
+            )

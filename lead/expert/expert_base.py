@@ -16,7 +16,6 @@ from privileged_route_planner import PrivilegedRoutePlanner
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
 
 import lead.common.common_utils as common_utils
-import lead.expert.expert_utils as pdm_lite_utils
 from lead.common.base_agent import BaseAgent
 from lead.common.constants import TransfuserSemanticSegmentationClass
 from lead.expert import expert_utils
@@ -416,7 +415,7 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
             sink_wp: carla.Waypoint = CarlaDataProvider.memory[scenario]["sink_wp"]
             opponent_traffic_route = CarlaDataProvider.memory[scenario]["opponent_traffic_route"]
             if opponent_traffic_route is None:
-                opponent_traffic_route = pdm_lite_utils.compute_global_route(
+                opponent_traffic_route = expert_utils.compute_global_route(
                     world=self.carla_world,
                     source_location=source_wp.transform.location,
                     sink_location=sink_wp.transform.location,
@@ -425,7 +424,7 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
 
             intersection_point = CarlaDataProvider.memory[scenario]["intersection_point"]
             if opponent_traffic_route is not None and intersection_point is None:
-                intersection_point, intersection_index_ego = pdm_lite_utils.intersection_of_routes(
+                intersection_point, intersection_index_ego = expert_utils.intersection_of_routes(
                     points_a=self.route_waypoints_np[
                         : self.config_expert.draw_future_route_till_distance
                     ],  # Don't use full route otherwise too expensive
@@ -526,7 +525,7 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                             elif scenario in ["SignalizedJunctionLeftTurnEnterFlow", "NonSignalizedJunctionLeftTurnEnterFlow"]:
                                 adversarial_actor_location = adversarial_actor.get_location()
                                 if (
-                                    pdm_lite_utils.distance_location_to_route(
+                                    expert_utils.distance_location_to_route(
                                         route=CarlaDataProvider.memory[scenario]["opponent_traffic_route"],
                                         location=np.array(
                                             [
@@ -945,19 +944,6 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
         return ego_location.distance(closest_biker.get_location())
 
     @step_cached_property
-    def distance_to_road_discontinuity(self) -> float:
-        route_points = self.route_waypoints_np
-        cumulative_dist = 0.0
-        for i in range(min(len(route_points) - 1, self.config_expert.discontinuous_road_max_future_check) - 1):
-            loc_current = route_points[i]
-            loc_next = route_points[i + 1]
-            dist = ((loc_current[0] - loc_next[0]) ** 2 + (loc_current[1] - loc_next[1]) ** 2) ** 0.5
-            cumulative_dist += dist
-            if dist > self.config_expert.max_distance_between_future_route_points:
-                return cumulative_dist / self.config_expert.points_per_meter
-        return float(np.inf)
-
-    @step_cached_property
     def route_left_length(self):
         route_points = self.route_waypoints_np
         dist_diff = np.diff(route_points[:, :2], axis=0)
@@ -1070,7 +1056,7 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
         ego_wp = self.carla_world_map.get_waypoint(
             self.ego_vehicle.get_location(), project_to_road=True, lane_type=carla.libcarla.LaneType.Any
         )
-        next_wps = pdm_lite_utils.wps_next_until_lane_end(ego_wp)
+        next_wps = expert_utils.wps_next_until_lane_end(ego_wp)
         try:
             next_lane_wps_ego = next_wps[-1].next(1)
             if len(next_lane_wps_ego) == 0:

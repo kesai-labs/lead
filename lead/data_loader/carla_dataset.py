@@ -220,8 +220,6 @@ class CARLAData(Dataset):
             "vehicle_hazard",
             "lane_type_str",
             "is_intersection",
-            "reduce_speed_discontinuous_road",
-            "reduce_speed_high_route_curvature",
             "does_emergency_brake_for_pedestrians",
             "construction_obstacle_two_ways_stuck",
             "accident_two_ways_stuck",
@@ -268,7 +266,6 @@ class CARLAData(Dataset):
             "steer",
             "throttle",
             "brake",
-            "dist_to_road_discontinuity",
             "dist_to_construction_site",
             "dist_to_accident_site",
             "dist_to_parked_obstacle",
@@ -295,8 +292,6 @@ class CARLAData(Dataset):
             "ego_lane_width",
             "route_left_length",
             "distance_ego_to_route",
-            "land_mark_speed_limit",
-            "last_encountered_speed_limit_sign",
             "target_speed_limit",
             "target_speed",
             "theta",
@@ -378,8 +373,10 @@ class CARLAData(Dataset):
         ego_yaw = meta["theta"]
         ego_position = np.array(meta["pos_global"][:2])
         if self.config.use_noisy_tp:
-            ego_position = np.array(meta["noisy_pos_global"][:2])
-
+            if self.config.use_kalman_filter_for_gps:
+                ego_position = np.array(meta["filtered_pos_global"][:2])
+            else:
+                ego_position = np.array(meta["noisy_pos_global"][:2])   
         def transform_and_augment(point: list[float]) -> jt.Float[npt.NDArray, " 2"]:
             ego_point = common_utils.inverse_conversion_2d(np.array(point), ego_position, ego_yaw)
             return carla_dataset_utils.perturbate_target_point(

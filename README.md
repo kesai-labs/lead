@@ -13,40 +13,40 @@
   </h4>
 </p>
 
-<p align="center">Official implementation of LEAD & TransFuser v6, an expert-student policy pair for autonomous driving research in CARLA. Includes a complete pipeline for data collection, training, and evaluation.</p>
-
 <div align="center">
 
-https://github.com/user-attachments/assets/1c67d296-41bb-460f-8c63-a756a5f40b6f
+https://github.com/user-attachments/assets/311f9f81-17f1-4741-a37d-93da81d25d08
 
-**End-to-end stress test:** Closed-loop execution of TransFuser v6, a state-of-the-art driving policy in CARLA, demonstrating stable control in a complex urban scenario under degraded perception condition and dense adversarial traffic.
+**Driving stress test:** Closed-loop execution of TransFuser v6, the latest iteration of the TransFuser family, demonstrating stable control in a complex urban scenario under degraded perception and adversarial traffic.
 
 </div>
 
 ## Overview
 
-LEAD provides a comprehensive framework for end-to-end driving research in the CARLA simulator, features:
+Accompanying the paper is a comprehensive research framework for end-to-end driving. Built around the CARLA simulator, the stack features:
 
-- **Data-centric infrastructure**:
-  - Comprehensive visualization suite.
-  - Runtime tensor shape and type validation.
-  - Efficient storage format, fitting 72 hours of driving in ~200GB.
+- **Data-centric design**:
+  - Extensive visualization suite.
+  - Runtime tensor shape & type validation.
+  - Optimized storage format, packs 72 hours of driving in ~200GB.
 
 - **Multi-dataset training pipeline**:
-  - Support for real-world datasets: NAVSIM, Waymo Vision-based E2E, Waymo Perception.
   - Domain adaptation through co-training on heterogeneous data sources.
+  - Native support for real-world datasets, including NAVSIM and Waymo Vision-based E2E.
+  
+We release the complete pipeline (covering routes description, expert driver, data preprocessing, training, and evaluation) required to achieve state-of-the-art closed-loop performance on the Bench2Drive benchmark.
 
 ## Table of Contents
 
 - [Roadmap](#roadmap)
 - [Updates](#updates)
-- [Setup Project (15 minutes)](#setup-project-15-minutes)
-- [Quick Start (5 minutes)](#quick-start-5-minutes)
-- [Bench2Drive Results](#bench2drive-results)
+- [Quick Start (Get Driving in 20 Minutes)](#quick-start-get-driving-in-20-minutes)
+- [Performance on Bench2Drive](#performance-on-bench2drive)
 - [Documentation and Resources](#documentation-and-resources)
 - [External Resources](#external-resources)
 - [Acknowledgements](#acknowledgements)
 - [Citation](#citation)
+- [License](#license)
 
 ## Roadmap
 
@@ -61,20 +61,17 @@ Status: Active development. Core code and checkpoints are released; remaining co
 
 - `2025/12/24` Arxiv paper and code release
 
-## Setup Project (15 minutes)
+## Quick Start (Get Driving in 20 Minutes)
 
-**1. Setup repository**
+**1. Environment initialization**
 
-Clone repository
+Clone the repository and map the project root to your environment
 
 ```bash
 git clone https://github.com/autonomousvision/lead.git
 cd lead
-```
 
-Set the project root directory and configure paths for CARLA, datasets, and dependencies.
-
-```bash
+# Set the project root directory and configure paths for CARLA, datasets, and dependencies.
 {
   echo -e "export LEAD_PROJECT_ROOT=$(pwd)"  # Set project root variable
   echo "source $(pwd)/scripts/main.sh"       # Persist more environment variables
@@ -83,87 +80,36 @@ Set the project root directory and configure paths for CARLA, datasets, and depe
 source ~/.bashrc  # Reload config to apply changes immediately
 ```
 
-<details>
-<summary>In case you use Zsh, you can instead run:</summary>
-
-```bash
-{
-  echo
-  echo "export LEAD_PROJECT_ROOT=$(pwd)"  # Set project root variable
-  echo "source $(pwd)/scripts/main.sh"    # Persist more environment variables
-} >> ~/.zshrc  # Append to zsh config to persist across sessions
-
-source ~/.zshrc  # Reload config to apply changes immediately
-```
-
-</details>
-
 > [!NOTE]
-> For some terminal (VSCode) you might need to manually edit `~/.bashrc` and `~/.zshrc` to ensure the lines are clean.
+> Please verify that ~/.bashrc reflects these paths correctly.
 
-**2. Create python environment**
+**2. Setup experiment infrastructure**
 
-We use [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install) for this project. First, create Conda environment
+We utilize [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install) and conda-lock for a more deterministic build:
 
 ```bash
-# Install conda-lock
-pip install conda-lock
-
-# Create Conda environment
-conda-lock install -n lead conda-lock.yml
-
+# Install conda-lock and create conda environment
+pip install conda-lock && conda-lock install -n lead conda-lock.yml
 # Activate conda environment
 conda activate lead
-```
-
-Install dependencies with uv
-
-```bash
-# Install uv
-pip install uv
-
-# Install dependencies
-uv pip install -r requirements.txt
-
-# Install project
-uv pip install -e .
-```
-
-Further dependencies
-```bash
-# Set-up git hooks
-pre-commit install
-
+# Install dependencies and setup git hooks
+pip install uv && uv pip install -r requirements.txt && uv pip install -e .
 # Install other tools needed for development
 conda install conda-forge::ffmpeg conda-forge::parallel conda-forge::tree conda-forge::gcc
+# Optional: Activate git hooks
+pre-commit install
 ```
 
-While waiting for dependencies installation, we recommend CARLA setup on parallel.
-
-**3. Setup CARLA**
-
-Install CARLA 0.9.15 at `3rd_party/CARLA_0915`
+While waiting for dependencies installation, we recommend CARLA setup on parallel:
 
 ```bash
-bash scripts/setup_carla.sh
+bash scripts/setup_carla.sh # Download and setup CARLA at 3rd_party/CARLA_0915
 ```
 
-<details>
-<summary>If you have an existing CARLA installation, you can softlink it by running:</summary>
+**3. Model zoo**
 
-```bash
-ln -s /your/carla/path $LEAD_PROJECT_ROOT/3rd_party/CARLA_0915
-```
-
-</details>
-
-## Quick Start (5 minutes)
-
-After setting up the project, you can evaluate the pre-trained checkpoints or expert (collecting data) to verify the pipeline.
-
-**1. Download model checkpoints**
-
-We provide pre-trained checkpoints on [HuggingFace](https://huggingface.co/ln2697/TFv6) for reproducibility. Fig. 1 shows the TFv6 network architecture. All checkpoints share the same structure but differ in their sensor configurations (e.g., with/without radar, different camera setups).
+Pre-trained driving policies are hosted on [HuggingFace](https://huggingface.co/ln2697/TFv6) for reproducibility. These checkpoints follow the TFv6 architecture 
+(detailed in Fig. 1), but differ in their sensor configurations (e.g., with/without radar), vision backbones (e.g., ResNet34/RegNetY-032) or dataset composition (e.g., with/without Town13).
 
 <br>
 
@@ -175,7 +121,7 @@ We provide pre-trained checkpoints on [HuggingFace](https://huggingface.co/ln269
 
 <br>
 
-Tab. 1 shows available checkpoints with their performance on three major CARLA benchmarks. To verify the pipeline, we recommend downloading `tfv6_resnet34` as it provides a good balance between performance and resource usage.
+Tab. 1 shows available checkpoints with their performance on three major CARLA benchmarks. As first step, we recommend `tfv6_resnet34` as it provides a good balance between performance and resource usage.
 
 <br>
 <div align="center">
@@ -189,7 +135,7 @@ Tab. 1 shows available checkpoints with their performance on three major CARLA b
 | [visiononly_resnet34](https://huggingface.co/ln2697/TFv6/tree/main/visiononly_resnet34)       | Vision-only driving model |    91.6     |     43      |    -     |
 | [town13heldout_resnet34](https://huggingface.co/ln2697/TFv6/tree/main/town13heldout_resnet34) | Generalization evaluation |    93.1     |     52      |   2.65   |
 
-**Table 1:** Performance of pre-trained checkpoints. We report Driving Score where higher is better.
+**Table 1:** Performance of pre-trained checkpoints. We report Driving Score, for which higher is better.
 
 </div>
 <br>
@@ -221,23 +167,23 @@ git lfs pull
 
 </details>
 
-**2. Run model evaluation**
+**4. Verify driving stack**
 
-To start the evaluation, follow those commands
+To initiate closed-loop evaluation and verify the integration of the driving stack, execute the following:
 
 ```bash
-# Start CARLA server
+# Start driving environment
 bash scripts/start_carla.sh
 
-# Evaluate one Bench2Drive route
+# Start policy on one route
 bash scripts/eval_bench2drive.sh
 
-# Optional: clean CARLA server
+# Optional: clean up driving environment
 bash scripts/clean_carla.sh
 ```
 
 <details>
-<summary>Results will be saved to <code>outputs/local_evaluation</code> with the following structure:</summary>
+<summary>Driving logs will be saved to <code>outputs/local_evaluation</code> with the following structure:</summary>
 
 ```html
 outputs/local_evaluation
@@ -252,12 +198,12 @@ outputs/local_evaluation
 </details>
 
 > [!TIP]
-> 1. Disable video generation in [config_closed_loop](lead/inference/config_closed_loop.py) by turning off `produce_demo_video` and `produce_debug_video`.
-> 2. Modify the file prefixes to load only the first seed, if memory is limited. By default, the pipeline loads all three seeds as an ensemble.
+> 1. Disable video recording in [config_closed_loop](lead/inference/config_closed_loop.py) by turning off `produce_demo_video` and `produce_debug_video`.
+> 2. If memory is limited, modify the file prefixes to load only the first checkpoint seed. By default, the pipeline loads all three seeds as an ensemble.
 
-**3. Run expert evaluation**
+**5. Verify autopilot**
 
-Evaluate expert and collect data
+Verify the expert policy and data acquisition pipeline by executing a test run on a sample route:
 
 ```bash
 # Start CARLA if not done already
@@ -298,7 +244,7 @@ data/expert_debug
 
 </details>
 
-## Bench2Drive Results
+## Performance on Bench2Drive
 
 We evaluate TFv6 on the [Bench2Drive](https://github.com/autonomousvision/Bench2Drive-Leaderboard/tree/ab8021b027fa9c4765f9a732355d3b2ae93736a0) benchmark, which consists of 220 routes across multiple towns with challenging weather conditions and traffic scenarios. Tab. 2 compares TFv6 with other recent methods.
 
