@@ -6,6 +6,7 @@ import pathlib
 import pickle
 import random
 import sys
+import typing
 from collections.abc import Generator
 
 from beartype import beartype
@@ -74,7 +75,7 @@ class AbstractBucketCollection(abc.ABC):
                 yield route_dir
 
     @beartype
-    def iter_route(self, route_path: str) -> Generator[int, abc.Any, None]:
+    def iter_route(self, route_path: str) -> Generator[int, typing.Any, None]:
         """Iterate over the frames in a route directory.
 
         Args:

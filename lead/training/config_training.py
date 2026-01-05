@@ -415,6 +415,8 @@ class TrainingConfig(BaseConfig):
     # Probability of the perburtated sample being used.
     @overridable_property
     def use_sensor_perburtation_prob(self):
+        if not self.use_sensor_perburtation:
+            return 0.0
         if not self.carla_leaderboard_mode:
             return 0.8
         return 0.5

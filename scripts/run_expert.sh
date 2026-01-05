@@ -15,9 +15,10 @@ cleanup() {
 trap cleanup INT TERM
 
 # Enter data here
-export ROUTE_DIR=data/data_routes/leaderboard1/
-export SCENARIO_NAME=BlockedIntersection
-export ROUTE_NUMBER=Town06_13
+export ROUTE_DIR=data/data_routes/50x36_Town13/
+export SCENARIO_NAME=ConstructionObstacleTwoWays
+export ROUTE_NUMBER=1128_0
+export LEAD_LOG_LEVEL="DEBUG"
 
 # Set standard environment variables
 export PYTHONPATH=3rd_party/CARLA_0915/PythonAPI/carla:$PYTHONPATH

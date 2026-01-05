@@ -1843,7 +1843,7 @@ class Expert(ExpertData):
             return target_speed
 
         # Compute the target speed using the IDM
-        target_speed = expert_utils.compute_target_speed_idm(
+        new_target_speed = expert_utils.compute_target_speed_idm(
             config=self.config_expert,
             desired_speed=target_speed,
             leading_actor_length=0.0,
@@ -1854,7 +1854,12 @@ class Expert(ExpertData):
             T=self.config_expert.idm_red_light_desired_time_headway,
         )
 
-        return target_speed
+        LOG.info(
+            f"""[{self.step}] Ego target speed adjusted for red light in {distance_to_traffic_light_stop_point:.2f}m
+from {target_speed:.2f} to {new_target_speed:.2f}"""
+        )
+
+        return new_target_speed
 
     @beartype
     def ego_agent_affected_by_stop_sign(self, target_speed: float) -> float:
@@ -2102,3 +2107,288 @@ class Expert(ExpertData):
                     )
 
         return False, None, -1.0
+
+    @beartype
+    def save_meta(
+        self, control: carla.VehicleControl, target_speed: float, tick_data: dict, speed_reduced_by_obj: list | None
+    ) -> dict:
+        """
+        Save the driving data for the current frame.
+
+        Args:
+            control: The control commands for the current frame.
+            target_speed: The target speed for the current frame.
+            tick_data: Dictionary containing the current state of the vehicle.
+            speed_reduced_by_obj: List containing information about the object that caused speed reduction.
+
+        Returns:
+            A dictionary containing the driving data for the current frame.
+        """
+        frame = self.step // self.config_expert.data_save_freq
+
+        # Extract relevant data from inputs
+        previous_target_points = [tp.tolist() for tp in self._command_planner.previous_target_points]
+        previous_commands = [int(i) for i in self._command_planner.previous_commands]
+        next_target_points = [tp[0].tolist() for tp in self._command_planner.route]
+        next_commands = [int(self._command_planner.route[i][1]) for i in range(len(self._command_planner.route))]
+
+        # Get the remaining route points in the local coordinate frame
+        dense_route = []
+        remaining_route = self.remaining_route[: self.config_expert.num_route_points_saved]
+
+        changed_route = bool(
+            (
+                self.privileged_route_planner.route_points[self.privileged_route_planner.route_index]
+                != self.privileged_route_planner.original_route_points[self.privileged_route_planner.route_index]
+            ).any()
+        )
+        for checkpoint in remaining_route:
+            dense_route.append(
+                common_utils.inverse_conversion_2d(
+                    checkpoint[:2], self.ego_location_array[:2], self.ego_orientation_rad
+                ).tolist()
+            )
+
+        # Extract speed reduction object information
+        speed_reduced_by_obj_type, speed_reduced_by_obj_id, speed_reduced_by_obj_distance = None, None, None
+        if speed_reduced_by_obj is not None:
+            speed_reduced_by_obj_type, speed_reduced_by_obj_id, speed_reduced_by_obj_distance = speed_reduced_by_obj[1:]
+            # Convert numpy to float so that it can be saved to json.
+            if speed_reduced_by_obj_distance is not None:
+                speed_reduced_by_obj_distance = float(speed_reduced_by_obj_distance)
+
+        ego_wp: carla.Waypoint = self.carla_world_map.get_waypoint(
+            self.ego_vehicle.get_location(), project_to_road=True, lane_type=carla.libcarla.LaneType.Any
+        )
+        next_wps = expert_utils.wps_next_until_lane_end(ego_wp)
+        try:
+            next_lane_wps_ego = next_wps[-1].next(1)
+            if len(next_lane_wps_ego) == 0:
+                next_lane_wps_ego = [next_wps[-1]]
+        except:
+            next_lane_wps_ego = []
+        if ego_wp.is_junction:
+            distance_to_junction_ego = 0.0
+            # get distance to ego vehicle
+        elif len(next_lane_wps_ego) > 0 and next_lane_wps_ego[0].is_junction:
+            distance_to_junction_ego = next_lane_wps_ego[0].transform.location.distance(ego_wp.transform.location)
+        else:
+            distance_to_junction_ego = None
+
+        # how far is next junction
+        next_wps = expert_utils.wps_next_until_lane_end(ego_wp)
+        try:
+            next_lane_wps_ego = next_wps[-1].next(1)
+            if len(next_lane_wps_ego) == 0:
+                next_lane_wps_ego = [next_wps[-1]]
+        except:
+            next_lane_wps_ego = []
+        if ego_wp.is_junction:
+            distance_to_junction_ego = 0.0
+            # get distance to ego vehicle
+        elif len(next_lane_wps_ego) > 0 and next_lane_wps_ego[0].is_junction:
+            distance_to_junction_ego = next_lane_wps_ego[0].transform.location.distance(ego_wp.transform.location)
+        else:
+            distance_to_junction_ego = None
+
+        next_road_ids_ego = []
+        next_next_road_ids_ego = []
+        for wp in next_lane_wps_ego:
+            next_road_ids_ego.append(wp.road_id)
+            next_next_wps = expert_utils.wps_next_until_lane_end(wp)
+            try:
+                next_next_lane_wps_ego = next_next_wps[-1].next(1)
+                if len(next_next_lane_wps_ego) == 0:
+                    next_next_lane_wps_ego = [next_next_wps[-1]]
+            except:
+                next_next_lane_wps_ego = []
+            for wp2 in next_next_lane_wps_ego:
+                if wp2.road_id not in next_next_road_ids_ego:
+                    next_next_road_ids_ego.append(wp2.road_id)
+
+        tl = self.carla_world.get_traffic_lights_from_waypoint(ego_wp, 50.0)
+        if len(tl) == 0:
+            tl_state = "None"
+        else:
+            tl_state = str(tl[0].state)
+
+        privileged_yaw = np.radians(self.ego_vehicle.get_transform().rotation.yaw)  # convert from degrees to radians
+        dangerous_adversarial_actors_ids, safe_adversarial_actors_ids, ignored_adversarial_actors_ids = (
+            self.adversarial_actors_ids
+        )
+        data = {
+            "num_dangerous_adversarial": len(dangerous_adversarial_actors_ids),
+            "num_safe_adversarial": len(safe_adversarial_actors_ids),
+            "num_ignored_adversarial": len(ignored_adversarial_actors_ids),
+            "rear_adversarial_id": -1 if self.rear_adversarial_actor is None else self.rear_adversarial_actor.id,
+            "town": self.town,
+            "privileged_past_positions": np.array(self.privileged_ego_past_positions, dtype=np.float32)[::-1],
+            "past_positions": np.array(self.ego_past_positions, dtype=np.float32)[::-1],
+            "past_filtered_state": np.array(self.ego_past_filtered_state, dtype=np.float32)[::-1],
+            "past_speeds": np.array(self.speeds_queue, dtype=np.float32)[::-1],
+            "past_yaws": np.array(self.ego_past_yaws, dtype=np.float32)[::-1],
+            "speed": tick_data["speed"],
+            "accel_x": tick_data["accel_x"],
+            "accel_y": tick_data["accel_y"],
+            "accel_z": tick_data["accel_z"],
+            "angular_velocity_x": tick_data["angular_velocity_x"],
+            "angular_velocity_y": tick_data["angular_velocity_y"],
+            "angular_velocity_z": tick_data["angular_velocity_z"],
+            "pos_global": self.ego_location_array.tolist(),
+            "filtered_pos_global": tick_data["filtered_state"][:2].tolist(),
+            "noisy_pos_global": tick_data["noisy_state"][:2].tolist(),
+            "theta": self.ego_orientation_rad,
+            "privileged_yaw": privileged_yaw,
+            "target_speed": target_speed,
+            "speed_limit": self.speed_limit,
+            "last_encountered_speed_limit_sign": self.last_encountered_speed_limit_sign,
+            "previous_target_points": previous_target_points,
+            "next_target_points": next_target_points,
+            "previous_commands": previous_commands,
+            "next_commands": next_commands,
+            "route": np.array(dense_route, dtype=np.float32),
+            "changed_route": changed_route,
+            "speed_reduced_by_obj_type": speed_reduced_by_obj_type,
+            "speed_reduced_by_obj_id": speed_reduced_by_obj_id,
+            "speed_reduced_by_obj_distance": speed_reduced_by_obj_distance,
+            "steer": control.steer,
+            "throttle": control.throttle,
+            "brake": bool(control.brake),
+            "perturbation_translation": self.perturbation_translation,
+            "perturbation_rotation": self.perturbation_rotation,
+            "ego_matrix": np.array(self.ego_vehicle.get_transform().get_matrix(), dtype=np.float32),
+            "scenario": self.scenario_name,
+            "traffic_light_state": tl_state,
+            "distance_to_next_junction": self.distance_to_next_junction,
+            "ego_lane_id": self.ego_lane_id,
+            "road_id": ego_wp.road_id,
+            "lane_id": ego_wp.lane_id,
+            "is_junction": ego_wp.is_junction,
+            "is_intersection": ego_wp.is_intersection,
+            "junction_id": ego_wp.junction_id,
+            "next_road_ids": next_road_ids_ego,
+            "next_next_road_ids_ego": next_next_road_ids_ego,
+            "lane_change_str": str(ego_wp.lane_change),
+            "lane_type_str": str(ego_wp.lane_type),
+            "left_lane_marking_color_str": str(ego_wp.left_lane_marking.color),
+            "left_lane_marking_type_str": str(ego_wp.left_lane_marking.type),
+            "right_lane_marking_color_str": str(ego_wp.right_lane_marking.color),
+            "right_lane_marking_type_str": str(ego_wp.right_lane_marking.type),
+            "route_curvature": self.route_curvature,
+            "dist_to_construction_site": self.distance_to_construction_site,
+            "dist_to_accident_site": self.distance_to_accident_site,
+            "dist_to_parked_obstacle": self.distance_to_parked_obstacle,
+            "dist_to_vehicle_opens_door": self.distance_to_vehicle_opens_door,
+            "dist_to_cutin_vehicle": self.distance_to_cutin_vehicle,
+            "dist_to_pedestrian": self.distance_to_pedestrian,
+            "dist_to_biker": self.distance_to_biker,
+            "dist_to_junction": distance_to_junction_ego,
+            "current_active_scenario_type": self.current_active_scenario_type,
+            "previous_active_scenario_type": self.previous_active_scenario_type,
+            "scenario_obstacles_ids": self.scenario_obstacles_ids,
+            "scenario_actors_ids": self.scenario_actors_ids,
+            "vehicle_opened_door": self.vehicle_opened_door,
+            "vehicle_door_side": self.vehicle_door_side,
+            "scenario_obstacles_convex_hull": self.scenario_obstacles_convex_hull,
+            "cut_in_actors_ids": self.cut_in_actors_ids,
+            "distance_to_intersection_index_ego": self.distance_to_intersection_index_ego,
+            "ego_lane_width": self.ego_lane_width,
+            "target_lane_width": self.target_lane_width,
+            "weather_setting": self.weather_setting,
+            "jpeg_storage_quality": self.jpeg_storage_quality,
+            "route_left_length": self.route_left_length,
+            "distance_ego_to_route": self.distance_ego_to_route,
+            "weather_parameters": self.weather_parameters,
+            "signed_dist_to_lane_change": self.signed_dist_to_lane_change,
+            "visual_visibility": int(self.visual_visibility),
+            "num_parking_vehicles_in_proximity": self.num_parking_vehicles_in_proximity,
+            "second_highest_speed": self.second_highest_speed,
+            "second_highest_speed_limit": self.second_highest_speed_limit,
+            "dataset_information": {
+                "save_depth_lower_resolution": self.config_expert.save_depth_lower_resolution,
+                "save_depth_resolution_ratio": self.config_expert.save_depth_resolution_ratio,
+                "save_depth_bits": self.config_expert.save_depth_bits,
+                "save_only_non_ground_lidar": self.config_expert.save_only_non_ground_lidar,
+                "target_dataset": int(self.config_expert.target_dataset),
+                "data_save_freq": self.config_expert.data_save_freq,
+                "save_grouped_semantic": self.config_expert.save_grouped_semantic,
+            },
+            "sensor_information": {
+                "lidar_pos_1": self.config_expert.lidar_pos_1,
+                "lidar_rot_1": self.config_expert.lidar_rot_1,
+                "lidar_pos_2": self.config_expert.lidar_pos_2,
+                "lidar_rot_2": self.config_expert.lidar_rot_2,
+                "lidar_accumulation": self.config_expert.lidar_accumulation,
+                "num_cameras": self.config_expert.num_cameras,
+                "camera_calibration": self.config_expert.camera_calibration,
+                "num_radar_sensors": self.config_expert.num_radar_sensors,
+                "radar_calibration": self.config_expert.radar_calibration,
+            },
+            "europe_traffic_light": self.europe_traffic_light,
+            "over_head_traffic_light": self.over_head_traffic_light,
+            "emergency_brake_for_special_vehicle": self.emergency_brake_for_special_vehicle,
+            "vehicle_hazard": bool(self.vehicle_hazard),
+            "vehicle_affecting_id": self.vehicle_affecting_id,
+            "light_hazard": bool(self.traffic_light_hazard),
+            "walker_hazard": bool(self.walker_hazard),
+            "walker_affecting_id": self.walker_affecting_id,
+            "stop_sign_hazard": bool(self.stop_sign_hazard),
+            "stop_sign_close": bool(self.stop_sign_close),
+            "walker_close": bool(self.walker_close),
+            "walker_close_id": self.walker_close_id,
+            "target_speed_limit": self.target_speed_limit,
+            "slower_bad_visibility": self.slower_bad_visibility,
+            "slower_clutterness": self.slower_clutterness,
+            "slower_occluded_junction": self.slower_occluded_junction,
+            "does_emergency_brake_for_pedestrians": self.does_emergency_brake_for_pedestrians,
+            "construction_obstacle_two_ways_stuck": self.construction_obstacle_two_ways_stuck,
+            "accident_two_ways_stuck": self.accident_two_ways_stuck,
+            "parked_obstacle_two_ways_stuck": self.parked_obstacle_two_ways_stuck,
+            "vehicle_opens_door_two_ways_stuck": self.vehicle_opens_door_two_ways_stuck,
+            "rear_danger_8": self.rear_danger_8,
+            "rear_danger_16": self.rear_danger_16,
+            "brake_cutin": self.brake_cutin,
+        }
+
+        previous_gps_target_points_dict = {}
+        previous_gps_commands_dict = {}
+        next_gps_target_points_dict = {}
+        next_gps_commands_dict = {}
+        for k, v in self.gps_waypoint_planners_dict.items():
+            previous_gps_target_points_dict[k] = [tp.tolist() for tp in v.previous_target_points]
+            previous_gps_commands_dict[k] = [int(i) for i in v.previous_commands]
+            next_gps_target_points_dict[k] = [tp[0].tolist() for tp in v.route]
+            next_gps_commands_dict[k] = [int(v.route[i][1]) for i in range(len(v.route))]
+
+        for k, v in previous_gps_target_points_dict.items():
+            data[f"previous_gps_target_points_{k}"] = v
+        for k, v in previous_gps_commands_dict.items():
+            data[f"previous_gps_commands_{k}"] = v
+        for k, v in next_gps_target_points_dict.items():
+            data[f"next_gps_target_points_{k}"] = v
+        for k, v in next_gps_commands_dict.items():
+            data[f"next_gps_commands_{k}"] = v
+
+        previous_target_points_dict = {}
+        previous_commands_dict = {}
+        next_target_points_dict = {}
+        next_commands_dict = {}
+        for k, v in self._command_planners_dict.items():
+            previous_target_points_dict[k] = [tp.tolist() for tp in v.previous_target_points]
+            previous_commands_dict[k] = [int(i) for i in v.previous_commands]
+            next_target_points_dict[k] = [tp[0].tolist() for tp in v.route]
+            next_commands_dict[k] = [int(v.route[i][1]) for i in range(len(v.route))]
+
+        for k, v in previous_target_points_dict.items():
+            data[f"previous_target_points_{k}"] = v
+        for k, v in previous_commands_dict.items():
+            data[f"previous_commands_{k}"] = v
+        for k, v in next_target_points_dict.items():
+            data[f"next_target_points_{k}"] = v
+        for k, v in next_commands_dict.items():
+            data[f"next_commands_{k}"] = v
+
+        if not self.config_expert.eval_expert:
+            self.metas.append((self.step, frame, data))
+
+        return data

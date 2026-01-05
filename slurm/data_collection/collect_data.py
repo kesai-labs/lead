@@ -263,6 +263,7 @@ if __name__ == "__main__":
     args = arg_parse()
     repetitions = 1
     repetition_start = 0
+    shuffle_routes = True
     partitions = ["day"]
     job_name = "collect"
     username = os.environ["USER"]
@@ -281,6 +282,9 @@ if __name__ == "__main__":
     route_folder = args.route_folder
     print("Start looking for routes...")
     routes = glob.glob(f"{route_folder}/**/*.xml", recursive=True)
+    if shuffle_routes:
+        random.seed(42)
+        random.shuffle(routes)
     print(f"Found {len(routes)} routes in total.")
     if len(scenario_white_lists) > 0:
         routes = [route for route in routes if any(scenario in route.split("/") for scenario in scenario_white_lists)]
