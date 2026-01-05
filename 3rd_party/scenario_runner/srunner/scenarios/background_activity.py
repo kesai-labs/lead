@@ -15,7 +15,6 @@ import carla
 
 from agents.navigation.local_planner import RoadOption
 
-from lead.inference.config_closed_loop import ClosedLoopConfig
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
 from srunner.scenariomanager.scenarioatomics.atomic_behaviors import AtomicBehavior
 from srunner.tools.scenario_helper import get_same_dir_lanes, get_opposite_dir_lanes
@@ -180,7 +179,6 @@ class BackgroundBehavior(AtomicBehavior):
         self._tm = CarlaDataProvider.get_client().get_trafficmanager(self._tm_port)
         self._tm.global_percentage_speed_difference(0.0)
         self._rng = CarlaDataProvider.get_random_seed()
-        self.closed_loop_config = ClosedLoopConfig()
         self._attribute_filter = {'base_type': 'car', 'special_type': '', 'has_lights': True, }
 
         # Global variables
@@ -210,8 +208,8 @@ class BackgroundBehavior(AtomicBehavior):
         self._road_dict = {}  # Dictionary lane key -> actor source
         self._road_checker_index = 0
 
-        self._road_front_vehicles = self.closed_loop_config.road_front_vehicles  # Amount of vehicles in front of the ego
-        self._road_back_vehicles = self.closed_loop_config.road_back_vehicles  # Amount of vehicles behind the ego
+        self._road_front_vehicles = 2  # Amount of vehicles in front of the ego
+        self._road_back_vehicles = 2  # Amount of vehicles behind the ego
         self._radius_increase_ratio = 1.7  # Meters the radius increases per m/s of the ego
 
         self._base_junction_detection = 30
@@ -235,7 +233,7 @@ class BackgroundBehavior(AtomicBehavior):
         self._active_junctions = []  # List of all the active junctions
 
         self._junction_sources_dist = 40  # Distance from the entry sources to the junction [m]
-        self._junction_sources_max_actors = self.closed_loop_config.junction_sources_max_actors  # Maximum vehicles alive at the same time per source
+        self._junction_sources_max_actors = 6  # Maximum vehicles alive at the same time per source
         self._junction_spawn_dist = 15  # Distance between spawned vehicles [m]
         self._junction_minimum_source_dist = 15  # Minimum distance between sources and their junction
 
@@ -246,8 +244,8 @@ class BackgroundBehavior(AtomicBehavior):
         self._opposite_sources = []
         self._opposite_route_index = 0
 
-        self._opposite_spawn_dist = self.closed_loop_config.opposite_spawn_dist  # Distance between spawned vehicles [m]
-        self._opposite_sources_dist = self.closed_loop_config.opposite_sources_dist  # Distance from the ego to the opposite sources [m]. Twice the spawn distance
+        self._opposite_spawn_dist = 40  # Distance between spawned vehicles [m]
+        self._opposite_sources_dist = 80  # Distance from the ego to the opposite sources [m]. Twice the spawn distance
 
         self._active_opposite_sources = True  # Flag to (de)activate all opposite sources
 

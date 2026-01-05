@@ -57,6 +57,7 @@ The basic section is sufficient to get started with the local data collection, t
    :caption: Miscellaneous
    :numbered:
 
+   external_resources
    transfuser_versions
    faq
    glossary

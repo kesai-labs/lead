@@ -244,6 +244,11 @@ class Expert(ExpertData):
                 if self.num_parking_vehicles_in_proximity >= 2:
                     self.target_speed_limit -= 2.0
                     self.slower_clutterness = True
+                if (
+                    self.distance_to_next_junction < 20
+                    and min([self.visibility_range_camera_1, self.visibility_range_camera_2, self.visibility_range_camera_3])
+                    < 0.2
+                ):
                     self.slower_occluded_junction = True
                     self.target_speed_limit -= 4.0
 
@@ -943,6 +948,7 @@ class Expert(ExpertData):
                         config=self.config_expert,
                         desired_speed=target_speed,
                         leading_actor_length=self.ego_vehicle.bounding_box.extent.x,
+                        ego_speed=self.ego_speed,
                         leading_actor_speed=0,
                         distance_to_leading_actor=distance_to_merging_point,
                         s0=self.config_expert.idm_two_way_scenarios_minimum_distance,

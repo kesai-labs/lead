@@ -23,26 +23,19 @@ https://github.com/user-attachments/assets/311f9f81-17f1-4741-a37d-93da81d25d08
 
 ## Overview
 
-Accompanying the paper is a comprehensive research framework for end-to-end driving. Built around the CARLA simulator, the stack features:
+We release the complete pipeline (covering routes description, expert driver, data preprocessing, training, and evaluation) required to achieve state-of-the-art
+closed-loop performance on the Bench2Drive benchmark. Built around the CARLA simulator, the stack features a data-centric design with:
 
-- **Data-centric design**:
-  - Extensive visualization suite.
-  - Runtime tensor shape & type validation.
-  - Optimized storage format, packs 72 hours of driving in ~200GB.
-
-- **Multi-dataset training pipeline**:
-  - Domain adaptation through co-training on heterogeneous data sources.
-  - Native support for real-world datasets, including NAVSIM and Waymo Vision-based E2E.
-  
-We release the complete pipeline (covering routes description, expert driver, data preprocessing, training, and evaluation) required to achieve state-of-the-art closed-loop performance on the Bench2Drive benchmark.
+- Extensive visualization suite and runtime type validation for easier debugging.
+- Optimized storage format, packs 72 hours of driving in ~200GB.
+- Native support for real-world datasets, including NAVSIM and Waymo Vision-based E2E.
 
 ## Table of Contents
 
 - [Roadmap](#roadmap)
 - [Updates](#updates)
 - [Quick Start (Get Driving in 20 Minutes)](#quick-start-get-driving-in-20-minutes)
-- [Performance on Bench2Drive](#performance-on-bench2drive)
-- [Documentation and Resources](#documentation-and-resources)
+- [Further Documentation](#further-documentation)
 - [External Resources](#external-resources)
 - [Acknowledgements](#acknowledgements)
 - [Citation](#citation)
@@ -108,17 +101,19 @@ bash scripts/setup_carla.sh # Download and setup CARLA at 3rd_party/CARLA_0915
 
 **3. Model zoo**
 
-Pre-trained driving policies are hosted on [HuggingFace](https://huggingface.co/ln2697/TFv6) for reproducibility. These checkpoints follow the TFv6 architecture 
-(detailed in Fig. 1), but differ in their sensor configurations (e.g., with/without radar), vision backbones (e.g., ResNet34/RegNetY-032) or dataset composition (e.g., with/without Town13).
+Pre-trained driving policies are hosted on [HuggingFace](https://huggingface.co/ln2697/TFv6) for reproducibility. These checkpoints follow the TFv6 architecture
+(detailed in Fig. 1), but differ in their sensor configurations, vision backbones or dataset composition.
 
+<br>
 <br>
 
 <p align="center">
-  <img src="https://ln2697.github.io/lead/static/images/tfv6.png" alt="TFv6 Architecture" width="90%">
+  <img src="https://ln2697.github.io/lead/static/images/tfv6.png" alt="TFv6 Architecture" width="80%" >
 </p>
 
 <p align="center"><b>Figure 1:</b> TFv6 architecture.</p>
 
+<br>
 <br>
 
 Tab. 1 shows available checkpoints with their performance on three major CARLA benchmarks. As first step, we recommend `tfv6_resnet34` as it provides a good balance between performance and resource usage.
@@ -143,29 +138,16 @@ Tab. 1 shows available checkpoints with their performance on three major CARLA b
 To download one checkpoint:
 
 ```bash
-# Create checkpoint directory
-mkdir -p outputs/checkpoints/tfv6_resnet34
-
-# Download config
-wget https://huggingface.co/ln2697/TFv6/resolve/main/tfv6_resnet34/config.json \
-  -O outputs/checkpoints/tfv6_resnet34/config.json
-
-# Download one checkpoint
-wget https://huggingface.co/ln2697/TFv6/resolve/main/tfv6_resnet34/model_0030_0.pth \
-  -O outputs/checkpoints/tfv6_resnet34/model_0030_0.pth
+bash scripts/download_one_checkpoint.sh
 ```
 
-
-<details>
-<summary>Alternatively, to download all checkpoints at once with <a href="https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage">git lfs</a>:</summary>
+Or download all checkpoints at once with <a href="https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage">git lfs</a>
 
 ```bash
 git clone https://huggingface.co/ln2697/TFv6 outputs/checkpoints
 cd outputs/checkpoints
 git lfs pull
 ```
-
-</details>
 
 **4. Verify driving stack**
 
@@ -174,12 +156,8 @@ To initiate closed-loop evaluation and verify the integration of the driving sta
 ```bash
 # Start driving environment
 bash scripts/start_carla.sh
-
 # Start policy on one route
 bash scripts/eval_bench2drive.sh
-
-# Optional: clean up driving environment
-bash scripts/clean_carla.sh
 ```
 
 <details>
@@ -208,12 +186,8 @@ Verify the expert policy and data acquisition pipeline by executing a test run o
 ```bash
 # Start CARLA if not done already
 bash scripts/start_carla.sh
-
 # Run expert on one route
 bash scripts/run_expert.sh
-
-# Optional: clean CARLA server
-bash scripts/clean_carla.sh
 ```
 
 <details>
@@ -244,65 +218,22 @@ data/expert_debug
 
 </details>
 
-## Performance on Bench2Drive
+## Further Documentation
 
-We evaluate TFv6 on the [Bench2Drive](https://github.com/autonomousvision/Bench2Drive-Leaderboard/tree/ab8021b027fa9c4765f9a732355d3b2ae93736a0) benchmark, which consists of 220 routes across multiple towns with challenging weather conditions and traffic scenarios. Tab. 2 compares TFv6 with other recent methods.
-
-<br>
-
-<div align="center">
-
-| Method          |    DS     |    SR     |   Merge   | Overtake  | EmgBrake  | Give Way  | Traffsign | Venue  |
-| --------------- | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: | :-------: | ------ |
-| TF++ (TFv5)     |   84.21   |   67.27   |   58.75   |   57.77   |   83.33   |   40.00   |   82.11   | ICCV23 |
-| SimLingo        |   85.07   |   67.27   |   54.01   |   57.04   |   88.33   | **53.33** |   82.45   | CVPR25 |
-| R2SE            |   86.28   |   69.54   |   53.33   |   61.25   |   90.00   |   50.00   |   84.21   | -      |
-| HiP-AD          |   86.77   |   69.09   |   50.00   |   84.44   |   83.33   |   40.00   |   72.10   | ICCV25 |
-| BridgeDrive     |   86.87   |   72.27   |   63.50   |   57.77   |   83.33   |   40.00   |   82.11   | -      |
-| DiffRefiner     |   87.10   |   71.40   |   63.80   |   60.00   |   85.00   |   50.00   |   86.30   | AAAI26 |
-| **TFv6 (Ours)** | **95.28** | **86.80** | **72.50** | **97.77** | **91.66** |   40.00   | **89.47** | -      |
-
-**Table 2**: Bench2Drive Performance. DS = Driving Score, SR = Success Rate. Higher is better.
-
-</div>
-
-<br>
-
-## Documentation and Resources
-
-For detailed training, data-collection, and large-scale experiment instructions, see the [full documentation](https://ln2697.github.io/lead/docs). In particular, we provide:
-
-- [Tutorial notebooks](https://ln2697.github.io/lead/docs/jupyter_notebooks.html)
-- [Frequently asked questions](https://ln2697.github.io/lead/docs/faq)
-- [Known issues](https://ln2697.github.io/lead/docs/known_issues.html)
-
-We maintain custom forks of CARLA evaluation tools with our modifications:
-
-- [scenario_runner_autopilot](https://github.com/ln2697/scenario_runner_autopilot), [leaderboard_autopilot](https://github.com/ln2697/leaderboard_autopilot), [Bench2Drive](https://github.com/ln2697/Bench2Drive), [scenario_runner](https://github.com/ln2697/scenario_runner), [leaderboard](https://github.com/ln2697/leaderboard)
-
-## External Resources
-
-Useful documentations from other repositories:
-
-- A cheatsheat of [CARLA coordinate systems](https://github.com/autonomousvision/carla_garage/blob/leaderboard_2/docs/coordinate_systems.md)
-- About [Longest6 v2 benchmark](https://github.com/autonomousvision/CaRL/tree/main/CARLA#longest6-v2) and [Town13 benchmark](https://github.com/autonomousvision/carla_garage?tab=readme-ov-file#carla-leaderboard-20-validation-routes)
-- Generate scenario XML files [randomly](https://github.com/autonomousvision/CaRL/tree/main/CARLA#scenario-generation) and [manually](https://github.com/autonomousvision/carla_route_generator)
-
-Other helpful repositories:
-
-- [SimLingo](https://github.com/RenzKa/simlingo), [PlanT2](https://github.com/autonomousvision/plant2), [Bench2Drive Leaderboard](https://github.com/autonomousvision/Bench2Drive-Leaderboard), [Bench2Drive](https://github.com/Thinklab-SJTU/Bench2Drive/), [CaRL](https://github.com/autonomousvision/CaRL)
-
-E2E self-driving research:
-
-- [Why study self-driving?](https://emergeresearch.substack.com/p/why-study-self-driving?triedRedirect=true) A timely perspective given recent commercial deployments of autonomous taxi services.
-- [End-to-end Autonomous Driving: Challenges and Frontiers](https://arxiv.org/abs/2306.16927) A comprehensive introductory survey of the field.
-- [Common Mistakes in Benchmarking Autonomous Driving](https://github.com/autonomousvision/carla_garage/blob/leaderboard_2/docs/common_mistakes_in_benchmarking_ad.md) Common pitfalls to avoid when evaluating autonomous driving systems.
+For more detailed instructions, see the [full documentation](https://ln2697.github.io/lead/docs). In particular:
+- [Data collection](https://ln2697.github.io/lead/docs/data_collection.html)
+- [Training](https://ln2697.github.io/lead/docs/carla_training.html)
+- [Evaluation](https://ln2697.github.io/lead/docs/carla_training.html)
 
 ## Acknowledgements
 
 Special thanks to [carla_garage](https://github.com/autonomousvision/carla_garage) for the foundational codebase. We also thank the creators of the numerous open-source projects we use:
 
 - [PDM-Lite](https://github.com/OpenDriveLab/DriveLM/blob/DriveLM-CARLA/pdm_lite/docs/report.pdf), [leaderboard](https://github.com/carla-simulator/leaderboard), [scenario_runner](https://github.com/carla-simulator/scenario_runner), [NAVSIM](https://github.com/autonomousvision/navsim), [Waymo Open Dataset](https://github.com/waymo-research/waymo-open-dataset)
+
+Other helpful repositories:
+
+- [SimLingo](https://github.com/RenzKa/simlingo), [PlanT2](https://github.com/autonomousvision/plant2), [Bench2Drive Leaderboard](https://github.com/autonomousvision/Bench2Drive-Leaderboard), [Bench2Drive](https://github.com/Thinklab-SJTU/Bench2Drive/), [CaRL](https://github.com/autonomousvision/CaRL)
 
 Long Nguyen led development of the project. Kashyap Chitta, Bernhard Jaeger, and Andreas Geiger contributed through technical discussion and advisory feedback. Daniel Dauner provided guidance with NAVSIM.
 

@@ -4,10 +4,10 @@ import traceback
 from collections import defaultdict
 
 import wandb
-from evaluate_utils import did_route_crash, is_on_slurm, load_json_file
 
 from lead.inference.config_closed_loop import ClosedLoopConfig
 from slurm.config_slurm import ConfigSlurm
+from slurm.evaluation.evaluate_utils import did_route_crash, is_on_slurm, load_json_file
 
 
 class WandBLogger:
@@ -19,8 +19,6 @@ class WandBLogger:
         self.metrics = defaultdict(lambda: [0] * num_routes)  # Initialize default values for metrics
         self.config_slurm = ConfigSlurm()
         if is_on_slurm():
-            config_dict = closed_loop_config.closed_loop_dict()
-            config_dict.update(closed_loop_config.open_loop_dict())
             self.run = wandb.init(
                 project=project_name,
                 id=self.config_slurm.experiment_run_id,
@@ -28,7 +26,6 @@ class WandBLogger:
                 resume="never",
                 dir=self.config_slurm.evaluation_output_dir,
                 notes=self.config_slurm.evaluation_output_dir,
-                config=config_dict,
             )
             self.finished = False
         self.logged_ds = []

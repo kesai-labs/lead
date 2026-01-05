@@ -1,4 +1,4 @@
-# History
+# History of the TransFuser Family
 
 There are many different version of TransFuser by now, and we sometimes see the wrong papers getting cited.
 Here is a short history over the different transFuser versions and how to cite them correctly.

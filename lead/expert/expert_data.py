@@ -21,6 +21,7 @@ from lead.common import constants, ransac, weathers
 from lead.common.constants import (
     CameraPointCloudIndex,
     CarlaSemanticSegmentationClass,
+    TargetDataset,
     TransfuserSemanticSegmentationClass,
 )
 from lead.common.kinematic_bicycle_model import KinematicBicycleModel
@@ -1031,10 +1032,8 @@ class ExpertData(ExpertBase):
                 "save_depth_bits": self.config_expert.save_depth_bits,
                 "save_only_non_ground_lidar": self.config_expert.save_only_non_ground_lidar,
                 "target_dataset": int(self.config_expert.target_dataset),
-                "replace_semantics_segmentation_with_instance_segmentation": self.config_expert.replace_semantics_segmentation_with_instance_segmentation,
                 "data_save_freq": self.config_expert.data_save_freq,
                 "save_grouped_semantic": self.config_expert.save_grouped_semantic,
-                
             },
             "sensor_information": {
                 "lidar_pos_1": self.config_expert.lidar_pos_1,
@@ -1948,3 +1947,30 @@ class ExpertData(ExpertBase):
                 color=color,
                 life_time=(1.0 / self.config_expert.carla_fps) + 1e-6,
             )
+
+    @expert_utils.step_cached_property
+    def visibility_range_camera_1(self):
+        if self.config_expert.target_dataset in [
+            TargetDataset.CARLA_LEADERBOARD2_3CAMERAS,
+            TargetDataset.CARLA_LEADERBOARD2_6CAMERAS,
+        ]:
+            return expert_utils.compute_camera_occlusion_score(self.tick_data["semantics_camera_pc_1"])
+        return 1.0
+
+    @expert_utils.step_cached_property
+    def visibility_range_camera_2(self):
+        if self.config_expert.target_dataset in [
+            TargetDataset.CARLA_LEADERBOARD2_3CAMERAS,
+            TargetDataset.CARLA_LEADERBOARD2_6CAMERAS,
+        ]:
+            return expert_utils.compute_camera_occlusion_score(self.tick_data["semantics_camera_pc_2"])
+        return 1.0
+
+    @expert_utils.step_cached_property
+    def visibility_range_camera_3(self):
+        if self.config_expert.target_dataset in [
+            TargetDataset.CARLA_LEADERBOARD2_3CAMERAS,
+            TargetDataset.CARLA_LEADERBOARD2_6CAMERAS,
+        ]:
+            return expert_utils.compute_camera_occlusion_score(self.tick_data["semantics_camera_pc_3"])
+        return 1.0

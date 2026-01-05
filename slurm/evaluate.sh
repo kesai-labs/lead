@@ -13,7 +13,7 @@ which python3
 set -x
 python3 slurm/evaluation/evaluate_scripts_generator.py \
 --base_checkpoint_endpoint $EVALUATION_OUTPUT_DIR \
---route_folder data/routes/$EVALUATION_DATASET \
+--route_folder data/benchmark_routes/$EVALUATION_DATASET \
 --team_agent lead/inference/sensor_agent.py $SCRIPT_GENERATOR_PARAMETERS
 
 # Run the evaluation scripts parallely.

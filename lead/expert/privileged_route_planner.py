@@ -218,10 +218,10 @@ class PrivilegedRoutePlanner:
                 transition_factor * target_lane_location + (1.0 - transition_factor) * self.original_route_points[idx]
             )
 
-        return transition_end_index - self.transition_smoothness_distance
+        return int(transition_end_index - self.transition_smoothness_distance)
 
     @beartype
-    def _smooth_transition(self, value: float) -> float:
+    def _smooth_transition(self, value: numbers.Real) -> float:
         """
         Transforms the linear transition between 0 to 1 into a cosine one.
 
@@ -241,8 +241,8 @@ class PrivilegedRoutePlanner:
         start_index: int,
         end_index: int,
         shift_to_left_lane: bool,
-        transition_length: float = 120.0,
-        lane_transition_factor: float = 1.0,
+        transition_length: numbers.Real = 120.0,
+        lane_transition_factor: numbers.Real = 1.0,
     ):
         """Shift the route smoothly to the left or right lane between the specified start and end indices.
 
@@ -422,14 +422,14 @@ class PrivilegedRoutePlanner:
 
         # Shift the route smoothly
         self.shift_route_smoothly(
-            shift_start_index,
-            shift_end_index,
+            int(shift_start_index),
+            int(shift_end_index),
             shift_to_left_lane,
             transition_length=transition_length,
             lane_transition_factor=lane_transition_factor,
         )
 
-        return shift_start_index, shift_end_index
+        return int(shift_start_index), int(shift_end_index)
 
     @beartype
     def setup_route(

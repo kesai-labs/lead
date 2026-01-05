@@ -6,7 +6,7 @@ import numpy as np
 
 from lead.common import weathers
 from lead.common.config_base import BaseConfig
-from lead.common.constants import CarlaImageCroppingType, TargetDataset, WeatherVisibility
+from lead.common.constants import TargetDataset, WeatherVisibility
 
 # Temporal hack for points per meter conversion - needs to be fixed
 points_per_meter = 10
@@ -503,17 +503,17 @@ class ExpertConfig(BaseConfig):
 
     # --- Debug Configuration ---
     # If true allow any visualization during debugging
-    visualization_allowed = True
+    visualization_allowed = False
     # If true force debug visualization regardless of environment
-    forced_debug_visualization = True
+    forced_debug_visualization = False
     # Default bounding box size for traffic warning signs.
     traffic_warning_bb_size = [1.186714768409729, 1.4352929592132568]
     # Default bounding box size for construction cones.
     construction_cone_bb_size = [0.1720348298549652, 0.1720348298549652]
     # If true  save camera point clouds
-    save_camera_pc = True
+    save_camera_pc = False
     # If true save instance segmentation images
-    save_instance_segmentation = True
+    save_instance_segmentation = False
     # If true run expert evaluation
     eval_expert = False
 

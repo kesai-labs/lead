@@ -116,6 +116,7 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
             config=self.training_config, config_test_time=self.config_closed_loop, lidar_queue=self.lidar_pc_queue
         )
         self.metric_info = {}
+        self.meters_travelled = 0.0
 
         self.track = autonomous_agent.Track.SENSORS
 
@@ -473,10 +474,10 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
             input_data["target_point_previous"] = transform(next_target_points[0][:2])
         else:
             assert len(next_target_points) == 2
-            input_data["target_point"] = transform(next_target_points[1][:2])
             input_data["target_point_next"] = transform(next_target_points[1][:2])
+            input_data["target_point"] = transform(next_target_points[1][:2])
             if len(previous_target_points) > 0:
-                input_data["target_point_previous"] = transform(previous_target_points[0][:2])
+                input_data["target_point_previous"] = transform(previous_target_points[-1][:2])
             else:
                 input_data["target_point_previous"] = transform(next_target_points[0][:2])
 
@@ -514,6 +515,7 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
             input_data["rgb"] = np.concatenate(rgb_slices, axis=2)
 
         # Plan next target point and command.
+
         self.set_target_points(input_data, pop_distance=self.config_closed_loop.route_planner_min_distance)
         if self.config_closed_loop.sensor_agent_pop_distance_adaptive:
             dense_points = (
@@ -625,6 +627,8 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         closed_loop_prediction.throttle, closed_loop_prediction.brake = self.force_move_post_processor.adjust(
             input_data["speed"].item(), closed_loop_prediction.throttle, closed_loop_prediction.brake
         )
+        self.meters_travelled += input_data["speed"].item() * self.config_closed_loop.carla_frame_rate
+        input_data["meters_travelled"] = self.meters_travelled
 
         self.control = carla.VehicleControl(
             steer=float(closed_loop_prediction.steer),
@@ -647,6 +651,7 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
                 "route_curvature": torch.Tensor(
                     [common_utils.waypoints_curvature(closed_loop_prediction.pred_route.squeeze())]
                 ),
+                "meters_travelled": torch.Tensor([self.meters_travelled]),
             }
         )
 

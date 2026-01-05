@@ -870,6 +870,7 @@ class Visualizer:
             "second_highest_speed_limit",
             "distance_to_stop_sign",
             "privileged_acceleration",
+            "meters_travelled",
         ]:
             attr_data = self.data.get(attr_name)
             if attr_data is not None:
