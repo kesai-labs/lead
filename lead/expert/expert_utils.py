@@ -1136,7 +1136,7 @@ def weather_parameter_to_dict(weather_parameter: carla.WeatherParameters) -> dic
 
 @beartype
 def compute_camera_occlusion_score(
-    pc: jt.Float[torch.Tensor, "N 4"],
+    pc: jt.Float[torch.Tensor, "N 5"],
     max_z: float = 1.0,
     min_dist: float = 6.0,
     max_dist: float = 48.0,
@@ -1173,10 +1173,10 @@ def compute_camera_occlusion_score(
         return 0.0
 
     # z filter
-    pc = pc[pc[:, 2] < max_z]
+    pc = pc[pc[:, CameraPointCloudIndex.Z] < max_z]
 
     # distance filters
-    norms = torch.linalg.norm(pc[:, :3], dim=1)
+    norms = torch.linalg.norm(pc[:, : CameraPointCloudIndex.Z + 1], dim=1)
     mask = (norms > min_dist) & (norms < max_dist)
     pc = pc[mask]
     all_pc = pc
@@ -1185,8 +1185,10 @@ def compute_camera_occlusion_score(
         return 0.0
 
     # class filter
-    class_mask = torch.isin(pc[:, 3].long(), torch.tensor(CLASSES_OF_INTEREST, device=pc.device))
-    pc = pc[class_mask][:, :3]
+    class_mask = torch.isin(
+        pc[:, CameraPointCloudIndex.UNREAL_SEMANTICS_ID].long(), torch.tensor(CLASSES_OF_INTEREST, device=pc.device)
+    )
+    pc = pc[class_mask][:, : CameraPointCloudIndex.Z + 1]
 
     if pc.shape[0] == 0:
         return 0.0
