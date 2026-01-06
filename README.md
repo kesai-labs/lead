@@ -6,8 +6,9 @@
   <h4 align="center">
   <a href="https://ln2697.github.io/lead" style="text-decoration: none;">Project Page</a> |
   <a href="https://ln2697.github.io/lead/docs" style="text-decoration: none;">Documentation</a> |
-  <a href="https://huggingface.co/ln2697/TFv6" style="text-decoration: none;">Checkpoints</a> |
-  <a href="https://huggingface.co/ln2697/LEAD" style="text-decoration: none;">Dataset</a> |
+  <a href="https://huggingface.co/ln2697/TFv6" style="text-decoration: none;">CARLA Model Zoo</a> |
+  <a href="https://huggingface.co/ln2697/tfv6_navsim" style="text-decoration: none;">NAVSIM Checkpoints</a> |
+  <a href="https://huggingface.co/ln2697/LEAD" style="text-decoration: none;">CARLA Dataset</a> |
   <a href="https://ln2697.github.io/assets/pdf/Nguyen2026LEADSUPP.pdf" style="text-decoration: none;">Supplementary Material</a> |
   <a href="https://arxiv.org/abs/2512.20563" style="text-decoration: none;">Paper</a>
   </h4>
@@ -23,20 +24,20 @@ https://github.com/user-attachments/assets/0c2dfb28-93b6-4324-be49-16c6744677da
 
 ## Overview
 
-We release the complete pipeline (covering routes description, expert driver, data preprocessing, training, and evaluation) required to achieve state-of-the-art
-closed-loop performance on the Bench2Drive benchmark. Built around the CARLA simulator, the stack features a data-centric design with:
+We release the complete pipeline (covering scenario descriptions, expert driver, data preprocessing scripts, training code, and evaluation infrastructure) required to achieve state-of-the-art closed-loop performance on the Bench2Drive benchmark. Built around the CARLA simulator, the stack features a data-centric design with:
 
 - Extensive visualization suite and runtime type validation for easier debugging.
 - Optimized storage format, packs 72 hours of driving in ~200GB.
-- Native support for real-world datasets, including NAVSIM and Waymo Vision-based E2E.
+- Native support for NAVSIM and Waymo Vision-based E2E, with LEAD extending these benchmarks through closed-loop simulation and synthetic data for additional supervision during training.
+
 
 ## Table of Contents
 
 - [Roadmap](#roadmap)
 - [Updates](#updates)
 - [Quick Start (Get Driving in 20 Minutes)](#quick-start-get-driving-in-20-minutes)
+- [Beyond CARLA: Cross-Benchmark Deployment](#beyond-carla-cross-benchmark-deployment)
 - [Further Documentation](#further-documentation)
-- [External Resources](#external-resources)
 - [Acknowledgements](#acknowledgements)
 - [Citation](#citation)
 - [License](#license)
@@ -217,6 +218,25 @@ data/expert_debug
 ```
 
 </details>
+
+## Beyond CARLA: Cross-Benchmark Deployment
+
+The LEAD pipeline and TFv6 models are deployed as **reference implementations and benchmark entries** across multiple autonomous driving simulators and evaluation suites:
+
+* **[AlpaSim Simulator (TransFuserModel)](https://github.com/NVlabs/alpasim)**
+  Official TransFuser v6 driver integrated into NVIDIA's AlpaSim, serving as a baseline policy for closed-loop simulation.
+
+* **[Waymo Vision-based End-to-End Driving Challenge (DiffusionLTF)](https://waymo.com/open/challenges/2025/e2e-driving/)**
+  Strong baseline entry for the inaugural end-to-end driving challenge hosted by Waymo, achieving **2nd place** in the final leaderboard.
+
+* **[NAVSIM v1 (LTFv6)](https://huggingface.co/spaces/AGC2024-P/e2e-driving-navtest)**
+  Updated reference baseline for the `navtest` split, improving PDMS by +3 points over the LTF baseline, used to evaluate navigation and control under diverse driving conditions.
+
+* **[NAVSIM v2 (LTFv6)](https://huggingface.co/spaces/AGC2025/e2e-driving-navhard)**
+  Updated reference baseline for the more challenging `navhard` split, improving EPMDS by +6 points over the LTF baseline, targeting increased distribution shift and scenario complexity.
+
+These deployments demonstrate the flexibility of LEAD as a portable training and inference stack that can be adapted across environments, sensor configurations, and evaluation protocols.
+LEAD complements existing benchmarks by extending them with reproducible closed-loop simulation and additional supervision from synthetic data.
 
 ## Further Documentation
 
