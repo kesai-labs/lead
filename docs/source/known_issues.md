@@ -2,10 +2,6 @@
 
 Known issues in the evaluation pipeline and models.
 
-## Town13 Evaluation Has Target Point Bugs
-
-The evaluation pipeline has bugs affecting target points on Town13, visible in videos on the [project website](https://ln2697.github.io/lead). This degrades policy performance, so Town13 numbers don't reflect true capability.
-
 ## Multi-GPU Training Can Slightly Degrade Performance
 
 Training on 4 GPUs sometimes yields marginally lower closed-loop performance than single-GPU training. The effect is small and doesn't change qualitative conclusions, but appears consistently in certain runs.

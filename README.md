@@ -8,7 +8,7 @@
   <a href="https://ln2697.github.io/lead/docs" style="text-decoration: none;">Documentation</a> |
   <a href="https://huggingface.co/ln2697/TFv6" style="text-decoration: none;">CARLA Model Zoo</a> |
   <a href="https://huggingface.co/ln2697/tfv6_navsim" style="text-decoration: none;">NAVSIM Checkpoints</a> |
-  <a href="https://huggingface.co/ln2697/LEAD" style="text-decoration: none;">CARLA Dataset</a> |
+  <a href="https://huggingface.co/ln2697/LEAD" style="text-decoration: none;">CARLA Dataset (Coming Soon)</a> |
   <a href="https://ln2697.github.io/assets/pdf/Nguyen2026LEADSUPP.pdf" style="text-decoration: none;">Supplementary Material</a> |
   <a href="https://arxiv.org/abs/2512.20563" style="text-decoration: none;">Paper</a>
   </h4>
@@ -46,8 +46,9 @@ We release the complete pipeline (covering scenario descriptions, expert driver,
 
 - [x] ✅ Checkpoints and inference code (stable)
 - [x] 🚧 Documentation, training pipeline and expert code (partial release)
-- [ ] Full dataset release on HuggingFace
-- [ ] Cross-dataset training tools and documentation
+- [ ] Full CARLA dataset release on HuggingFace
+- [ ] Datasets for cross-benchmark release on HuggingFace
+- [ ] Cross-benchmark training tools and documentation
 
 Status: Active development. Core code and checkpoints are released; remaining components coming soon.
 
@@ -223,20 +224,21 @@ data/expert_debug
 
 The LEAD pipeline and TFv6 models are deployed as **reference implementations and benchmark entries** across multiple autonomous driving simulators and evaluation suites:
 
-* **[AlpaSim Simulator (TransFuserModel)](https://github.com/NVlabs/alpasim)**
-  Official TransFuser v6 driver integrated into NVIDIA's AlpaSim, serving as a baseline policy for closed-loop simulation.
-
 * **[Waymo Vision-based End-to-End Driving Challenge (DiffusionLTF)](https://waymo.com/open/challenges/2025/e2e-driving/)**
   Strong baseline entry for the inaugural end-to-end driving challenge hosted by Waymo, achieving **2nd place** in the final leaderboard.
 
 * **[NAVSIM v1 (LTFv6)](https://huggingface.co/spaces/AGC2024-P/e2e-driving-navtest)**
-  Updated reference baseline for the `navtest` split, improving PDMS by +3 points over the LTF baseline, used to evaluate navigation and control under diverse driving conditions.
+  Latent TransFuser v6 is an updated reference baseline for the `navtest` split, improving PDMS by +3 points over the Latent TransFuser baseline, used to evaluate navigation and control under diverse driving conditions.
 
 * **[NAVSIM v2 (LTFv6)](https://huggingface.co/spaces/AGC2025/e2e-driving-navhard)**
-  Updated reference baseline for the more challenging `navhard` split, improving EPMDS by +6 points over the LTF baseline, targeting increased distribution shift and scenario complexity.
+  The same Latent TransFuser v6 improves EPMDS by +6 points over the Latent TransFuser baseline, targeting distribution shift and scenario complexity.
+
+* **[NVIDIA AlpaSim Simulator (TransFuserModel)](https://github.com/NVlabs/alpasim)**
+  Adapting the NAVSIM's Latent TransFuser v6 checkpoints, AlpaSim also features an official TransFuser driver, serving as a baseline policy for closed-loop simulation.
 
 These deployments demonstrate the flexibility of LEAD as a portable training and inference stack that can be adapted across environments, sensor configurations, and evaluation protocols.
-LEAD complements existing benchmarks by extending them with reproducible closed-loop simulation and additional supervision from synthetic data.
+
+LEAD complements existing benchmarks by extending them with reproducible long-horizon closed-loop evaluation and additional synthetic supervision benefits of CARLA.
 
 ## Further Documentation
 
