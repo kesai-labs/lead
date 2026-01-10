@@ -82,7 +82,7 @@ def get_centernet_labels(
         yaw_res_target[0, cty_int, ctx_int] = yaw_res
 
         velocity_target[0, cty_int, ctx_int] = 0  # NavSim does not provide velocity information.
-        # Brakes can potentially be continous but we classify them now.
+        # Brakes can potentially be continuous but we classify them now.
         # Using mathematical rounding the split is applied at 0.5
         brake_target[0, cty_int, ctx_int] = 0  # NavSim does not provide brake information.
 

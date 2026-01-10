@@ -463,7 +463,7 @@ class PrivilegedRoutePlanner:
         # Handle the case where the route starts with a parking exit scenario
         # In this case the first wp is on the center of the road, not the parking lot,
         # where the agent starts
-        if starts_with_parking_exit:  # workaraound for ParkingExit scenario
+        if starts_with_parking_exit:  # workaround for ParkingExit scenario
             self.route_index = 0
             self.last_route_index = 0
 

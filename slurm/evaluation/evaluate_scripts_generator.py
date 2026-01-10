@@ -71,7 +71,7 @@ rm -f $DEBUG_CHECKPOINT_ENDPOINT
 # Miniconda activating and debugging
 which python3
 
-# Debugging GPU availablity
+# Debugging GPU availability
 python -c "import torch; print('PyTorch CUDA is available?', torch.cuda.is_available())"
 nvidia-smi
 

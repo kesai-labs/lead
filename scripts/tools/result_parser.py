@@ -16,7 +16,7 @@ import ujson
 
 scale_factor = 0.2
 PENALTY_VALUE_DICT = {
-    # Traffic events that substract a set amount of points.
+    # Traffic events that subtract a set amount of points.
     "collisions_pedestrian": 0.5 * scale_factor,
     "collisions_vehicle": 0.6 * scale_factor,
     "collisions_layout": 0.65 * scale_factor,

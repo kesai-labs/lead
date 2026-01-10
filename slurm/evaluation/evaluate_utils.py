@@ -16,7 +16,7 @@ def is_on_slurm():
 def did_record_crash(record):
     """Determine if a record crashed because of the software problem or the agent somehow did not move at all."""
     if record["status"] == "Failed - TickRuntime":
-        return False  # Bench2Drive specific error when the agent is stucked. No software problem. https://github.com/Thinklab-SJTU/Bench2Drive/blob/8f9f1da103ea7153a17c5b1dd046548a9bcd5af2/leaderboard/leaderboard/scenarios/scenario_manager.py#L182
+        return False  # Bench2Drive specific error when the agent is stuck. No software problem. https://github.com/Thinklab-SJTU/Bench2Drive/blob/8f9f1da103ea7153a17c5b1dd046548a9bcd5af2/leaderboard/leaderboard/scenarios/scenario_manager.py#L182
     if int(record["scores"]["score_route"] < 0.00000000001):
         return True
     if record["status"] == "Failed - Agent couldn't be set up":

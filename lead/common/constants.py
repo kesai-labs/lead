@@ -97,7 +97,7 @@ class CarlaNavigationCommand(IntEnum):
 
 
 class ChaffeurNetBEVSemanticClass(IntEnum):
-    """Indicies to access BEV semantic map produced by ChaffeurNet."""
+    """Indices to access BEV semantic map produced by ChaffeurNet."""
 
     UNLABELED = 0
     ROAD = 1
@@ -111,7 +111,7 @@ class ChaffeurNetBEVSemanticClass(IntEnum):
 
 
 class TransfuserBEVSemanticClass(IntEnum):
-    """Indicies to access BEV semantic map produced by TransFuser."""
+    """Indices to access BEV semantic map produced by TransFuser."""
 
     UNLABELED = 0
     ROAD = 1
@@ -129,7 +129,7 @@ class TransfuserBEVSemanticClass(IntEnum):
 
 
 class TransfuserBEVOccupancyClass(IntEnum):
-    """Indicies to access BEV occupancy map produced by TransFuser."""
+    """Indices to access BEV occupancy map produced by TransFuser."""
 
     UNLABELED = 0
     VEHICLE = 1
@@ -537,7 +537,7 @@ NUPLAN_CAMERA_CALIBRATION = {
 
 
 class NavSimBEVSemanticClass(IntEnum):  # dead: disable
-    """Indicies to access BEV semantic map produced by NavSim.
+    """Indices to access BEV semantic map produced by NavSim.
 
     See: https://github.com/autonomousvision/navsim/blob/main/navsim/agents/transfuser/transfuser_config.py#L83
     """

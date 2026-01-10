@@ -212,7 +212,7 @@ class Expert(ExpertData):
         if self.second_highest_speed > 30.0 / 3.6:  # We don't want to drive too fast either
             self.target_speed_limit = min(self.target_speed_limit, self.second_highest_speed / 0.9)
 
-        # --- Drive slower with bad weather, neight time, junction and clutterness in city ---
+        # --- Drive slower with bad weather, night time, junction and clutterness in city ---
         self.weather_setting = expert_utils.get_weather_name(self.carla_world.get_weather(), self.config_expert)
         self.visual_visibility = int(weathers.WEATHER_VISIBILITY_MAPPING[self.weather_setting])
         self.slower_bad_visibility = False
@@ -537,7 +537,7 @@ class Expert(ExpertData):
                     continue
 
                 # Allow earlier acceleration.
-                # We only want predictable earlier acceleration from scratch that is why we hav the ego_speed < 1.0 constraint.
+                # We only want predictable earlier acceleration from scratch that is why we have the ego_speed < 1.0 constraint.
                 # Ignore vehicle that are close to the ego vehicle and is already almost out of the way
                 if self.ego_speed < 1.0 and vehicle.get_velocity().length() > 3.0:
                     if self.current_active_scenario_type in ["ConstructionObstacleTwoWays"]:

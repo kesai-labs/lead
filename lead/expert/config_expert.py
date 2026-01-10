@@ -301,7 +301,7 @@ class ExpertConfig(BaseConfig):
     idm_two_way_scenarios_time_headway = 0.1
     # Boundary time - the integration won’t continue beyond it.
     idm_t_bound = 0.05
-    # IDM maximum accelaration parameter per frame
+    # IDM maximum acceleration parameter per frame
     idm_maximum_acceleration = 24.0
     # The following parameters were determined by measuring the vehicle's braking performance.
     # IDM maximum deceleration parameter per frame while driving slow

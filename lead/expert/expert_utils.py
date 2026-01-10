@@ -563,7 +563,7 @@ def wps_next_until_lane_end(wp: carla.Waypoint) -> list[carla.Waypoint]:
 
 
 def get_night_mode(weather) -> bool:
-    """Check wheather or not the street lights need to be turned on"""
+    """Check whether or not the street lights need to be turned on"""
     SUN_ALTITUDE_THRESHOLD_1 = 15
     SUN_ALTITUDE_THRESHOLD_2 = 165
 
@@ -579,7 +579,7 @@ def get_night_mode(weather) -> bool:
     cloudiness_dist = CLOUDINESS_THRESHOLD - weather.cloudiness
     fog_density_dist = FOG_THRESHOLD - weather.fog_density
 
-    # Check each parameter independetly
+    # Check each parameter independently
     if altitude_dist < 0 or cloudiness_dist < 0 or fog_density_dist < 0:
         return True
 
@@ -837,7 +837,7 @@ def match_unreal_engine_ids_to_carla_bounding_boxes_ids(
 
             filtered_unreal_instance_pc = unreal_instance_pc
             if penalize_points_outside:
-                # If we penalize points outside of bb, we also want to minimize those penalities.
+                # If we penalize points outside of bb, we also want to minimize those penalties.
                 # This is needed since Car windows are transparent and take depth of objects behind them
                 dist = np.linalg.norm(unreal_instance_pc[..., :3], axis=1)
                 filtered_unreal_instance_pc = unreal_instance_pc[

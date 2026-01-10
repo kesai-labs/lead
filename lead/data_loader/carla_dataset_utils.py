@@ -379,7 +379,7 @@ def get_bbox_labels(
         if current_box["class"] in ["ego_car"]:
             continue
 
-        # Occulusion check
+        # Occlusion check
         if "num_points" in current_box:
             num_points = current_box["num_points"]
             visible_pixels = -1

@@ -224,7 +224,7 @@ def scenario_sampling(potential_scenarios_definitions, random_seed=0):
         scenario_choice = select_scenario(possible_scenarios)
         del possible_scenarios[possible_scenarios.index(scenario_choice)]
         # We keep sampling and testing if this position is present on any of the scenarios.
-        print("Stucked position_sampled")
+        print("Stuck position_sampled")
         while position_sampled(scenario_choice, sampled_scenarios):
             if possible_scenarios is None or not possible_scenarios:
                 scenario_choice = None
@@ -256,7 +256,7 @@ def compare_scenarios(scenario_choice, existent_scenario):
 
     choice_vec = transform_to_pos_vec(scenario_choice)
     existent_vec = transform_to_pos_vec(existent_scenario)
-    print("Stucked compare_scenarios")
+    print("Stuck compare_scenarios")
     for pos_choice in choice_vec:
         for pos_existent in existent_vec:
 

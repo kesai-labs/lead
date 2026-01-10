@@ -63,7 +63,7 @@ class TrainingConfig(BaseConfig):
     @overridable_property
     def used_cameras(self):
         """List indicating which cameras are used based on the target dataset.
-        Can be overriden, if a camera is false it will be ignored during training."""
+        Can be overridden, if a camera is false it will be ignored during training."""
         return [True] * self.num_available_cameras
 
     @property

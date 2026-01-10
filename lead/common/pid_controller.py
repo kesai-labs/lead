@@ -353,8 +353,8 @@ class ExpertLongitudinalController:
         Returns:
             The throttle value in range [0, 1].
         """
-        current_speed = current_speed * 3.6  # Convertion to km/h
-        target_speed = target_speed * 3.6  # Convertion to km/h
+        current_speed = current_speed * 3.6  # Conversion to km/h
+        target_speed = target_speed * 3.6  # Conversion to km/h
         params = self.params
         speed_error = target_speed - current_speed
 
