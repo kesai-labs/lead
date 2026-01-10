@@ -47,14 +47,14 @@ def iou_bbs(bb1: jt.Float[npt.NDArray, "5"], bb2: jt.Float[npt.NDArray, "5"]) ->
 
 @beartype
 def non_maximum_suppression(
-    bounding_boxes: list[jt.Float[npt.NDArray, "num_boxes D"]], iou_treshhold: float
+    bounding_boxes: list[jt.Float[npt.NDArray, "num_boxes D"]], iou_threshold: float
 ) -> jt.Float[npt.NDArray, "num_filtered_boxes D"]:
     """
     Basic Non-Maximum Suppression (NMS) implementation for oriented bounding boxes.
 
     Args:
         bounding_boxes: List of bounding boxes produced by an ensemble of detectors.
-        iou_treshhold: IoU treshhold for NMS.
+        iou_threshold: IoU threshold for NMS.
 
     Returns:
         List of filtered bounding boxes after NMS.
@@ -77,7 +77,7 @@ def non_maximum_suppression(
             break
 
         for idx2 in deepcopy(confidences_indices):
-            if iou_bbs(current_bb, bounding_boxes[idx2]) > iou_treshhold:  # Remove BB from list
+            if iou_bbs(current_bb, bounding_boxes[idx2]) > iou_threshold:  # Remove BB from list
                 confidences_indices = confidences_indices[confidences_indices != idx2]
 
     return np.array(filtered_boxes).astype(np.float32)

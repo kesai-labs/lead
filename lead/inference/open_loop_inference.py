@@ -150,7 +150,7 @@ class OpenLoopInference:
 
         if len(pred_bounding_boxes_vehicle_system) > 0:
             pred_bounding_boxes_vehicle_system = inference_utils.non_maximum_suppression(
-                pred_bounding_boxes_vehicle_system, float(self.config_training.iou_treshold_nms)
+                pred_bounding_boxes_vehicle_system, float(self.config_training.iou_threshold_nms)
             )
 
             pred_bounding_boxes_image_system = carla_dataset_utils.bb_vehicle_to_image_system(

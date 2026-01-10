@@ -309,7 +309,7 @@ class BaseConfig:
     # CARLA frame rate in seconds
     carla_frame_rate = 1.0 / carla_fps
     # IoU threshold used for non-maximum suppression on bounding box predictions
-    iou_treshold_nms = 0.2
+    iou_threshold_nms = 0.2
     # Minimum distance to route planner waypoints
     route_planner_min_distance = 7.5
     # Maximum distance to route planner waypoints
