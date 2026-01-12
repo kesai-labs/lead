@@ -14,8 +14,6 @@
 # ==============================================================================
 """WOD E2E Rater Feedback Score."""
 
-from typing import Dict, List, Tuple, Union
-
 import jaxtyping as jt
 import numpy as np
 import numpy.typing as npt
@@ -28,8 +26,8 @@ _MINIMUM_SCORE_OUTSIDE_TRUST_REGION = 4.0
 
 def get_lat_lng_thresholds(
     init_speed: np.ndarray,  # [B]
-    lat_lng_threshold_multipliers: Tuple[float, float],
-) -> Tuple[np.ndarray, np.ndarray]:
+    lat_lng_threshold_multipliers: tuple[float, float],
+) -> tuple[np.ndarray, np.ndarray]:
     """Get lateral and longitudinal thresholds."""
     # Set and scale thresholds with the initial velocity
     lat_threshold_multiplier, lng_threshold_multiplier = lat_lng_threshold_multipliers
@@ -43,11 +41,11 @@ def get_lat_lng_thresholds(
 
 
 def process_rater_specified_trajectories(
-    trajectory_batches: List[List[np.ndarray]],
-    trajectory_labels_batches: List[np.ndarray],
+    trajectory_batches: list[list[np.ndarray]],
+    trajectory_labels_batches: list[np.ndarray],
     target_num_waypoints: int,
     target_num_trajectories_per_batch: int,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Processes rater-specified trajectories by truncating or padding.
 
     Args:
@@ -149,17 +147,17 @@ def process_rater_specified_trajectories(
 def get_rater_feedback_score(
     inference_trajectories: np.ndarray,  # [B, I, T, 2]
     inference_probs: np.ndarray,  # [B, I]
-    rater_specified_trajectories: List[List[np.ndarray]],  # [[T1, 2], [T2, 2], ...], ...]
-    rater_feedback_labels: List[np.ndarray],  #  [[P1], [P2], ...]
+    rater_specified_trajectories: list[list[np.ndarray]],  # [[T1, 2], [T2, 2], ...], ...]
+    rater_feedback_labels: list[np.ndarray],  #  [[P1], [P2], ...]
     init_speed: np.ndarray,  # [B]
-    lat_lng_threshold_multipliers: Tuple[float, float] = (1.0, 4.0),
+    lat_lng_threshold_multipliers: tuple[float, float] = (1.0, 4.0),
     decay_factor: float = 0.1,
     frequency: int = 4,
     length_seconds: int = 5,
     default_num_of_rater_specified_trajectories: int = 3,
     output_trust_region_visualization: bool = True,
     minimum_score_outside_trust_region: float = _MINIMUM_SCORE_OUTSIDE_TRUST_REGION,
-) -> Dict[str, np.ndarray]:
+) -> dict[str, np.ndarray]:
     """Get rater feedback score (https://waymo.com/open/challenges/2025/e2e-driving/).
 
     Notations:
@@ -374,7 +372,7 @@ def compute_rfs(
     rater_scores: jt.Float[npt.NDArray, "B 3"],
     initial_speed: jt.Float[npt.NDArray, " B"],
     detailed_output: bool = False,
-) -> Union[jt.Float[npt.NDArray, " B"], dict[str, npt.NDArray]]:
+) -> jt.Float[npt.NDArray, " B"] | dict[str, npt.NDArray]:
     """Compute the Waymo rater feedback metric score for trajectory predictions.
 
     Args:

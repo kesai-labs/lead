@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import math
+import numbers
 from dataclasses import dataclass
 from functools import cached_property
 from math import sqrt
-import numbers
 
 import numpy as np
 import torch

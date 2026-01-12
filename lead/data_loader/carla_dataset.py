@@ -376,7 +376,8 @@ class CARLAData(Dataset):
             if self.config.use_kalman_filter_for_gps:
                 ego_position = np.array(meta["filtered_pos_global"][:2])
             else:
-                ego_position = np.array(meta["noisy_pos_global"][:2])   
+                ego_position = np.array(meta["noisy_pos_global"][:2])
+
         def transform_and_augment(point: list[float]) -> jt.Float[npt.NDArray, " 2"]:
             ego_point = common_utils.inverse_conversion_2d(np.array(point), ego_position, ego_yaw)
             return carla_dataset_utils.perturbate_target_point(
