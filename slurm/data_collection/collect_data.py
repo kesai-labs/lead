@@ -270,7 +270,7 @@ if __name__ == "__main__":
     code_root = os.getcwd()
     carla_root = os.getcwd() + "/3rd_party/CARLA_0915"
     agent = f"{code_root}/lead/expert/expert.py"
-    dataset_name = "carla_leaderboard2_debug"
+    dataset_name = "carla_leaderboard2_tfv5"
     scenario_white_lists = []  # Empty list = all scenarios allowed
     scenario_blacklist = ["YieldToEmergencyVehicle"]  # Scenarios to exclude
     max_route_per_scenario_type = 3  # -1 means no limit

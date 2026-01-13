@@ -17,6 +17,7 @@ class TargetDataset(IntEnum):
     UNKNOWN = 0
     CARLA_LEADERBOARD2_3CAMERAS = auto()
     CARLA_LEADERBOARD2_6CAMERAS = auto()
+    CARLA_LEADERBOARD2_1CAMERA = auto()
     NAVSIM_4CAMERAS = auto()
     WAYMO_E2E_2025_3CAMERAS = auto()
 

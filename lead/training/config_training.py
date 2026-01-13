@@ -149,8 +149,14 @@ class TrainingConfig(BaseConfig):
 
     # Description of the experiment.
     description = "An example experiment description."
-    # Produce images while training
-    visualize_training = True
+
+    @overridable_property
+    def visualize_training(self):
+        """If true produce images during training for visualization."""
+        if self.is_on_slurm:
+            return True
+        return False
+
     # Unique experiment identifier.
     id = "Experiment 1"
     # File to continue training from

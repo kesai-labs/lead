@@ -110,6 +110,7 @@ class BaseConfig:
         return {
             TargetDataset.CARLA_LEADERBOARD2_6CAMERAS: 6,
             TargetDataset.CARLA_LEADERBOARD2_3CAMERAS: 3,
+            TargetDataset.CARLA_LEADERBOARD2_1CAMERA: 1,
             TargetDataset.NAVSIM_4CAMERAS: 4,
             TargetDataset.WAYMO_E2E_2025_3CAMERAS: 3,
         }[self.target_dataset]
@@ -194,6 +195,17 @@ class BaseConfig:
                     "cropped_height": 384,
                     "fov": 60,
                 },
+            }
+        elif self.target_dataset == TargetDataset.CARLA_LEADERBOARD2_1CAMERA:
+            return {
+                1: {
+                    "pos": [-1.5, 0.0, 2.0],
+                    "rot": [0.0, 0.0, 0.0],
+                    "width": 1024,
+                    "height": 512,
+                    "cropped_height": 384,
+                    "fov": 110,
+                }
             }
         elif self.target_dataset == TargetDataset.NAVSIM_4CAMERAS:
             return {

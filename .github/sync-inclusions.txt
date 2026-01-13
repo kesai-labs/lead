@@ -1,0 +1,24 @@
+# Sync Inclusions Configuration
+# Files and directories listed here will be synced FROM the public repository TO the private repository
+#
+# Format:
+#   - One file or directory path per line (relative to repository root)
+#   - Lines starting with # are comments
+#   - Empty lines are ignored
+#   - Use forward slashes (/) for paths
+#   - Directories will sync all contents recursively
+#
+# Examples:
+#   README.md
+#   docs/
+#   scripts/setup.sh
+#   src/utils/
+
+# Documentation files
+README.md
+LICENSE
+CONTRIBUTING.md
+lead/
+slurm/
+scripts/
+docs/

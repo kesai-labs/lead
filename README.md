@@ -6,9 +6,9 @@
   <h4 align="center">
   <a href="https://ln2697.github.io/lead" style="text-decoration: none;">Project Page</a> |
   <a href="https://ln2697.github.io/lead/docs" style="text-decoration: none;">Documentation</a> |
-  <a href="https://huggingface.co/ln2697/TFv6" style="text-decoration: none;">CARLA Model Zoo</a> |
+  <a href="https://huggingface.co/ln2697/tfv6" style="text-decoration: none;">CARLA Model Zoo</a> |
   <a href="https://huggingface.co/ln2697/tfv6_navsim" style="text-decoration: none;">NAVSIM Checkpoints</a> |
-  <a href="https://huggingface.co/ln2697/LEAD" style="text-decoration: none;">CARLA Dataset (Coming Soon)</a> |
+  <a href="https://huggingface.co/datasets/ln2697/lead_carla" style="text-decoration: none;">CARLA Dataset</a> |
   <a href="https://ln2697.github.io/assets/pdf/Nguyen2026LEADSUPP.pdf" style="text-decoration: none;">Supplementary Material</a> |
   <a href="https://arxiv.org/abs/2512.20563" style="text-decoration: none;">Paper</a>
   </h4>
@@ -24,11 +24,11 @@ https://github.com/user-attachments/assets/0c2dfb28-93b6-4324-be49-16c6744677da
 
 ## Overview
 
-We release the complete pipeline (covering scenario descriptions, expert driver, data preprocessing scripts, training code, and evaluation infrastructure) required to achieve state-of-the-art closed-loop performance on the Bench2Drive benchmark. Built around the CARLA simulator, the stack features a data-centric design with:
+We release the complete pipeline required to achieve state-of-the-art closed-loop performance on the Bench2Drive benchmark. Built around the CARLA simulator, the stack features a data-centric design with:
 
 - Extensive visualization suite and runtime type validation for easier debugging.
 - Optimized storage format, packs 72 hours of driving in ~200GB.
-- Native support for NAVSIM and Waymo Vision-based E2E, with LEAD extending these benchmarks through closed-loop simulation and synthetic data for additional supervision during training.
+- Native support for NAVSIM and Waymo Vision-based E2E and extending those benchmarks through closed-loop simulation and synthetic data for additional supervision during training.
 
 
 ## Table of Contents
@@ -45,16 +45,19 @@ We release the complete pipeline (covering scenario descriptions, expert driver,
 ## Roadmap
 
 - [x] ✅ Checkpoints and inference code (stable)
-- [x] 🚧 Documentation, training pipeline and expert code (partial release)
-- [ ] Full CARLA dataset release on HuggingFace
-- [ ] Datasets for cross-benchmark release on HuggingFace
-- [ ] Cross-benchmark training tools and documentation
+- [x] 🟨 Documentation, training pipeline and expert code (under test)
+- [x] 🟨 Full CARLA dataset release on HuggingFace (under test)
+- [ ] 🚧 Datasets for cross-benchmark
+- [ ] 🚧 Cross-benchmark training tools and documentation
 
-Status: Active development. Core code and checkpoints are released; remaining components coming soon.
+Status: Active development. Remaining components coming soon.
 
 ## Updates
 
-- `2025/12/24` Arxiv paper and code release
+- **`[2026/01/13]`** CARLA dataset and full CARLA training doc release
+  > We publicly release a CARLA dataset generated with the same pipeline as used in the paper. However, due to subsequent refactoring and cleanup of the expert driver, the released dataset is not bit-identical to the dataset used for the reported experiments. A verification of the dataset is running right now.
+
+- **`[2025/12/24]`** Arxiv paper and code release
 
 ## Quick Start (Get Driving in 20 Minutes)
 
@@ -103,7 +106,7 @@ bash scripts/setup_carla.sh # Download and setup CARLA at 3rd_party/CARLA_0915
 
 **3. Model zoo**
 
-Pre-trained driving policies are hosted on [HuggingFace](https://huggingface.co/ln2697/TFv6) for reproducibility. These checkpoints follow the TFv6 architecture
+Pre-trained driving policies are hosted on [HuggingFace](https://huggingface.co/ln2697/tfv6) for reproducibility. These checkpoints follow the TFv6 architecture
 (detailed in Fig. 1), but differ in their sensor configurations, vision backbones or dataset composition.
 
 <br>
@@ -125,12 +128,12 @@ Tab. 1 shows available checkpoints with their performance on three major CARLA b
 
 | Checkpoint                                                                                    | Description               | Bench2Drive | Longest6 v2 |  Town13  |
 | --------------------------------------------------------------------------------------------- | ------------------------- | :---------: | :---------: | :------: |
-| [tfv6_regnety032](https://huggingface.co/ln2697/TFv6/tree/main/tfv6_regnety032)               | TFv6                      |  **95.2**   |   **62**    | **5.01** |
-| [tfv6_resnet34](https://huggingface.co/ln2697/TFv6/tree/main/tfv6_resnet34)                   | ResNet34 Backbone         |    94.7     |     57      |   3.31   |
-| [4cameras_resnet34](https://huggingface.co/ln2697/TFv6/tree/main/4cameras_resnet34)           | Additional rear camera    |    95.1     |     53      |    -     |
-| [noradar_resnet34](https://huggingface.co/ln2697/TFv6/tree/main/noradar_resnet34)             | No radar sensor           |    94.7     |     52      |    -     |
-| [visiononly_resnet34](https://huggingface.co/ln2697/TFv6/tree/main/visiononly_resnet34)       | Vision-only driving model |    91.6     |     43      |    -     |
-| [town13heldout_resnet34](https://huggingface.co/ln2697/TFv6/tree/main/town13heldout_resnet34) | Generalization evaluation |    93.1     |     52      |   2.65   |
+| [tfv6_regnety032](https://huggingface.co/ln2697/tfv6/tree/main/tfv6_regnety032)               | TFv6                      |  **95.2**   |   **62**    | **5.24** |
+| [tfv6_resnet34](https://huggingface.co/ln2697/tfv6/tree/main/tfv6_resnet34)                   | ResNet34 Backbone         |    94.7     |     57      |   5.01   |
+| [4cameras_resnet34](https://huggingface.co/ln2697/tfv6/tree/main/4cameras_resnet34)           | Additional rear camera    |    95.1     |     53      |    -     |
+| [noradar_resnet34](https://huggingface.co/ln2697/tfv6/tree/main/noradar_resnet34)             | No radar sensor           |    94.7     |     52      |    -     |
+| [visiononly_resnet34](https://huggingface.co/ln2697/tfv6/tree/main/visiononly_resnet34)       | Vision-only driving model |    91.6     |     43      |    -     |
+| [town13heldout_resnet34](https://huggingface.co/ln2697/tfv6/tree/main/town13heldout_resnet34) | Generalization evaluation |    93.1     |     52      |   3.52   |
 
 **Table 1:** Performance of pre-trained checkpoints. We report Driving Score, for which higher is better.
 
@@ -146,7 +149,7 @@ bash scripts/download_one_checkpoint.sh
 Or download all checkpoints at once with <a href="https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage">git lfs</a>
 
 ```bash
-git clone https://huggingface.co/ln2697/TFv6 outputs/checkpoints
+git clone https://huggingface.co/ln2697/tfv6 outputs/checkpoints
 cd outputs/checkpoints
 git lfs pull
 ```
@@ -243,7 +246,7 @@ LEAD complements existing benchmarks by extending them with reproducible long-ho
 ## Further Documentation
 
 For more detailed instructions, see the [full documentation](https://ln2697.github.io/lead/docs). In particular:
-- [Data collection](https://ln2697.github.io/lead/docs/data_collection.html)
+- [Training data collection](https://ln2697.github.io/lead/docs/data_collection.html)
 - [Training](https://ln2697.github.io/lead/docs/carla_training.html)
 - [Evaluation](https://ln2697.github.io/lead/docs/carla_training.html)
 
