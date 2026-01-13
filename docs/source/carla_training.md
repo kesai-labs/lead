@@ -13,15 +13,13 @@ The following steps need to be performed once per dataset.
 
 ### Prepare Data
 
-We will upload a dataset soon. In the meantime, follow the [data collection tutorial](data_collection.md) to collect data locally.
+This step assumes you either
 
-After collecting data locally, organize it with:
+1. fellow the [data collection tutorial](data_collection.md) to collect data locally
 
-```bash
-cp -r data/expert_debug data/carla_leaderboard2
-```
+2. or downloaded the data from  [Hugging Face](https://huggingface.co/datasets/ln2697/lead_carla).
 
-Your data structure should match:
+Eitherway, your data structure should match:
 
 ```{code-block}
 :emphasize-lines: 2,3,4
@@ -30,8 +28,6 @@ data/carla_leaderboard2
 ├── data
 │   └── BlockedIntersection
 │       └── 999_Rep-1_Town06_13_route0_12_22_22_34_45
-└── results
-    └── Town06_13_result.json
 ```
 
 ### Build Data Buckets
@@ -68,8 +64,6 @@ data/carla_leaderboard2
 ├── data
 │   └── BlockedIntersection
 │       └── 999_Rep-1_Town06_13_route0_12_22_22_34_45
-└── results
-    └── Town06_13_result.json
 ```
 
 Bucket files use relative paths and are portable across machines.
@@ -112,8 +106,6 @@ data/carla_leaderboard2
 ├── data
 │   └── BlockedIntersection
 │       └── 999_Rep-1_Town06_13_route0_12_22_22_34_45
-└── results
-    └── Town06_13_result.json
 ```
 
 Training session cache is loaded in the first few epochs of the training from shared disk and stored on training session's disk. This implementation is specific to SLURM clusters of our organization.

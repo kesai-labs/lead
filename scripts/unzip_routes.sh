@@ -1,49 +1,28 @@
 #!/bin/bash
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --time=1-00:00:00
+#SBATCH --cpus-per-task=8
+#SBATCH --partition=L40Sday
+#SBATCH --mail-type=FAIL,END
+#SBATCH --mail-user=long.nguyen@student.uni-tuebingen.de
+#SBATCH --mem=64G
 
-# Unzip routes from data/carla_leaderboard2/zip to data/carla_leaderboard2/data
+zip_dir="data/carla_leaderboard2/zip/"
 
-SOURCE_DIR="data/carla_leaderboard2/zip"
-TARGET_DIR="data/carla_leaderboard2/data"
-TEMP_DIR="data/carla_leaderboard2/temp_unzip"
+# collect all zip files
+mapfile -d '' -t zips < <(find "$zip_dir" -type f -name "*.zip" -print0)
 
-# Create directories if they don't exist
-mkdir -p "$TARGET_DIR"
-mkdir -p "$TEMP_DIR"
+echo "Found ${#zips[@]} zip files to unzip."
+echo "First 10 zips:"
+printf '%s\n' "${zips[@]:0:10}"
 
-# Find and unzip all zip files
-echo "Unzipping routes from $SOURCE_DIR to $TARGET_DIR..."
+unzip_route() {
+  zip_file="$1"
+  unzip -o "$zip_file" -d . >/dev/null
+}
 
-count=0
-for zip_file in "$SOURCE_DIR"/*.zip; do
-    if [ -f "$zip_file" ]; then
-        echo "Unzipping: $(basename "$zip_file")"
+export -f unzip_route
+export target_dir
 
-        # Unzip to temp directory
-        unzip -q "$zip_file" -d "$TEMP_DIR"
-
-        # Find the deeply nested content and move it to target
-        # Look for the pattern: data/carla_leaderboad2_v8/results/data/sensor_data/data/*/
-        nested_path=$(find "$TEMP_DIR" -type d -path "*/data/carla_leaderboad2_v8/results/data/sensor_data/data/*" -maxdepth 10 | head -n 1)
-
-        if [ -n "$nested_path" ]; then
-            # Move each scenario folder (e.g., Accident) directly to target
-            for scenario_dir in "$TEMP_DIR"/data/carla_leaderboad2_v8/results/data/sensor_data/data/*; do
-                if [ -d "$scenario_dir" ]; then
-                    mv "$scenario_dir" "$TARGET_DIR/"
-                    echo "  Moved: $(basename "$scenario_dir")"
-                fi
-            done
-        fi
-
-        # Clean up temp directory
-        rm -rf "$TEMP_DIR"
-        mkdir -p "$TEMP_DIR"
-
-        count=$((count + 1))
-    fi
-done
-
-# Remove temp directory
-rm -rf "$TEMP_DIR"
-
-echo "Done! Unzipped $count route(s)."
+printf '%s\0' "${zips[@]}" | parallel --will-cite -0 -P 64 unzip_route {}

@@ -74,9 +74,6 @@ def merge_route_json(folder_path):
 
     with open(os.path.join(folder_path, "merged.json"), "w") as file:
         json.dump(merged_data, file, indent=4)
-    print(
-        f"driving score: {merged_data['driving score']} success rate: {merged_data['success rate']} eval num: {merged_data['eval num']} current_driving_score: {merged_data['current_driving_score']}"
-    )
     return merged_data
 
 

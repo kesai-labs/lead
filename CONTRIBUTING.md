@@ -30,7 +30,7 @@ We welcome feature contributions! To ensure quality and maintainability:
 ### Code Quality Standards
 - Install pre-commit hooks locally before starting development: `pre-commit install`
 - Use type hints with `jaxtyping` for tensor operations
-- Add `beartype` decorators for runtime validation
+- Add appropriate `beartype` decorators for runtime validation
 - Include docstrings for all public functions
 - Run existing tests before submitting: `pytest tests/`
 

@@ -189,3 +189,5 @@ data/**/*
 !data/**/*.xml
 outputs/checkpoints
 outputs/local_evaluation
+3rd_party/alpamayo
+ar1_venv
