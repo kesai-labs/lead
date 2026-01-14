@@ -15,9 +15,9 @@ The following steps need to be performed once per dataset.
 
 This step assumes you either
 
-1. fellow the [data collection tutorial](data_collection.md) to collect data locally
+1. Fellow the [data collection tutorial](data_collection.md) to collect data locally
 
-2. or downloaded the data from  [Hugging Face](https://huggingface.co/datasets/ln2697/lead_carla).
+2. Or downloaded the data from  [Hugging Face](https://huggingface.co/datasets/ln2697/lead_carla).
 
 Eitherway, your data structure should match:
 

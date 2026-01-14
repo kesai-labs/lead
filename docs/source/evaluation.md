@@ -69,15 +69,9 @@ outputs/local_evaluation/<route_id>/
 ├── metric_info.json              # Bench2Drive extended metrics (Bench2Drive only)
 ├── demo_images/                  # Bird's-eye view frames
 ├── debug_images/                 # Debug visualization frames
-└── debug_checkpoint/             # Debug checkpoints
-```
-
-If video generation is enabled:
-
-```
-outputs/local_evaluation/
 ├── <route_id>_demo.mp4          # Bird's-eye view video
-└── <route_id>_debug.mp4         # Debug video with sensor data
+├── <route_id>_debug.mp4         # Debug video with sensor data
+└── debug_checkpoint/             # Debug checkpoints
 ```
 
 ## Summarizing Results

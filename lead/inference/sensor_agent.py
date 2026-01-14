@@ -48,7 +48,8 @@ torch.backends.cudnn.allow_tf32 = True
 DEMO_CAMERAS = [
     {
         "name": "cinematic_camera",
-        "draw_points": False,
+        "draw_target_points": False,
+        "draw_planning": False,
         "image_size_x": "960",
         "image_size_y": "1080",
         "fov": "100",
@@ -60,7 +61,8 @@ DEMO_CAMERAS = [
     },
     {
         "name": "bev_camera",
-        "draw_points": True,
+        "draw_target_points": False,
+        "draw_planning": True,
         "image_size_x": "960",
         "image_size_y": "1080",
         "fov": "100",
@@ -132,6 +134,9 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         if self.config_closed_loop.save_path is not None:
             if self.config_closed_loop.produce_debug_video:
                 self.debug_video_writer = None
+
+            # Initialize input video writer
+            self.input_video_writer = None
 
             if self.config_closed_loop.produce_demo_video or self.config_closed_loop.produce_demo_image:
                 self.demo_video_writer = None
@@ -274,14 +279,15 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
             image = self._demo_camera_images[camera_idx]
             camera_config = DEMO_CAMERAS[camera_idx - 1]  # camera_idx is 1-based
             camera_name = camera_config.get("name", f"demo_{camera_idx}")
-            draw_points = camera_config.get("draw_points", False)
+            draw_target_points = camera_config.get("draw_target_points", False)
+            draw_planning = camera_config.get("draw_planning", False)
 
             processed_image = image.copy()
 
             # Add visualizations if enabled
-            if draw_points and pred_waypoints is not None:
+            if draw_planning and pred_waypoints is not None:
                 processed_image = self.draw_waypoints(processed_image, pred_waypoints, camera_config)
-            if draw_points and target_points is not None and camera_name == "bev_camera":
+            if draw_target_points and target_points is not None and camera_name == "bev_camera":
                 processed_image = self.draw_target_points(processed_image, target_points, camera_config)
 
             processed_images.append(processed_image)
@@ -490,11 +496,9 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         """Pre-processes sensor data"""
         input_data = super().tick(input_data)
 
-        # Store RGB for later visualization (before JPEG compression)
-        self._rgb_for_visualization = input_data["rgb"].copy()
-
         # Simulate JPEG compression to avoid train-test mismatch
         rgb = input_data["rgb"]
+        input_data["original_rgb"] = rgb.copy()
         rgb = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
         _, rgb = cv2.imencode(".jpg", rgb, [int(cv2.IMWRITE_JPEG_QUALITY), self.config_closed_loop.jpeg_quality])
         rgb = cv2.imdecode(rgb, cv2.IMREAD_UNCHANGED)
@@ -502,20 +506,20 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         input_data["rgb"] = rgb
 
         # Cut cameras down to only used cameras
-        if self.training_config.num_used_cameras != self.training_config.num_available_cameras:
-            n = self.training_config.num_available_cameras
-            w = input_data["rgb"].shape[2] // n
+        for modality in ["rgb", "original_rgb"]:
+            if self.training_config.num_used_cameras != self.training_config.num_available_cameras:
+                n = self.training_config.num_available_cameras
+                w = input_data[modality].shape[2] // n
 
-            rgb_slices = []
-            for i, use in enumerate(self.training_config.used_cameras):
-                if use:
-                    s, e = i * w, (i + 1) * w
-                    rgb_slices.append(input_data["rgb"][:, :, s:e])
+                rgb_slices = []
+                for i, use in enumerate(self.training_config.used_cameras):
+                    if use:
+                        s, e = i * w, (i + 1) * w
+                        rgb_slices.append(input_data[modality][:, :, s:e])
 
-            input_data["rgb"] = np.concatenate(rgb_slices, axis=2)
+                input_data[modality] = np.concatenate(rgb_slices, axis=2)
 
         # Plan next target point and command.
-
         self.set_target_points(input_data, pop_distance=self.config_closed_loop.route_planner_min_distance)
         if self.config_closed_loop.sensor_agent_pop_distance_adaptive:
             dense_points = (
@@ -655,6 +659,32 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
             }
         )
 
+        # Save input images as PNG and video
+        if self.config_closed_loop.save_path is not None and self.step >= 0:
+            # Get the RGB image for visualization (before JPEG compression)
+            input_image = input_data["original_rgb"].copy()
+            input_image_rgb = cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB)
+
+            # Save input image as PNG
+            save_path_input = str(self.config_closed_loop.save_path / "input_images")
+            os.makedirs(save_path_input, exist_ok=True)
+            PIL.Image.fromarray(input_image_rgb).save(
+                f"{save_path_input}/{str(self.step).zfill(5)}.png",
+                optimize=True,
+                compress_level=0,
+            )
+
+            # Add to input video
+            if self.input_video_writer is None:
+                os.makedirs(os.path.dirname(self.config_closed_loop.input_video_path), exist_ok=True)
+                self.input_video_writer = cv2.VideoWriter(
+                    self.config_closed_loop.input_video_path,
+                    cv2.VideoWriter_fourcc(*"mp4v"),
+                    self.config_closed_loop.video_fps,
+                    (input_image.shape[1], input_image.shape[0]),
+                )
+            self.input_video_writer.write(input_image)
+
         # Save demo images
         if self.config_closed_loop.save_path is not None and self.step >= 0:
             # Get predicted route and waypoints (if available)
@@ -732,6 +762,16 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
 
         # Clean up video writers
         if self.config_closed_loop.save_path is not None:
+            # Input video - high quality for presentation
+            if hasattr(self, "input_video_writer") and self.input_video_writer is not None:
+                self.input_video_writer.release()
+                self.compress_video(
+                    temp_path=self.config_closed_loop.temp_input_video_path,
+                    final_path=self.config_closed_loop.input_video_path,
+                    crf=18,
+                    preset="slow",
+                )
+
             if self.config_closed_loop.produce_debug_video:
                 # Debug video - low quality for disk space
                 self.debug_video_writer.release()

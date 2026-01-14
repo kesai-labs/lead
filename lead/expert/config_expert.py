@@ -109,7 +109,7 @@ class ExpertConfig(BaseConfig):
     # Color for yellow traffic lights
     yellow_traffic_light_color = rgb(255, 255, 0)
     # Color for green traffic lights
-    green_traffic_light_color = rgb(255, 0, 0, 255)
+    green_traffic_light_color = rgb(255, 0, 0)
     # Color for off traffic lights
     off_traffic_light_color = rgb(0, 0, 0)
     # Color for unknown traffic lights

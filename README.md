@@ -18,7 +18,7 @@
 
 https://github.com/user-attachments/assets/e2ef014c-ad1a-4411-9275-fe275723490a
 
-**Driving stress test:** Closed-loop execution of TransFuser v6, the latest iteration of the TransFuser family, demonstrating stable control in a complex urban scenario under degraded perception and adversarial traffic.
+**TransFuser v6:** The latest iteration of the TransFuser linage in evaluation.
 
 </div>
 
@@ -223,10 +223,6 @@ The LEAD pipeline and TFv6 models are deployed as **reference implementations an
 
 * **[NVIDIA AlpaSim Simulator (TransFuserModel)](https://github.com/NVlabs/alpasim)**
   Adapting the NAVSIM's Latent TransFuser v6 checkpoints, AlpaSim also features an official TransFuser driver, serving as a baseline policy for closed-loop simulation.
-
-These deployments demonstrate the flexibility of LEAD as a portable training and inference stack that can be adapted across environments, sensor configurations, and evaluation protocols.
-
-LEAD complements existing benchmarks by extending them with reproducible long-horizon closed-loop evaluation and additional synthetic supervision benefits of CARLA.
 
 ## Further Documentation
 

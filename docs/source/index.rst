@@ -3,8 +3,6 @@ Documentation
 
 .. note::
    This documentation is maintained with best effort. If you find any inconsistencies or issues, please report them on our issue tracker.
-.. warning::
-   The documentation is updated regularly, some browser caching may cause you to see an older version. If you suspect this, please try a hard refresh (Ctrl+F5).
 
 This documentation is organized into three sections.
 **Basic:** Quickstart guides to get you started.
@@ -46,7 +44,6 @@ The basic section is sufficient to get started with the local data collection, t
    :caption: In-Depth
    :numbered:
 
-   debug_expert
    cross_dataset_training
    config_system
    inspecting_pickle_files

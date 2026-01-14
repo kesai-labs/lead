@@ -190,6 +190,16 @@ class ClosedLoopConfig(OpenLoopConfig):
         os.makedirs(path, exist_ok=True)
         return path
 
+    @property
+    def input_video_path(self):
+        """Get the path for input video output."""
+        return os.path.join(self.save_path, f"{self.route_id}_input.mp4")
+
+    @property
+    def temp_input_video_path(self):
+        """Get the path for temporary input video output."""
+        return os.path.join(self.save_path, f"{self.route_id}_input_temp.mp4")
+
     @overridable_property
     def video_fps(self):
         """Calculate video FPS based on frame production frequency."""
