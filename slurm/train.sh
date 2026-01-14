@@ -52,7 +52,7 @@ fi
 export MASTER_ADDR=127.0.0.1
 export MASTER_PORT=$((10000 + RANDOM % 50000))
 if [ "$nproc_per_node" -le 1 ]; then
-    python training/train.py
+    python lead/training/train.py
 else
-	torchrun --standalone --nnodes=1 --nproc_per_node=$nproc_per_node --max_restarts=0 --rdzv_id=$SLURM_JOB_ID --rdzv_backend=c10d training/train.py
+	torchrun --standalone --nnodes=1 --nproc_per_node=$nproc_per_node --max_restarts=0 --rdzv_id=$SLURM_JOB_ID --rdzv_backend=c10d lead/training/train.py
 fi

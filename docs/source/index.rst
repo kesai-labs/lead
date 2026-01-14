@@ -27,7 +27,6 @@ The basic section is sufficient to get started with the local data collection, t
    :numbered:
 
    data_collection
-   download_training_data
    carla_training
    evaluation
    jupyter_notebooks

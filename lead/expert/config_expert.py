@@ -95,45 +95,45 @@ class ExpertConfig(BaseConfig):
     # Color for future route visualization during debugging
     future_route_color = rgb(0, 255, 0)
     # Color for other vehicles' forecasted bounding boxes
-    other_vehicles_forecasted_bbs_color = carla.Color(0, 0, 255)
+    other_vehicles_forecasted_bbs_color = rgb(0, 0, 255)
     # Color for leading vehicle visualization
-    leading_vehicle_color = carla.Color(255, 0, 0)
+    leading_vehicle_color = rgb(255, 0, 0)
     # Color for trailing vehicle visualization
-    trailing_vehicle_color = carla.Color(255, 255, 255)
+    trailing_vehicle_color = rgb(255, 255, 255)
     # Color for ego vehicle bounding box
-    ego_vehicle_bb_color = carla.Color(0, 0, 0)
+    ego_vehicle_bb_color = rgb(0, 0, 0)
     # Color for pedestrian forecasted bounding boxes
-    pedestrian_forecasted_bbs_color = carla.Color(0, 0, 255)
+    pedestrian_forecasted_bbs_color = rgb(0, 0, 255)
     # Color for red traffic lights
-    red_traffic_light_color = carla.Color(0, 255, 0)
+    red_traffic_light_color = rgb(0, 255, 0)
     # Color for yellow traffic lights
-    yellow_traffic_light_color = carla.Color(255, 255, 0)
+    yellow_traffic_light_color = rgb(255, 255, 0)
     # Color for green traffic lights
-    green_traffic_light_color = carla.Color(255, 0, 0, 255)
+    green_traffic_light_color = rgb(255, 0, 0, 255)
     # Color for off traffic lights
-    off_traffic_light_color = carla.Color(0, 0, 0)
+    off_traffic_light_color = rgb(0, 0, 0)
     # Color for unknown traffic lights
-    unknown_traffic_light_color = carla.Color(0, 0, 0)
+    unknown_traffic_light_color = rgb(0, 0, 0)
     # Color for cleared stop signs
-    cleared_stop_sign_color = carla.Color(0, 255, 0)
+    cleared_stop_sign_color = rgb(0, 255, 0)
     # Color for uncleared stop signs
-    uncleared_stop_sign_color = carla.Color(255, 0, 0)
+    uncleared_stop_sign_color = rgb(255, 0, 0)
     # Color for ego vehicle forecasted bounding boxes in hazard situations
-    ego_vehicle_forecasted_bbs_hazard_color = carla.Color(255, 0, 0)
+    ego_vehicle_forecasted_bbs_hazard_color = rgb(255, 0, 0)
     # Color for ego vehicle forecasted bounding boxes in normal situations
-    ego_vehicle_forecasted_bbs_normal_color = carla.Color(0, 255, 0)
+    ego_vehicle_forecasted_bbs_normal_color = rgb(0, 255, 0)
     # Color for highlighted route segments
-    highlight_route_segment_color = carla.Color(255, 0, 0)
+    highlight_route_segment_color = rgb(255, 0, 0)
     # Color for source lane visualization
-    source_lane_color = carla.Color(0, 255, 0)
+    source_lane_color = rgb(0, 255, 0)
     # Color for target lane visualization
-    target_lane_color = carla.Color(255, 0, 0)
+    target_lane_color = rgb(255, 0, 0)
     # Color for opponent traffic route
-    opponent_traffic_route_color = carla.Color(255, 0, 0)
+    opponent_traffic_route_color = rgb(255, 0, 0)
     # Color for intersection points
-    intersection_point_color = carla.Color(0, 0, 255)
+    intersection_point_color = rgb(0, 0, 255)
     # Color for adversarial situations
-    adversarial_color = carla.Color(255, 0, 0)
+    adversarial_color = rgb(255, 0, 0)
 
     # --- Dataset and Timing Configuration ---
     # How many pixels make up 1 meter in BEV grids.

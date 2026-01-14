@@ -26,9 +26,9 @@ https://github.com/user-attachments/assets/0c2dfb28-93b6-4324-be49-16c6744677da
 
 We release the complete pipeline required to achieve state-of-the-art closed-loop performance on the Bench2Drive benchmark. Built around the CARLA simulator, the stack features a data-centric design with:
 
-- Extensive visualization suite and runtime type validation for easier debugging.
-- Optimized storage format, packs 72 hours of driving in ~200GB.
-- Native support for NAVSIM and Waymo Vision-based E2E and extending those benchmarks through closed-loop simulation and synthetic data for additional supervision during training.
+- Extensive visualization suite and runtime type validation.
+- Optimized storage format, packs 72 hours of driving in ~260GB.
+- Native support for NAVSIM and Waymo Vision-based E2E. Extending those benchmarks through closed-loop simulation and synthetic data for additional supervision during training.
 
 
 ## Table of Contents
@@ -45,23 +45,26 @@ We release the complete pipeline required to achieve state-of-the-art closed-loo
 ## Roadmap
 
 - [x] ✅ Checkpoints and inference code (stable)
-- [x] 🟨 Documentation, training pipeline and expert code (under test)
-- [x] 🟨 Full CARLA dataset release on HuggingFace (under test)
-- [ ] 🚧 Datasets for cross-benchmark
-- [ ] 🚧 Cross-benchmark training tools and documentation
+- [x] 🟨 Documentation, training pipeline and expert code (released, under test)
+- [x] 🟨 Full CARLA dataset release on HuggingFace (released, under test)
+- [ ] 🚧 Datasets for cross-benchmark (coming soon)
+- [ ] 🚧 Cross-benchmark training tools and documentation (coming soon)
 
-Status: Active development. Remaining components coming soon.
+Status: Active development.
 
 ## Updates
 
 - **`[2026/01/13]`** CARLA dataset and full CARLA training doc release
   > We publicly release a CARLA dataset generated with the same pipeline as used in the paper. However, due to subsequent refactoring and cleanup of the expert driver, the released dataset is not bit-identical to the dataset used for the reported experiments. A verification of the dataset is running right now.
 
+- **`[2026/01/05]`** Bug in RoutePlanner fixed
+  > An index error caused driving policy to to crash at end of routes in Town13. New Driving Score are updated.
+
 - **`[2025/12/24]`** Arxiv paper and code release
 
 ## Quick Start (Get Driving in 20 Minutes)
 
-**1. Environment initialization**
+### 1. Environment initialization
 
 Clone the repository and map the project root to your environment
 
@@ -81,9 +84,9 @@ source ~/.bashrc  # Reload config to apply changes immediately
 > [!NOTE]
 > Please verify that ~/.bashrc reflects these paths correctly.
 
-**2. Setup experiment infrastructure**
+### 2. Setup experiment infrastructure
 
-We utilize [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install) and conda-lock for a more deterministic build:
+We utilize [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install), conda-lock and uv:
 
 ```bash
 # Install conda-lock and create conda environment
@@ -104,22 +107,9 @@ While waiting for dependencies installation, we recommend CARLA setup on paralle
 bash scripts/setup_carla.sh # Download and setup CARLA at 3rd_party/CARLA_0915
 ```
 
-**3. Model zoo**
+### 3. Model zoo
 
-Pre-trained driving policies are hosted on [HuggingFace](https://huggingface.co/ln2697/tfv6) for reproducibility. These checkpoints follow the TFv6 architecture
-(detailed in Fig. 1), but differ in their sensor configurations, vision backbones or dataset composition.
-
-<br>
-<br>
-
-<p align="center">
-  <img src="https://ln2697.github.io/lead/static/images/tfv6.png" alt="TFv6 Architecture" width="80%" >
-</p>
-
-<p align="center"><b>Figure 1:</b> TFv6 architecture.</p>
-
-<br>
-<br>
+Pre-trained driving policies are hosted on [HuggingFace](https://huggingface.co/ln2697/tfv6) for reproducibility. These checkpoints follow the TFv6 architecture, but differ in their sensor configurations, vision backbones or dataset composition.
 
 Tab. 1 shows available checkpoints with their performance on three major CARLA benchmarks. As first step, we recommend `tfv6_resnet34` as it provides a good balance between performance and resource usage.
 
@@ -154,7 +144,7 @@ cd outputs/checkpoints
 git lfs pull
 ```
 
-**4. Verify driving stack**
+### 4. Verify driving stack
 
 To initiate closed-loop evaluation and verify the integration of the driving stack, execute the following:
 
@@ -165,26 +155,24 @@ bash scripts/start_carla.sh
 bash scripts/eval_bench2drive.sh
 ```
 
-<details>
-<summary>Driving logs will be saved to <code>outputs/local_evaluation</code> with the following structure:</summary>
+Driving logs will be saved to <code>outputs/local_evaluation</code> with the following structure:
 
 ```html
-outputs/local_evaluation
-├── 23687
-│   ├── checkpoint_endpoint.json
-│   ├── debug_images
-│   ├── demo_images
-│   └── metric_info.json
+outputs/local_evaluation/23687
 ├── 23687_debug.mp4
-└── 23687_demo.mp4
+├── 23687_demo.mp4
+├── checkpoint_endpoint.json
+├── debug_images
+├── demo_images
+├── input_log
+└── metric_info.json
 ```
-</details>
 
 > [!TIP]
 > 1. Disable video recording in [config_closed_loop](lead/inference/config_closed_loop.py) by turning off `produce_demo_video` and `produce_debug_video`.
 > 2. If memory is limited, modify the file prefixes to load only the first checkpoint seed. By default, the pipeline loads all three seeds as an ensemble.
 
-**5. Verify autopilot**
+### 5. Verify autopilot
 
 Verify the expert policy and data acquisition pipeline by executing a test run on a sample route:
 
@@ -195,8 +183,7 @@ bash scripts/start_carla.sh
 bash scripts/run_expert.sh
 ```
 
-<details>
-<summary>Data collected will be stored at <code>data/expert_debug</code> and should have following structure:</summary>
+Data collected will be stored at <code>data/expert_debug</code> and should have following structure:
 
 ```html
 data/expert_debug
@@ -220,8 +207,6 @@ data/expert_debug
 └── results
     └── Town06_13_result.json
 ```
-
-</details>
 
 ## Beyond CARLA: Cross-Benchmark Deployment
 

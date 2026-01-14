@@ -166,27 +166,27 @@ class ClosedLoopConfig(OpenLoopConfig):
     @property
     def debug_video_path(self):
         """Get the path for video output."""
-        return os.path.join(self.save_path, "..", f"{self.route_id}_debug.mp4")
+        return os.path.join(self.save_path, f"{self.route_id}_debug.mp4")
 
     @property
     def temp_debug_video_path(self):
         """Get the path for temporary video output."""
-        return os.path.join(self.save_path, "..", f"{self.route_id}_debug_temp.mp4")
+        return os.path.join(self.save_path, f"{self.route_id}_debug_temp.mp4")
 
     @property
     def demo_video_path(self):
         """Get the path for demo video output."""
-        return os.path.join(self.save_path, "..", f"{self.route_id}_demo.mp4")
+        return os.path.join(self.save_path, f"{self.route_id}_demo.mp4")
 
     @property
     def temp_demo_video_path(self):
         """Get the path for temporary demo video output."""
-        return os.path.join(self.save_path, "..", f"{self.route_id}_demo_temp.mp4")
+        return os.path.join(self.save_path, f"{self.route_id}_demo_temp.mp4")
 
     @property
     def input_log_path(self):
         """Get and create the path for input logging."""
-        path = os.path.join(self.save_path, "..", "input_log")
+        path = os.path.join(self.save_path, "input_log")
         os.makedirs(path, exist_ok=True)
         return path
 

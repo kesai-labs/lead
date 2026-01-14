@@ -21,7 +21,7 @@ fi
 
 # Run's outputs will be directed too this directory.
 export EVALUATION_OUTPUT_DIR=outputs/evaluation/$EXPERIMENT_RUN_DIR
-export TRAINING_OUTPUT_DIR=training/$EXPERIMENT_RUN_DIR
+export TRAINING_OUTPUT_DIR=outputs/training/$EXPERIMENT_RUN_DIR
 EXPERIMENT_SEED=$(basename "$0" ".sh" | awk -F'_' '{print $NF}') # Last part of the script name is the seed
 export EXPERIMENT_SEED
 
