@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LEAD Infraction Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>LEAD Infraction Dashboard</h1>
+            <div class="header-controls">
+                <input type="text" id="output-dir" placeholder="Evaluation output directory..." />
+                <button id="load-routes">Load Routes</button>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <!-- Route Selection Sidebar -->
+            <aside class="sidebar">
+                <h2>Routes</h2>
+                <div id="route-stats" class="stats-panel"></div>
+                <div id="route-list" class="route-list">
+                    <p class="loading">Click "Load Routes" to begin</p>
+                </div>
+            </aside>
+
+            <!-- Main Viewer -->
+            <main class="viewer">
+                <div id="no-route-selected" class="placeholder">
+                    <p>Select a route to view infractions</p>
+                </div>
+
+                <div id="route-viewer" class="route-viewer" style="display: none;">
+                    <!-- Route Info Header -->
+                    <div class="route-header">
+                        <h2 id="route-name"></h2>
+                        <div id="route-metrics" class="metrics"></div>
+                    </div>
+
+                    <!-- Video Player -->
+                    <div class="video-container">
+                        <div class="video-controls-top">
+                            <select id="video-type">
+                                <option value="debug">Debug Video</option>
+                                <option value="demo">Demo Video</option>
+                            </select>
+                            <div class="playback-controls">
+                                <button id="speed-down" title="Slow down">0.5x</button>
+                                <button id="speed-normal" title="Normal speed">1x</button>
+                                <button id="speed-up" title="Speed up">2x</button>
+                            </div>
+                            <div class="frame-controls">
+                                <button id="back-5s" title="Back 5 seconds">◀◀ 5s</button>
+                                <button id="back-1s" title="Back 1 second">◀ 1s</button>
+                                <button id="forward-1s" title="Forward 1 second">1s ▶</button>
+                                <button id="forward-5s" title="Forward 5 seconds">5s ▶▶</button>
+                            </div>
+                        </div>
+                        <video id="video-player" controls>
+                            Your browser does not support the video tag.
+                        </video>
+                        <div class="video-info">
+                            <span id="current-time">0.00s</span>
+                            <span id="current-frame">Frame: 0</span>
+                            <span id="current-step">Step: 0</span>
+                        </div>
+                    </div>
+
+                    <!-- Infractions List -->
+                    <div class="infractions-panel">
+                        <h3>
+                            Infractions
+                            <span id="infraction-count" class="badge">0</span>
+                        </h3>
+                        <div class="filter-controls">
+                            <input type="text" id="filter-input" placeholder="Filter by type..." />
+                            <button id="clear-filter">Clear</button>
+                        </div>
+                        <div id="infractions-list" class="infractions-list">
+                            <p class="loading">Loading infractions...</p>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let currentRoute = null;
+        let infractions = [];
+        let filteredInfractions = [];
+        const VIDEO_FPS = 20; // CARLA runs at 20 FPS
+
+        // DOM elements
+        const outputDirInput = document.getElementById('output-dir');
+        const loadRoutesBtn = document.getElementById('load-routes');
+        const routeList = document.getElementById('route-list');
+        const routeViewer = document.getElementById('route-viewer');
+        const noRouteSelected = document.getElementById('no-route-selected');
+        const videoPlayer = document.getElementById('video-player');
+        const videoTypeSelect = document.getElementById('video-type');
+        const infractionsList = document.getElementById('infractions-list');
+        const infractionCount = document.getElementById('infraction-count');
+        const filterInput = document.getElementById('filter-input');
+        const currentTimeSpan = document.getElementById('current-time');
+        const currentFrameSpan = document.getElementById('current-frame');
+        const currentStepSpan = document.getElementById('current-step');
+
+        // Infraction type metadata
+        const infractionTypes = {
+            'CollisionTest': { icon: '●', color: '#dc2626', label: 'Collision' },
+            'RunningRedLightTest': { icon: '●', color: '#ef4444', label: 'Red Light' },
+            'RunningStopTest': { icon: '●', color: '#f97316', label: 'Stop Sign' },
+            'OutsideRouteLanesTest': { icon: '●', color: '#f59e0b', label: 'Outside Lane' },
+            'OffRoadTest': { icon: '●', color: '#d97706', label: 'Off Road' },
+            'OnSidewalkTest': { icon: '●', color: '#ea580c', label: 'Sidewalk' },
+            'MinimumSpeedRouteTest': { icon: '●', color: '#64748b', label: 'Min Speed' },
+            'MinSpeedTest': { icon: '●', color: '#64748b', label: 'Min Speed' },
+            'ActorBlockedTest': { icon: '●', color: '#f43f5e', label: 'Blocked' },
+            'RouteCompletionTest': { icon: '●', color: '#22c55e', label: 'Completion' },
+        };
+
+        function getInfractionMeta(type) {
+            return infractionTypes[type] || { icon: '●', color: '#94a3b8', label: type };
+        }
+
+        // Load routes
+        loadRoutesBtn.addEventListener('click', loadRoutes);
+
+        async function loadRoutes() {
+            const dir = outputDirInput.value;
+            const url = dir ? `/api/routes?dir=${encodeURIComponent(dir)}` : '/api/routes';
+
+            try {
+                routeList.innerHTML = '<p class="loading">Loading routes...</p>';
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.error) {
+                    routeList.innerHTML = `<p class="error">${data.error}</p>`;
+                    return;
+                }
+
+                if (data.routes.length === 0) {
+                    routeList.innerHTML = '<p class="empty">No routes found</p>';
+                    return;
+                }
+
+                renderRoutes(data.routes);
+                updateRouteStats(data.routes);
+            } catch (error) {
+                routeList.innerHTML = `<p class="error">Error loading routes: ${error.message}</p>`;
+            }
+        }
+
+        function updateRouteStats(routes) {
+            const total = routes.length;
+            const withInfractions = routes.filter(r => r.infraction_count > 0).length;
+            const totalInfractions = routes.reduce((sum, r) => sum + (r.infraction_count || 0), 0);
+
+            document.getElementById('route-stats').innerHTML = `
+                <div class="stat"><strong>${total}</strong> routes</div>
+                <div class="stat"><strong>${withInfractions}</strong> with infractions</div>
+                <div class="stat"><strong>${totalInfractions}</strong> total infractions</div>
+            `;
+        }
+
+        function renderRoutes(routes) {
+            routeList.innerHTML = routes.map(route => `
+                <div class="route-item" onclick="selectRoute('${route.name}')">
+                    <div class="route-item-header">
+                        <strong>${route.name}</strong>
+                        ${route.infraction_count > 0 ?
+                            `<span class="badge ${route.infraction_count > 10 ? 'badge-danger' : 'badge-warning'}">${route.infraction_count}</span>` :
+                            '<span class="badge badge-success">✓</span>'
+                        }
+                    </div>
+                    <div class="route-item-info">
+                        ${route.has_debug_video ? '[Debug]' : ''}
+                        ${route.has_demo_video ? '[Demo]' : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function selectRoute(routeName) {
+            currentRoute = routeName;
+
+            // Update UI
+            document.getElementById('route-name').textContent = routeName;
+            noRouteSelected.style.display = 'none';
+            routeViewer.style.display = 'block';
+
+            // Load video
+            const videoType = videoTypeSelect.value;
+            videoPlayer.src = `/video/${routeName}/${videoType}`;
+
+            // Load infractions
+            await loadInfractions(routeName);
+
+            // Load checkpoint data (for metrics)
+            await loadCheckpointData(routeName);
+        }
+
+        async function loadInfractions(routeName) {
+            try {
+                infractionsList.innerHTML = '<p class="loading">Loading infractions...</p>';
+                const response = await fetch(`/api/route/${routeName}/infractions`);
+                const data = await response.json();
+
+                if (data.error) {
+                    infractionsList.innerHTML = `<p class="error">${data.error}</p>`;
+                    return;
+                }
+
+                // Filter out min speed and completion infractions completely
+                infractions = data.infractions.filter(inf =>
+                    inf.infraction !== 'MinimumSpeedRouteTest' &&
+                    inf.infraction !== 'MinSpeedTest' &&
+                    !inf.infraction.toLowerCase().includes('minspeed') &&
+                    !inf.infraction.toLowerCase().includes('completion')
+                );
+                applyFilters();
+            } catch (error) {
+                infractionsList.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+            }
+        }
+
+        async function loadCheckpointData(routeName) {
+            try {
+                const response = await fetch(`/api/route/${routeName}/checkpoint`);
+                const data = await response.json();
+
+                if (!data.error && data.values) {
+                    document.getElementById('route-metrics').innerHTML = `
+                        <div class="metric">DS: ${data.values[0].toFixed(2)}</div>
+                        <div class="metric">RC: ${data.values[1].toFixed(2)}%</div>
+                        <div class="metric">Infractions: ${data.values[4].toFixed(0)}</div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading checkpoint data:', error);
+            }
+        }
+
+        function renderInfractions() {
+            infractionCount.textContent = filteredInfractions.length;
+
+            if (filteredInfractions.length === 0) {
+                infractionsList.innerHTML = '<p class="empty">No infractions found</p>';
+                return;
+            }
+
+            infractionsList.innerHTML = filteredInfractions.map((inf, idx) => {
+                const timestamp = inf.step / VIDEO_FPS;
+                const minutes = Math.floor(timestamp / 60);
+                const seconds = (timestamp % 60).toFixed(2);
+                const timeStr = `${minutes}:${seconds.padStart(5, '0')}`;
+                const meta = getInfractionMeta(inf.infraction);
+
+                return `
+                    <div class="infraction-item" onclick="jumpToInfraction(${inf.step})" style="border-left-color: ${meta.color}">
+                        <div class="infraction-header">
+                            <span class="infraction-type" style="color: ${meta.color}">
+                                <span class="infraction-icon">${meta.icon}</span>
+                                ${meta.label}
+                            </span>
+                            <span class="infraction-time">${timeStr}</span>
+                        </div>
+                        <div class="infraction-details">
+                            <div>Step: ${inf.step} | Frame: ${inf.frame}</div>
+                            ${inf.message ? `<div class="infraction-message">${inf.message}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function jumpToInfraction(step) {
+            const timestamp = step / VIDEO_FPS;
+            videoPlayer.currentTime = timestamp;
+            videoPlayer.play();
+        }
+
+        // Video controls
+        videoTypeSelect.addEventListener('change', () => {
+            if (currentRoute) {
+                const videoType = videoTypeSelect.value;
+                const currentTime = videoPlayer.currentTime;
+                videoPlayer.src = `/video/${currentRoute}/${videoType}`;
+                videoPlayer.currentTime = currentTime;
+            }
+        });
+
+        document.getElementById('speed-down').addEventListener('click', () => {
+            videoPlayer.playbackRate = 0.5;
+        });
+
+        document.getElementById('speed-normal').addEventListener('click', () => {
+            videoPlayer.playbackRate = 1.0;
+        });
+
+        document.getElementById('speed-up').addEventListener('click', () => {
+            videoPlayer.playbackRate = 2.0;
+        });
+
+        document.getElementById('back-5s').addEventListener('click', () => {
+            videoPlayer.currentTime = Math.max(0, videoPlayer.currentTime - 5);
+        });
+
+        document.getElementById('back-1s').addEventListener('click', () => {
+            videoPlayer.currentTime = Math.max(0, videoPlayer.currentTime - 1);
+        });
+
+        document.getElementById('forward-1s').addEventListener('click', () => {
+            videoPlayer.currentTime = Math.min(videoPlayer.duration, videoPlayer.currentTime + 1);
+        });
+
+        document.getElementById('forward-5s').addEventListener('click', () => {
+            videoPlayer.currentTime = Math.min(videoPlayer.duration, videoPlayer.currentTime + 5);
+        });
+
+        // Update time display
+        videoPlayer.addEventListener('timeupdate', () => {
+            const time = videoPlayer.currentTime;
+            const frame = Math.floor(time * VIDEO_FPS);
+            const step = frame;
+
+            currentTimeSpan.textContent = `${time.toFixed(2)}s`;
+            currentFrameSpan.textContent = `Frame: ${frame}`;
+            currentStepSpan.textContent = `Step: ${step}`;
+        });
+
+        // Filter infractions
+        function applyFilters() {
+            const searchFilter = filterInput.value.toLowerCase();
+
+            filteredInfractions = infractions.filter(inf => {
+                // Apply search filter
+                if (searchFilter && !inf.infraction.toLowerCase().includes(searchFilter) &&
+                    !(inf.message && inf.message.toLowerCase().includes(searchFilter))) {
+                    return false;
+                }
+
+                return true;
+            });
+
+            renderInfractions();
+        }
+
+        filterInput.addEventListener('input', applyFilters);
+
+        document.getElementById('clear-filter').addEventListener('click', () => {
+            filterInput.value = '';
+            applyFilters();
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (!videoPlayer.src) return;
+
+            switch(e.key) {
+                case ' ':
+                    e.preventDefault();
+                    videoPlayer.paused ? videoPlayer.play() : videoPlayer.pause();
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    videoPlayer.currentTime = Math.max(0, videoPlayer.currentTime - (e.shiftKey ? 5 : 1));
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    videoPlayer.currentTime = Math.min(videoPlayer.duration, videoPlayer.currentTime + (e.shiftKey ? 5 : 1));
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>

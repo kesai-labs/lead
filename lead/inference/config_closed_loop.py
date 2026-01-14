@@ -138,6 +138,20 @@ class ClosedLoopConfig(OpenLoopConfig):
         return True
 
     @overridable_property
+    def produce_input_image(self):
+        """If true produce input image output."""
+        if self.is_on_slurm:
+            return False
+        return True
+
+    @overridable_property
+    def produce_input_video(self):
+        """If true produce input video output."""
+        if self.is_on_slurm:
+            return True
+        return True
+
+    @overridable_property
     def produce_input_log(self):
         """If true produce input logging."""
         if self.is_on_slurm:

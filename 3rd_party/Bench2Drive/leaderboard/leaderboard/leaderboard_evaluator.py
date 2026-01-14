@@ -405,6 +405,11 @@ class LeaderboardEvaluator(object):
                 self.client.start_recorder("{}/{}_rep{}.log".format(args.record, config.name, config.repetition_index))
             self.manager.load_scenario(self.route_scenario, self.agent_instance, config.index, config.repetition_index)
             self.manager.tick_count = 0
+            
+            # Pass scenario reference to agent for infraction tracking (if supported)
+            if hasattr(self.agent_instance, 'set_scenario'):
+                self.agent_instance.set_scenario(self.route_scenario)
+            
             self.manager.run_scenario()
 
         except AgentError:

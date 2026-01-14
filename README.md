@@ -29,13 +29,19 @@ We release the complete pipeline required to achieve state-of-the-art closed-loo
 - Extensive visualization suite and runtime type validation.
 - Optimized storage format, packs 72 hours of driving in ~260GB.
 - Native support for NAVSIM and Waymo Vision-based E2E. Extending those benchmarks through closed-loop simulation and synthetic data for additional supervision during training.
+- Interactive infraction analysis webapp for debugging driving failures with video playback and frame-level infraction tracking.
 
 
 ## Table of Contents
 
 - [Roadmap](#roadmap)
 - [Updates](#updates)
-- [Quick Start (Get Driving in 20 Minutes)](#quick-start-get-driving-in-20-minutes)
+- [Quick Start (20 Minutes)](#quick-start-20-minutes)
+  - [1. Environment initialization](#1-environment-initialization)
+  - [2. Setup experiment infrastructure](#2-setup-experiment-infrastructure)
+  - [3. Model zoo](#3-model-zoo)
+  - [4. Verify driving stack](#4-verify-driving-stack)
+  - [5. Verify autopilot](#5-verify-autopilot)
 - [Beyond CARLA: Cross-Benchmark Deployment](#beyond-carla-cross-benchmark-deployment)
 - [Further Documentation](#further-documentation)
 - [Acknowledgements](#acknowledgements)
@@ -62,7 +68,7 @@ Status: Active development.
 
 - **`[2025/12/24]`** Arxiv paper and code release
 
-## Quick Start (Get Driving in 20 Minutes)
+## Quick Start (20 Minutes)
 
 ### 1. Environment initialization
 
@@ -71,18 +77,17 @@ Clone the repository and map the project root to your environment
 ```bash
 git clone https://github.com/autonomousvision/lead.git
 cd lead
-
-# Set the project root directory and configure paths for CARLA, datasets, and dependencies.
-{
-  echo -e "export LEAD_PROJECT_ROOT=$(pwd)"  # Set project root variable
-  echo "source $(pwd)/scripts/main.sh"       # Persist more environment variables
-} >> ~/.bashrc  # Append to bash config to persist across sessions
-
-source ~/.bashrc  # Reload config to apply changes immediately
 ```
 
-> [!NOTE]
-> Please verify that ~/.bashrc reflects these paths correctly.
+Set up environment variables
+
+```bash
+echo -e "export LEAD_PROJECT_ROOT=$(pwd)" >> ~/.bashrc  # Set project root variable
+echo "source $(pwd)/scripts/main.sh" >> ~/.bashrc       # Persist more environment variables
+source ~/.bashrc                                        # Reload config
+```
+
+Please verify that ~/.bashrc reflects these paths correctly.
 
 ### 2. Setup experiment infrastructure
 
@@ -111,19 +116,19 @@ bash scripts/setup_carla.sh # Download and setup CARLA at 3rd_party/CARLA_0915
 
 Pre-trained driving policies are hosted on [HuggingFace](https://huggingface.co/ln2697/tfv6) for reproducibility. These checkpoints follow the TFv6 architecture, but differ in their sensor configurations, vision backbones or dataset composition.
 
-Tab. 1 shows available checkpoints with their performance on three major CARLA benchmarks. As first step, we recommend `tfv6_resnet34` as it provides a good balance between performance and resource usage.
+Tab. 1 shows available checkpoints with their performance on three major CARLA benchmarks. As first step, we recommend the second checkpoint `2. TFv6 with ResNet34 backbone` as it provides a good balance between performance and resource usage.
 
 <br>
 <div align="center">
 
-| Checkpoint                                                                                    | Description               | Bench2Drive | Longest6 v2 |  Town13  |
-| --------------------------------------------------------------------------------------------- | ------------------------- | :---------: | :---------: | :------: |
-| [tfv6_regnety032](https://huggingface.co/ln2697/tfv6/tree/main/tfv6_regnety032)               | TFv6                      |  **95.2**   |   **62**    | **5.24** |
-| [tfv6_resnet34](https://huggingface.co/ln2697/tfv6/tree/main/tfv6_resnet34)                   | ResNet34 Backbone         |    94.7     |     57      |   5.01   |
-| [4cameras_resnet34](https://huggingface.co/ln2697/tfv6/tree/main/4cameras_resnet34)           | Additional rear camera    |    95.1     |     53      |    -     |
-| [noradar_resnet34](https://huggingface.co/ln2697/tfv6/tree/main/noradar_resnet34)             | No radar sensor           |    94.7     |     52      |    -     |
-| [visiononly_resnet34](https://huggingface.co/ln2697/tfv6/tree/main/visiononly_resnet34)       | Vision-only driving model |    91.6     |     43      |    -     |
-| [town13heldout_resnet34](https://huggingface.co/ln2697/tfv6/tree/main/town13heldout_resnet34) | Generalization evaluation |    93.1     |     52      |   3.52   |
+| Description                         | Bench2Drive | Longest6 v2 |  Town13  |                                 Checkpoint                                  |
+| ----------------------------------- | :---------: | :---------: | :------: | :-------------------------------------------------------------------------: |
+| 1. Full TransFuser V6               |  **95.2**   |   **62**    | **5.24** |    [Link](https://huggingface.co/ln2697/tfv6/tree/main/tfv6_regnety032)     |
+| 2. TFv6 with ResNet34 backbone      |    94.7     |     57      |   5.01   |     [Link](https://huggingface.co/ln2697/tfv6/tree/main/tfv6_resnet34)      |
+| 3. TFv6 with additional rear camera |    95.1     |     53      |    -     |   [Link](https://huggingface.co/ln2697/tfv6/tree/main/4cameras_resnet34)    |
+| 4. TFv6 without radar sensor        |    94.7     |     52      |    -     |    [Link](https://huggingface.co/ln2697/tfv6/tree/main/noradar_resnet34)    |
+| 5. TFv6 but vision only inputs      |    91.6     |     43      |    -     |  [Link](https://huggingface.co/ln2697/tfv6/tree/main/visiononly_resnet34)   |
+| 6. TFv6 but not trained on Town13   |    93.1     |     52      |   3.52   | [Link](https://huggingface.co/ln2697/tfv6/tree/main/town13heldout_resnet34) |
 
 **Table 1:** Performance of pre-trained checkpoints. We report Driving Score, for which higher is better.
 
@@ -164,9 +169,19 @@ outputs/local_evaluation/23687
 ├── checkpoint_endpoint.json
 ├── debug_images
 ├── demo_images
+├── infractions.json
 ├── input_log
 └── metric_info.json
 ```
+Launch the interactive infraction dashboard to analyze driving failures:
+
+```bash
+python lead/infraction_webapp/app.py
+```
+
+Navigate to [http://localhost:5000](http://localhost:5000) to access the dashboard
+
+![](docs/assets/webapp.png)
 
 > [!TIP]
 > 1. Disable video recording in [config_closed_loop](lead/inference/config_closed_loop.py) by turning off `produce_demo_video` and `produce_debug_video`.
@@ -207,6 +222,11 @@ data/expert_debug
 └── results
     └── Town06_13_result.json
 ```
+
+Look into [notebooks](notebooks) on how to visualize the data
+
+![](docs/assets/jupyter-notebook.png)
+![](docs/assets/jupyter-notebook1.png)
 
 ## Beyond CARLA: Cross-Benchmark Deployment
 

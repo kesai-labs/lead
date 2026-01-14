@@ -59,4 +59,3 @@ The basic section is sufficient to get started with the local data collection, t
    faq
    glossary
    known_issues
-   safe_warnings

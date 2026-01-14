@@ -510,12 +510,27 @@ class ExpertConfig(BaseConfig):
     traffic_warning_bb_size = [1.186714768409729, 1.4352929592132568]
     # Default bounding box size for construction cones.
     construction_cone_bb_size = [0.1720348298549652, 0.1720348298549652]
+
     # If true  save camera point clouds
-    save_camera_pc = False
+    @property
+    def save_camera_pc(self):
+        if self.is_on_slurm:
+            return False
+        return True
+
     # If true save instance segmentation images
-    save_instance_segmentation = False
+    @property
+    def save_instance_segmentation(self):
+        if self.is_on_slurm:
+            return False
+        return True
+
     # If true run expert evaluation
-    eval_expert = False
+    @property
+    def eval_expert(self):
+        if self.is_on_slurm:
+            return False
+        return False
 
     @property
     def image_width(self):

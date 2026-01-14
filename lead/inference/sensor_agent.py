@@ -120,10 +120,23 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         self.metric_info = {}
         self.meters_travelled = 0.0
 
+        # Infraction tracking
+        self.infractions_log = []  # List of {"step": int, "infraction": str}
+        self.tracked_infraction_ids = set()  # Track which infractions we've already logged
+        self.scenario = None  # Will be set by set_scenario() method
+
         self.track = autonomous_agent.Track.SENSORS
 
         if not shutil.which("ffmpeg"):
             raise RuntimeError("ffmpeg is not installed or not found in PATH. Please install ffmpeg to use video compression.")
+
+    def set_scenario(self, scenario):
+        """Set the scenario reference to track infractions.
+
+        This should be called by the leaderboard after loading the scenario.
+        """
+        self.scenario = scenario
+        LOG.info("[SensorAgent] Scenario reference set for infraction tracking")
 
     def _init(self):
         # Get the hero vehicle and the CARLA world
@@ -136,7 +149,8 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
                 self.debug_video_writer = None
 
             # Initialize input video writer
-            self.input_video_writer = None
+            if self.config_closed_loop.produce_input_video:
+                self.input_video_writer = None
 
             if self.config_closed_loop.produce_demo_video or self.config_closed_loop.produce_demo_image:
                 self.demo_video_writer = None
@@ -446,6 +460,38 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
 
         return img_with_targets
 
+    def check_infractions(self) -> None:
+        """Check for infractions that occurred in the current step and log them."""
+        if self.scenario is None:
+            return
+
+        try:
+            criteria = self.scenario.get_criteria()
+
+            for criterion in criteria:
+                if hasattr(criterion, "events") and criterion.events:
+                    for event in criterion.events:
+                        # Create a unique ID for this infraction event
+                        event_id = (criterion.name, event.get_frame())
+
+                        # Only log if we haven't seen this infraction before
+                        if event_id not in self.tracked_infraction_ids:
+                            self.tracked_infraction_ids.add(event_id)
+
+                            # Map criterion name to readable infraction type
+                            infraction_info = {
+                                "step": self.step,
+                                "infraction": criterion.name,
+                                "frame": event.get_frame(),
+                                "message": event.get_message() if hasattr(event, "get_message") else "",
+                                "event_type": str(event.get_type()) if hasattr(event, "get_type") else "",
+                            }
+
+                            self.infractions_log.append(infraction_info)
+                            LOG.info(f"[SensorAgent] Infraction detected at step {self.step}: {criterion.name}")
+        except Exception as e:
+            LOG.warning(f"[SensorAgent] Error checking infractions: {e}")
+
     @beartype
     def set_target_points(self, input_data: dict, pop_distance: float):
         """Defines local planning signals based on the input data.
@@ -644,6 +690,9 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         if self.step < self.training_config.inital_frames_delay:
             self.control = carla.VehicleControl(0.0, 0.0, 1.0)
 
+        # Check for infractions at this step
+        self.check_infractions()
+
         # Visualization of prediction for debugging and video recording
         input_data_tensors.update(
             {
@@ -666,24 +715,26 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
             input_image_rgb = cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB)
 
             # Save input image as PNG
-            save_path_input = str(self.config_closed_loop.save_path / "input_images")
-            os.makedirs(save_path_input, exist_ok=True)
-            PIL.Image.fromarray(input_image_rgb).save(
-                f"{save_path_input}/{str(self.step).zfill(5)}.png",
-                optimize=True,
-                compress_level=0,
-            )
+            if self.config_closed_loop.produce_input_image:
+                save_path_input = str(self.config_closed_loop.save_path / "input_images")
+                os.makedirs(save_path_input, exist_ok=True)
+                PIL.Image.fromarray(input_image_rgb).save(
+                    f"{save_path_input}/{str(self.step).zfill(5)}.png",
+                    optimize=True,
+                    compress_level=0,
+                )
 
             # Add to input video
-            if self.input_video_writer is None:
-                os.makedirs(os.path.dirname(self.config_closed_loop.input_video_path), exist_ok=True)
-                self.input_video_writer = cv2.VideoWriter(
-                    self.config_closed_loop.input_video_path,
-                    cv2.VideoWriter_fourcc(*"mp4v"),
-                    self.config_closed_loop.video_fps,
-                    (input_image.shape[1], input_image.shape[0]),
-                )
-            self.input_video_writer.write(input_image)
+            if self.config_closed_loop.produce_input_video:
+                if self.input_video_writer is None:
+                    os.makedirs(os.path.dirname(self.config_closed_loop.input_video_path), exist_ok=True)
+                    self.input_video_writer = cv2.VideoWriter(
+                        self.config_closed_loop.input_video_path,
+                        cv2.VideoWriter_fourcc(*"mp4v"),
+                        self.config_closed_loop.video_fps,
+                        (input_image.shape[1], input_image.shape[0]),
+                    )
+                self.input_video_writer.write(input_image)
 
         # Save demo images
         if self.config_closed_loop.save_path is not None and self.step >= 0:
@@ -752,6 +803,13 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         return self.control
 
     def destroy(self, _=None):
+        # Save infractions log to JSON
+        if self.config_closed_loop.save_path is not None and hasattr(self, "infractions_log"):
+            infractions_path = self.config_closed_loop.save_path / "infractions.json"
+            with open(infractions_path, "w") as f:
+                json.dump(self.infractions_log, f, indent=4)
+            LOG.info(f"[SensorAgent] Saved {len(self.infractions_log)} infractions to {infractions_path}")
+
         # Clean up demo cameras
         if hasattr(self, "_demo_cameras"):
             for demo_cam_info in self._demo_cameras:
@@ -763,7 +821,11 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         # Clean up video writers
         if self.config_closed_loop.save_path is not None:
             # Input video - high quality for presentation
-            if hasattr(self, "input_video_writer") and self.input_video_writer is not None:
+            if (
+                self.config_closed_loop.produce_input_video
+                and hasattr(self, "input_video_writer")
+                and self.input_video_writer is not None
+            ):
                 self.input_video_writer.release()
                 self.compress_video(
                     temp_path=self.config_closed_loop.temp_input_video_path,
