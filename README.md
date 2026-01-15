@@ -1,6 +1,13 @@
+![](docs/assets/logo.png)
 <h2 align="center">
-<b> LEAD: Minimizing Learner–Expert Asymmetry in End-to-End Driving </b>
+<b> Minimizing Learner–Expert Asymmetry in End-to-End Driving </b>
 </h2>
+
+<div align="center">
+
+https://github.com/user-attachments/assets/9f316ad2-e629-4bb4-bffb-9bb55e225738
+
+</div>
 
 <p align="center">
   <a href="https://ln2697.github.io/lead" style="text-decoration: none;">Website | </a>
@@ -11,14 +18,6 @@
   <a href="https://ln2697.github.io/assets/pdf/Nguyen2026LEADSUPP.pdf" style="text-decoration: none;">Supplementary | </a>
   <a href="https://arxiv.org/abs/2512.20563" style="text-decoration: none;">Paper</a>
 </p>
-
-<div align="center">
-
-
-https://github.com/user-attachments/assets/9f316ad2-e629-4bb4-bffb-9bb55e225738
-
-
-</div>
 
 ## Overview
 
@@ -31,7 +30,6 @@ We release the complete pipeline required to achieve state-of-the-art closed-loo
 
 ## Table of Contents
 
-- [Roadmap](#roadmap)
 - [Updates](#updates)
 - [Quick Start](#quick-start)
   - [1. Environment initialization](#1-environment-initialization)
@@ -45,25 +43,19 @@ We release the complete pipeline required to achieve state-of-the-art closed-loo
 - [Citation](#citation)
 - [License](#license)
 
-## Roadmap
-
-- [x] ✅ Checkpoints and inference code (stable)
-- [x] 🟨 Documentation, training pipeline and expert code (released, under test)
-- [x] 🟨 Full CARLA dataset release on HuggingFace (released, under test)
-- [ ] 🚧 Datasets for cross-benchmark (coming soon)
-- [ ] 🚧 Cross-benchmark training tools and documentation (coming soon)
-
-Status: Active development.
-
 ## Updates
 
-- **`[2026/01/13]`** CARLA dataset and full CARLA training doc release
-  > We publicly release a CARLA dataset generated with the same pipeline as used in the paper. However, due to subsequent refactoring and cleanup of the expert driver, the released dataset is not bit-identical to the dataset used for the reported experiments. A verification of the dataset is running right now.
+- **`[COMING SOON]`** Cross-benchmark datasets and training tools
+  > Datasets and documentation for NAVSIM and Waymo training coming soon.
 
-- **`[2026/01/05]`** Bug in RoutePlanner fixed
-  > An index error caused driving policy to to crash at end of routes in Town13. New Driving Score are updated.
+- **`[2026/01/13]`** CARLA dataset and training documentation released
+  > We publicly release a CARLA dataset generated with the same pipeline as described in the paper. Note that due to subsequent refactoring and code cleanup, the released dataset differs from the original dataset used in our experiments. Validation is ongoing.
 
-- **`[2025/12/24]`** Arxiv paper and code release
+- **`[2026/01/05]`** RoutePlanner bug fix
+  > Fixed an index error that caused the driving policy to crash at the end of routes in Town13. Driving scores have been updated accordingly.
+
+- **`[2025/12/24]`** Initial release
+  > Paper, checkpoints, expert driver, and inference code are now available.
 
 ## Quick Start
 

@@ -6,7 +6,7 @@
 }
 
 body {
-    background: #fef3e2;
+    background: #fff9ef;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
@@ -32,7 +32,7 @@ body {
 .main-content-area {
     height: calc(100vh - 72px);
     overflow-y: auto;
-    background: #fef3e2;
+    background: #fff9ef;
 }
 
 /* Route cards */
