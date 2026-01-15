@@ -1,23 +1,23 @@
 #!/bin/bash
 
-# Function to cleanup on exit
-cleanup() {
-    echo "Caught signal, cleaning up..."
-    if [ ! -z "$PYTHON_PID" ]; then
-        kill -9 $PYTHON_PID 2>/dev/null
-        pkill -9 -P $PYTHON_PID 2>/dev/null
-    fi
-    pkill -9 -f "leaderboard_evaluator_local.py" 2>/dev/null
-    exit 130
-}
+# # Function to cleanup on exit
+# cleanup() {
+#     echo "Caught signal, cleaning up..."
+#     if [ ! -z "$PYTHON_PID" ]; then
+#         kill -9 $PYTHON_PID 2>/dev/null
+#         pkill -9 -P $PYTHON_PID 2>/dev/null
+#     fi
+#     pkill -9 -f "leaderboard_evaluator_local.py" 2>/dev/null
+#     exit 130
+# }
 
-# Trap SIGINT and SIGTERM
-trap cleanup INT TERM
+# # Trap SIGINT and SIGTERM
+# trap cleanup INT TERM
 
 # Enter data here
-export ROUTE_DIR=data/data_routes/lead
-export SCENARIO_NAME=ConstructionObstacle
-export ROUTE_NUMBER=route_001977
+export ROUTE_DIR=data
+export SCENARIO_NAME=debug_routes
+export ROUTE_NUMBER=1_town15_construction
 export LEAD_LOG_LEVEL="DEBUG"
 
 # Set standard environment variables
@@ -53,5 +53,5 @@ python -u 3rd_party/leaderboard_autopilot/leaderboard/leaderboard_evaluator_loca
     --resume=1 \
     --timeout=600 &
 
-PYTHON_PID=$!
-wait $PYTHON_PID
+# PYTHON_PID=$!
+# wait $PYTHON_PID

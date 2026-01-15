@@ -44,7 +44,7 @@ class BaseConfig:
 
     # --- Augmentation and Misc ---
     # Frequency (in steps) at which data is saved during data collection
-    data_save_freq = 5
+    data_save_freq = 1
     # If true enable camera perturbation during data collection
     perturbate_sensors = True
     # Safety translation perturbation penalty for default scenarios
@@ -293,14 +293,14 @@ class BaseConfig:
 
     # --- Data Storage ---
     # If true save depth images at lower resolution
-    save_depth_lower_resolution = True
+    save_depth_lower_resolution = False
 
     @property
     def save_depth_resolution_ratio(self):
         """Resolution reduction ratio for depth image storage."""
         if self.is_on_slurm:
-            return 4
-        return 4
+            return 1
+        return 41
 
     # Number of bits used for saving depth images
     save_depth_bits = 8

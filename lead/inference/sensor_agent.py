@@ -485,6 +485,7 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
                                 "frame": event.get_frame(),
                                 "message": event.get_message() if hasattr(event, "get_message") else "",
                                 "event_type": str(event.get_type()) if hasattr(event, "get_type") else "",
+                                "meters_travelled": round(self.meters_travelled, 2),
                             }
 
                             self.infractions_log.append(infraction_info)

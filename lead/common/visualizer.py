@@ -99,8 +99,8 @@ class Visualizer:
 
         # Bev
         self._bev_semantic(ground_truth=True)
-        self._route()
-        self._future_waypoints()
+        # self._route()
+        # self._future_waypoints()
         self._ego_bounding_box()
         self._bounding_boxes()
         self._target_point()
@@ -375,7 +375,7 @@ class Visualizer:
                 log_image -= log_image.min()
                 log_image /= log_image.max() + 1e-6
                 log_image = (log_image * 255).astype(np.uint8)
-                perspective_image = cv2.applyColorMap(log_image, cv2.COLORMAP_PLASMA)
+                perspective_image = cv2.applyColorMap(log_image, cv2.COLORMAP_WINTER)
             self.perspectives[perspective_modality] = perspective_image
 
     def _concatenate_all_perspectives_and_bev(self, border_size: int = 10, border_color: tuple = (255, 255, 255)) -> np.ndarray:
@@ -425,6 +425,8 @@ class Visualizer:
 
         # Concatenate all perspectives vertically
         stacked_perspectives = np.concatenate(bordered_perspectives, axis=0)
+
+        self.stacked_perspectives = stacked_perspectives
 
         # Add only right border to perspectives (left border will be shared with BEV)
         if len(stacked_perspectives.shape) == 3:

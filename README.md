@@ -3,22 +3,18 @@
 </h2>
 
 <p align="center">
-  <h4 align="center">
-  <a href="https://ln2697.github.io/lead" style="text-decoration: none;">Project Page</a> |
-  <a href="https://ln2697.github.io/lead/docs" style="text-decoration: none;">Documentation</a> |
-  <a href="https://huggingface.co/ln2697/tfv6" style="text-decoration: none;">CARLA Model Zoo</a> |
-  <a href="https://huggingface.co/ln2697/tfv6_navsim" style="text-decoration: none;">NAVSIM Checkpoints</a> |
-  <a href="https://huggingface.co/datasets/ln2697/lead_carla" style="text-decoration: none;">CARLA Dataset</a> |
-  <a href="https://ln2697.github.io/assets/pdf/Nguyen2026LEADSUPP.pdf" style="text-decoration: none;">Supplementary Material</a> |
+  <a href="https://ln2697.github.io/lead" style="text-decoration: none;">Website | </a>
+  <a href="https://ln2697.github.io/lead/docs" style="text-decoration: none;">Documentation | </a>
+  <a href="https://huggingface.co/datasets/ln2697/lead_carla" style="text-decoration: none;">CARLA Dataset | </a>
+  <a href="https://huggingface.co/ln2697/tfv6" style="text-decoration: none;">CARLA Model | </a>
+  <a href="https://huggingface.co/ln2697/tfv6_navsim" style="text-decoration: none;">NAVSIM Model | </a>
+  <a href="https://ln2697.github.io/assets/pdf/Nguyen2026LEADSUPP.pdf" style="text-decoration: none;">Supplementary | </a>
   <a href="https://arxiv.org/abs/2512.20563" style="text-decoration: none;">Paper</a>
-  </h4>
 </p>
 
 <div align="center">
 
 https://github.com/user-attachments/assets/e2ef014c-ad1a-4411-9275-fe275723490a
-
-**TransFuser v6:** The latest iteration of the TransFuser linage in evaluation.
 
 </div>
 
@@ -26,17 +22,16 @@ https://github.com/user-attachments/assets/e2ef014c-ad1a-4411-9275-fe275723490a
 
 We release the complete pipeline required to achieve state-of-the-art closed-loop performance on the Bench2Drive benchmark. Built around the CARLA simulator, the stack features a data-centric design with:
 
-- Extensive visualization suite and runtime type validation.
+- Extensive visualization suite, runtime type validation and evaluation infraction tracker.
 - Optimized storage format, packs 72 hours of driving in ~260GB.
-- Native support for NAVSIM and Waymo Vision-based E2E. Extending those benchmarks through closed-loop simulation and synthetic data for additional supervision during training.
-- Interactive infraction analysis webapp for debugging driving failures with video playback and frame-level infraction tracking.
+- Native support for NAVSIM and Waymo Vision-based E2E.
 
 
 ## Table of Contents
 
 - [Roadmap](#roadmap)
 - [Updates](#updates)
-- [Quick Start (20 Minutes)](#quick-start-20-minutes)
+- [Quick Start](#quick-start)
   - [1. Environment initialization](#1-environment-initialization)
   - [2. Setup experiment infrastructure](#2-setup-experiment-infrastructure)
   - [3. Model zoo](#3-model-zoo)
@@ -68,7 +63,7 @@ Status: Active development.
 
 - **`[2025/12/24]`** Arxiv paper and code release
 
-## Quick Start (20 Minutes)
+## Quick Start
 
 ### 1. Environment initialization
 
@@ -116,19 +111,17 @@ bash scripts/setup_carla.sh # Download and setup CARLA at 3rd_party/CARLA_0915
 
 Pre-trained driving policies are hosted on [HuggingFace](https://huggingface.co/ln2697/tfv6) for reproducibility. These checkpoints follow the TFv6 architecture, but differ in their sensor configurations, vision backbones or dataset composition.
 
-Tab. 1 shows available checkpoints with their performance on three major CARLA benchmarks. As first step, we recommend the second checkpoint `2. TFv6 with ResNet34 backbone` as it provides a good balance between performance and resource usage.
-
 <br>
 <div align="center">
 
-| Description                         | Bench2Drive | Longest6 v2 |  Town13  |                                 Checkpoint                                  |
-| ----------------------------------- | :---------: | :---------: | :------: | :-------------------------------------------------------------------------: |
-| 1. Full TransFuser V6               |  **95.2**   |   **62**    | **5.24** |    [Link](https://huggingface.co/ln2697/tfv6/tree/main/tfv6_regnety032)     |
-| 2. TFv6 with ResNet34 backbone      |    94.7     |     57      |   5.01   |     [Link](https://huggingface.co/ln2697/tfv6/tree/main/tfv6_resnet34)      |
-| 3. TFv6 with additional rear camera |    95.1     |     53      |    -     |   [Link](https://huggingface.co/ln2697/tfv6/tree/main/4cameras_resnet34)    |
-| 4. TFv6 without radar sensor        |    94.7     |     52      |    -     |    [Link](https://huggingface.co/ln2697/tfv6/tree/main/noradar_resnet34)    |
-| 5. TFv6 but vision only inputs      |    91.6     |     43      |    -     |  [Link](https://huggingface.co/ln2697/tfv6/tree/main/visiononly_resnet34)   |
-| 6. TFv6 but not trained on Town13   |    93.1     |     52      |   3.52   | [Link](https://huggingface.co/ln2697/tfv6/tree/main/town13heldout_resnet34) |
+| Description                           | Bench2Drive | Longest6 v2 |  Town13  |                                 Checkpoint                                  |
+| ------------------------------------- | :---------: | :---------: | :------: | :-------------------------------------------------------------------------: |
+| Full TransFuser V6                    |  **95.2**   |   **62**    | **5.24** |    [Link](https://huggingface.co/ln2697/tfv6/tree/main/tfv6_regnety032)     |
+| ResNet34 backbone with 60M parameters |    94.7     |     57      |   5.01   |     [Link](https://huggingface.co/ln2697/tfv6/tree/main/tfv6_resnet34)      |
+| Rear camera as additional input       |    95.1     |     53      |    -     |   [Link](https://huggingface.co/ln2697/tfv6/tree/main/4cameras_resnet34)    |
+| Radar sensor removed                  |    94.7     |     52      |    -     |    [Link](https://huggingface.co/ln2697/tfv6/tree/main/noradar_resnet34)    |
+| Vision only driving                   |    91.6     |     43      |    -     |  [Link](https://huggingface.co/ln2697/tfv6/tree/main/visiononly_resnet34)   |
+| Removed Town13 from training set      |    93.1     |     52      |   3.52   | [Link](https://huggingface.co/ln2697/tfv6/tree/main/town13heldout_resnet34) |
 
 **Table 1:** Performance of pre-trained checkpoints. We report Driving Score, for which higher is better.
 
@@ -163,15 +156,18 @@ bash scripts/eval_bench2drive.sh
 Driving logs will be saved to <code>outputs/local_evaluation</code> with the following structure:
 
 ```html
-outputs/local_evaluation/23687
-├── 23687_debug.mp4
-├── 23687_demo.mp4
+outputs/local_evaluation/1_town15_construction
+├── 1_town15_construction_debug.mp4
+├── 1_town15_construction_demo.mp4
+├── 1_town15_construction_input.mp4
 ├── checkpoint_endpoint.json
 ├── debug_images
 ├── demo_images
-├── infractions.json
+├── input_images
 ├── input_log
-└── metric_info.json
+├── infractions.json
+├── metric_info.json
+└── qualitative_results.mp4
 ```
 Launch the interactive infraction dashboard to analyze driving failures:
 
@@ -181,7 +177,16 @@ python lead/infraction_webapp/app.py
 
 Navigate to [http://localhost:5000](http://localhost:5000) to access the dashboard
 
-![](docs/assets/webapp.png)
+<br>
+<div align="center">
+  <picture>
+    <img src="docs/assets/webapp.png" width="100%" />
+  </picture>
+
+  **Figure 1:** Interactive infraction analysis tool.
+
+</div>
+<br>
 
 > [!TIP]
 > 1. Disable video recording in [config_closed_loop](lead/inference/config_closed_loop.py) by turning off `produce_demo_video` and `produce_debug_video`.
@@ -201,15 +206,19 @@ bash scripts/run_expert.sh
 Data collected will be stored at <code>data/expert_debug</code> and should have following structure:
 
 ```html
-data/expert_debug
+data/expert_debug/
 ├── data
-│   └── BlockedIntersection
-│       └── 999_Rep-1_Town06_13_route0_12_22_22_34_45
+│   └── debug_routes
+│       └── Town15_Rep-1_1_town15_construction_route0_01_15_12_48_52
 │           ├── bboxes
+│           ├── camera_pc
+│           ├── camera_pc_perturbated
 │           ├── depth
 │           ├── depth_perturbated
 │           ├── hdmap
 │           ├── hdmap_perturbated
+│           ├── instance
+│           ├── instance_perturbated
 │           ├── lidar
 │           ├── metas
 │           ├── radar
@@ -220,13 +229,24 @@ data/expert_debug
 │           ├── semantics
 │           └── semantics_perturbated
 └── results
-    └── Town06_13_result.json
+    └── 1_town15_construction_result.json
 ```
 
-Look into [notebooks](notebooks) on how to visualize the data
+The [Jupyter notebooks](notebooks) provide some quick scripts to visualize the collected data:
 
-![](docs/assets/jupyter-notebook.png)
-![](docs/assets/jupyter-notebook1.png)
+<br>
+<div align="center">
+  <picture>
+    <img src="docs/assets/visualization.webp" width="49%" />
+  </picture>
+  <picture>
+    <img src="docs/assets/point_cloud_visualization.webp" width="49%" />
+  </picture>
+
+  **Figure 2:** Outputs of data visualization notebooks.
+
+</div>
+<br>
 
 ## Beyond CARLA: Cross-Benchmark Deployment
 

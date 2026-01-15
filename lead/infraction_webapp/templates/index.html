@@ -3,89 +3,152 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LEAD Infraction Dashboard</title>
+    <title>Infraction Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>LEAD Infraction Dashboard</h1>
-            <div class="header-controls">
-                <input type="text" id="output-dir" placeholder="Evaluation output directory..." />
-                <button id="load-routes">Load Routes</button>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-warm shadow-sm">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="bi bi-speedometer2 text-primary"></i> Infraction Dashboard
+            </span>
+            <div class="d-flex gap-2 flex-grow-1 ms-3">
+                <input type="text" id="output-dir" class="form-control" placeholder="Evaluation output directory..." />
+                <button id="load-routes" class="btn btn-primary">
+                    <i class="bi bi-folder-open"></i> Load Routes
+                </button>
             </div>
-        </header>
+        </div>
+    </nav>
 
-        <div class="main-content">
-            <!-- Route Selection Sidebar -->
-            <aside class="sidebar">
-                <h2>Routes</h2>
-                <div id="route-stats" class="stats-panel"></div>
-                <div id="route-list" class="route-list">
-                    <p class="loading">Click "Load Routes" to begin</p>
+    <!-- Main Content -->
+    <div class="container-fluid px-0">
+        <div class="row g-0">
+            <!-- Sidebar -->
+            <aside class="col-md-3 bg-light border-end sidebar-height">
+                <div class="p-3">
+                    <h5 class="fw-bold mb-3">
+                        <i class="bi bi-list-ul text-primary"></i> Routes
+                    </h5>
+                    <div id="route-stats" class="mb-3"></div>
+                    <div id="route-list" class="route-list">
+                        <div class="alert alert-info" role="alert">
+                            <i class="bi bi-info-circle"></i> Click "Load Routes" to begin
+                        </div>
+                    </div>
                 </div>
             </aside>
 
             <!-- Main Viewer -->
-            <main class="viewer">
-                <div id="no-route-selected" class="placeholder">
-                    <p>Select a route to view infractions</p>
+            <main class="col-md-9 p-4 main-content-area">
+                <div id="no-route-selected" class="text-center text-muted py-5">
+                    <i class="bi bi-arrow-left-circle display-1 mb-3"></i>
+                    <h4>Select a route to view infractions</h4>
                 </div>
 
-                <div id="route-viewer" class="route-viewer" style="display: none;">
+                <div id="route-viewer" style="display: none;">
                     <!-- Route Info Header -->
-                    <div class="route-header">
-                        <h2 id="route-name"></h2>
-                        <div id="route-metrics" class="metrics"></div>
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h3 id="route-name" class="fw-bold mb-0"></h3>
+                        <div id="route-metrics" class="d-flex gap-2"></div>
                     </div>
 
-                    <!-- Video Player -->
-                    <div class="video-container">
-                        <div class="video-controls-top">
-                            <select id="video-type">
-                                <option value="debug">Debug Video</option>
-                                <option value="demo">Demo Video</option>
-                            </select>
-                            <div class="playback-controls">
-                                <button id="speed-down" title="Slow down">0.5x</button>
-                                <button id="speed-normal" title="Normal speed">1x</button>
-                                <button id="speed-up" title="Speed up">2x</button>
-                            </div>
-                            <div class="frame-controls">
-                                <button id="back-5s" title="Back 5 seconds">◀◀ 5s</button>
-                                <button id="back-1s" title="Back 1 second">◀ 1s</button>
-                                <button id="forward-1s" title="Forward 1 second">1s ▶</button>
-                                <button id="forward-5s" title="Forward 5 seconds">5s ▶▶</button>
+                    <!-- Video Player Card -->
+                    <div class="card mb-4 shadow-sm">
+                        <div class="card-header bg-white">
+                            <div class="row g-2 align-items-center">
+                                <div class="col-auto">
+                                    <select id="video-type" class="form-select">
+                                        <option value="debug">Debug Video</option>
+                                        <option value="demo">Demo Video</option>
+                                    </select>
+                                </div>
+                                <div class="col-auto">
+                                    <div class="btn-group" role="group">
+                                        <button id="speed-0.5" class="btn btn-sm btn-outline-secondary speed-btn" data-speed="0.5" title="Slow down">0.5x</button>
+                                        <button id="speed-1" class="btn btn-sm btn-outline-secondary speed-btn active" data-speed="1" title="Normal speed">1x</button>
+                                        <button id="speed-2" class="btn btn-sm btn-outline-secondary speed-btn" data-speed="2" title="Speed up">2x</button>
+                                        <button id="speed-3" class="btn btn-sm btn-outline-secondary speed-btn" data-speed="3" title="Fast">3x</button>
+                                        <button id="speed-4" class="btn btn-sm btn-outline-secondary speed-btn" data-speed="4" title="Very fast">4x</button>
+                                        <button id="speed-5" class="btn btn-sm btn-outline-secondary speed-btn" data-speed="5" title="Ultra fast">5x</button>
+                                    </div>
+                                </div>
+                                <div class="col-auto">
+                                    <div class="btn-group" role="group">
+                                        <button id="back-5s" class="btn btn-sm btn-outline-primary" title="Back 5 seconds">
+                                            <i class="bi bi-skip-backward"></i> 5s
+                                        </button>
+                                        <button id="back-1s" class="btn btn-sm btn-outline-primary" title="Back 1 second">
+                                            <i class="bi bi-skip-start"></i> 1s
+                                        </button>
+                                        <button id="forward-1s" class="btn btn-sm btn-outline-primary" title="Forward 1 second">
+                                            1s <i class="bi bi-skip-end"></i>
+                                        </button>
+                                        <button id="forward-5s" class="btn btn-sm btn-outline-primary" title="Forward 5 seconds">
+                                            5s <i class="bi bi-skip-forward"></i>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <video id="video-player" controls>
-                            Your browser does not support the video tag.
-                        </video>
-                        <div class="video-info">
-                            <span id="current-time">0.00s</span>
-                            <span id="current-frame">Frame: 0</span>
-                            <span id="current-step">Step: 0</span>
+                        <div class="card-body p-0">
+                            <video id="video-player" class="w-100" controls style="background: black;">
+                                Your browser does not support the video tag.
+                            </video>
+                        </div>
+                        <div class="card-footer bg-white text-muted small">
+                            <div class="d-flex gap-3 align-items-center">
+                                <div class="d-flex align-items-center gap-1">
+                                    <i class="bi bi-clock"></i>
+                                    <input type="number" id="current-time" class="form-control form-control-sm" style="width: 80px;" step="0.05" min="0" placeholder="0.00" title="Time (seconds)"> s
+                                </div>
+                                <div class="d-flex align-items-center gap-1">
+                                    <i class="bi bi-film"></i> Frame:
+                                    <input type="number" id="current-frame" class="form-control form-control-sm" style="width: 70px;" step="1" min="0" placeholder="0" title="Frame number">
+                                </div>
+                                <div class="d-flex align-items-center gap-1">
+                                    <i class="bi bi-flag"></i> Step:
+                                    <input type="number" id="current-step" class="form-control form-control-sm" style="width: 70px;" step="1" min="0" placeholder="0" title="Step number">
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Infractions List -->
-                    <div class="infractions-panel">
-                        <h3>
-                            Infractions
-                            <span id="infraction-count" class="badge">0</span>
-                        </h3>
-                        <div class="filter-controls">
-                            <input type="text" id="filter-input" placeholder="Filter by type..." />
-                            <button id="clear-filter">Clear</button>
+                    <!-- Infractions Card -->
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-white">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0 fw-bold">
+                                    <i class="bi bi-exclamation-triangle text-danger"></i> Infractions
+                                    <span id="infraction-count" class="badge bg-danger ms-2">0</span>
+                                </h5>
+                            </div>
+                            <div class="input-group mt-2">
+                                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                <input type="text" id="filter-input" class="form-control" placeholder="Filter by type..." />
+                                <button id="clear-filter" class="btn btn-outline-secondary">Clear</button>
+                            </div>
                         </div>
-                        <div id="infractions-list" class="infractions-list">
-                            <p class="loading">Loading infractions...</p>
+                        <div class="card-body p-0">
+                            <div id="infractions-list" class="infractions-list" style="max-height: 500px; overflow-y: auto;">
+                                <div class="text-center text-muted p-4">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-2">Loading infractions...</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </main>
         </div>
     </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
         // Global state
@@ -105,9 +168,9 @@
         const infractionsList = document.getElementById('infractions-list');
         const infractionCount = document.getElementById('infraction-count');
         const filterInput = document.getElementById('filter-input');
-        const currentTimeSpan = document.getElementById('current-time');
-        const currentFrameSpan = document.getElementById('current-frame');
-        const currentStepSpan = document.getElementById('current-step');
+        const currentTimeInput = document.getElementById('current-time');
+        const currentFrameInput = document.getElementById('current-frame');
+        const currentStepInput = document.getElementById('current-step');
 
         // Infraction type metadata
         const infractionTypes = {
@@ -135,24 +198,24 @@
             const url = dir ? `/api/routes?dir=${encodeURIComponent(dir)}` : '/api/routes';
 
             try {
-                routeList.innerHTML = '<p class="loading">Loading routes...</p>';
+                routeList.innerHTML = '<div class="text-center p-3"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div></div>';
                 const response = await fetch(url);
                 const data = await response.json();
 
                 if (data.error) {
-                    routeList.innerHTML = `<p class="error">${data.error}</p>`;
+                    routeList.innerHTML = `<div class="alert alert-danger m-2"><i class="bi bi-exclamation-triangle"></i> ${data.error}</div>`;
                     return;
                 }
 
                 if (data.routes.length === 0) {
-                    routeList.innerHTML = '<p class="empty">No routes found</p>';
+                    routeList.innerHTML = '<div class="alert alert-warning m-2"><i class="bi bi-inbox"></i> No routes found</div>';
                     return;
                 }
 
                 renderRoutes(data.routes);
                 updateRouteStats(data.routes);
             } catch (error) {
-                routeList.innerHTML = `<p class="error">Error loading routes: ${error.message}</p>`;
+                routeList.innerHTML = `<div class="alert alert-danger m-2"><i class="bi bi-x-circle"></i> Error loading routes: ${error.message}</div>`;
             }
         }
 
@@ -162,25 +225,44 @@
             const totalInfractions = routes.reduce((sum, r) => sum + (r.infraction_count || 0), 0);
 
             document.getElementById('route-stats').innerHTML = `
-                <div class="stat"><strong>${total}</strong> routes</div>
-                <div class="stat"><strong>${withInfractions}</strong> with infractions</div>
-                <div class="stat"><strong>${totalInfractions}</strong> total infractions</div>
+                <div class="row g-2 text-center small">
+                    <div class="col-12">
+                        <div class="p-2 bg-white rounded border">
+                            <div class="fw-bold text-primary fs-5">${total}</div>
+                            <div class="text-muted">Routes</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-2 bg-white rounded border">
+                            <div class="fw-bold text-warning">${withInfractions}</div>
+                            <div class="text-muted">With Issues</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-2 bg-white rounded border">
+                            <div class="fw-bold text-danger">${totalInfractions}</div>
+                            <div class="text-muted">Infractions</div>
+                        </div>
+                    </div>
+                </div>
             `;
         }
 
         function renderRoutes(routes) {
             routeList.innerHTML = routes.map(route => `
-                <div class="route-item" onclick="selectRoute('${route.name}')">
-                    <div class="route-item-header">
-                        <strong>${route.name}</strong>
-                        ${route.infraction_count > 0 ?
-                            `<span class="badge ${route.infraction_count > 10 ? 'badge-danger' : 'badge-warning'}">${route.infraction_count}</span>` :
-                            '<span class="badge badge-success">✓</span>'
-                        }
-                    </div>
-                    <div class="route-item-info">
-                        ${route.has_debug_video ? '[Debug]' : ''}
-                        ${route.has_demo_video ? '[Demo]' : ''}
+                <div class="card mb-2 route-card" onclick="selectRoute('${route.name}')" style="cursor: pointer;">
+                    <div class="card-body p-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong class="text-dark">${route.name}</strong>
+                            ${route.infraction_count > 0 ?
+                                `<span class="badge ${route.infraction_count > 10 ? 'bg-danger' : 'bg-warning'}">${route.infraction_count}</span>` :
+                                '<span class="badge bg-success"><i class="bi bi-check-lg"></i></span>'
+                            }
+                        </div>
+                        <div class="text-muted small mt-1">
+                            ${route.has_debug_video ? '<i class="bi bi-camera-video"></i> Debug ' : ''}
+                            ${route.has_demo_video ? '<i class="bi bi-play-circle"></i> Demo' : ''}
+                        </div>
                     </div>
                 </div>
             `).join('');
@@ -207,12 +289,12 @@
 
         async function loadInfractions(routeName) {
             try {
-                infractionsList.innerHTML = '<p class="loading">Loading infractions...</p>';
+                infractionsList.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div><p class="mt-2 text-muted">Loading infractions...</p></div>';
                 const response = await fetch(`/api/route/${routeName}/infractions`);
                 const data = await response.json();
 
                 if (data.error) {
-                    infractionsList.innerHTML = `<p class="error">${data.error}</p>`;
+                    infractionsList.innerHTML = `<div class="alert alert-danger m-3"><i class="bi bi-exclamation-triangle"></i> ${data.error}</div>`;
                     return;
                 }
 
@@ -225,7 +307,7 @@
                 );
                 applyFilters();
             } catch (error) {
-                infractionsList.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+                infractionsList.innerHTML = `<div class="alert alert-danger m-3"><i class="bi bi-x-circle"></i> Error: ${error.message}</div>`;
             }
         }
 
@@ -236,9 +318,9 @@
 
                 if (!data.error && data.values) {
                     document.getElementById('route-metrics').innerHTML = `
-                        <div class="metric">DS: ${data.values[0].toFixed(2)}</div>
-                        <div class="metric">RC: ${data.values[1].toFixed(2)}%</div>
-                        <div class="metric">Infractions: ${data.values[4].toFixed(0)}</div>
+                        <span class="badge bg-primary">DS: ${data.values[0].toFixed(2)}</span>
+                        <span class="badge bg-info">RC: ${data.values[1].toFixed(2)}%</span>
+                        <span class="badge bg-danger">Infractions: ${data.values[4].toFixed(0)}</span>
                     `;
                 }
             } catch (error) {
@@ -250,7 +332,7 @@
             infractionCount.textContent = filteredInfractions.length;
 
             if (filteredInfractions.length === 0) {
-                infractionsList.innerHTML = '<p class="empty">No infractions found</p>';
+                infractionsList.innerHTML = '<div class="alert alert-info m-3"><i class="bi bi-info-circle"></i> No infractions found</div>';
                 return;
             }
 
@@ -260,19 +342,23 @@
                 const seconds = (timestamp % 60).toFixed(2);
                 const timeStr = `${minutes}:${seconds.padStart(5, '0')}`;
                 const meta = getInfractionMeta(inf.infraction);
+                const metersText = inf.meters_travelled !== undefined ? `${inf.meters_travelled}m` : 'N/A';
 
                 return `
-                    <div class="infraction-item" onclick="jumpToInfraction(${inf.step})" style="border-left-color: ${meta.color}">
-                        <div class="infraction-header">
-                            <span class="infraction-type" style="color: ${meta.color}">
-                                <span class="infraction-icon">${meta.icon}</span>
-                                ${meta.label}
+                    <div class="border-bottom p-3 infraction-item" onclick="jumpToInfraction(${inf.step})" style="cursor: pointer; border-left: 4px solid ${meta.color} !important;">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <span class="fw-bold" style="color: ${meta.color}">
+                                <i class="bi bi-exclamation-circle"></i> ${meta.label}
                             </span>
-                            <span class="infraction-time">${timeStr}</span>
+                            <span class="badge bg-primary">${timeStr}</span>
                         </div>
-                        <div class="infraction-details">
-                            <div>Step: ${inf.step} | Frame: ${inf.frame}</div>
-                            ${inf.message ? `<div class="infraction-message">${inf.message}</div>` : ''}
+                        <div class="small text-muted">
+                            <div>
+                                <i class="bi bi-flag"></i> Step: ${inf.step} | 
+                                <i class="bi bi-film"></i> Frame: ${inf.frame} | 
+                                <i class="bi bi-rulers"></i> Distance: ${metersText}
+                            </div>
+                            ${inf.message ? `<div class="mt-1 fst-italic">${inf.message}</div>` : ''}
                         </div>
                     </div>
                 `;
@@ -295,16 +381,16 @@
             }
         });
 
-        document.getElementById('speed-down').addEventListener('click', () => {
-            videoPlayer.playbackRate = 0.5;
-        });
-
-        document.getElementById('speed-normal').addEventListener('click', () => {
-            videoPlayer.playbackRate = 1.0;
-        });
-
-        document.getElementById('speed-up').addEventListener('click', () => {
-            videoPlayer.playbackRate = 2.0;
+        // Handle speed button clicks
+        document.querySelectorAll('.speed-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const speed = parseFloat(e.target.dataset.speed);
+                videoPlayer.playbackRate = speed;
+                
+                // Update active state
+                document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+            });
         });
 
         document.getElementById('back-5s').addEventListener('click', () => {
@@ -324,14 +410,71 @@
         });
 
         // Update time display
-        videoPlayer.addEventListener('timeupdate', () => {
+        function updateTimeDisplay() {
             const time = videoPlayer.currentTime;
             const frame = Math.floor(time * VIDEO_FPS);
             const step = frame;
 
-            currentTimeSpan.textContent = `${time.toFixed(2)}s`;
-            currentFrameSpan.textContent = `Frame: ${frame}`;
-            currentStepSpan.textContent = `Step: ${step}`;
+            // Only update if not currently being edited
+            if (document.activeElement !== currentTimeInput) {
+                currentTimeInput.value = time.toFixed(2);
+            }
+            if (document.activeElement !== currentFrameInput) {
+                currentFrameInput.value = frame;
+            }
+            if (document.activeElement !== currentStepInput) {
+                currentStepInput.value = step;
+            }
+        }
+
+        videoPlayer.addEventListener('timeupdate', updateTimeDisplay);
+        videoPlayer.addEventListener('seeked', updateTimeDisplay);
+
+        // Handle jumping to specific time/frame/step
+        currentTimeInput.addEventListener('change', (e) => {
+            const time = parseFloat(e.target.value);
+            if (!isNaN(time) && time >= 0 && time <= videoPlayer.duration) {
+                videoPlayer.currentTime = time;
+            } else {
+                updateTimeDisplay();
+            }
+        });
+
+        currentFrameInput.addEventListener('change', (e) => {
+            const frame = parseInt(e.target.value);
+            if (!isNaN(frame) && frame >= 0) {
+                const time = frame / VIDEO_FPS;
+                if (time <= videoPlayer.duration) {
+                    videoPlayer.currentTime = time;
+                } else {
+                    updateTimeDisplay();
+                }
+            } else {
+                updateTimeDisplay();
+            }
+        });
+
+        currentStepInput.addEventListener('change', (e) => {
+            const step = parseInt(e.target.value);
+            if (!isNaN(step) && step >= 0) {
+                const time = step / VIDEO_FPS;
+                if (time <= videoPlayer.duration) {
+                    videoPlayer.currentTime = time;
+                } else {
+                    updateTimeDisplay();
+                }
+            } else {
+                updateTimeDisplay();
+            }
+        });
+
+        // Allow Enter key to apply changes
+        [currentTimeInput, currentFrameInput, currentStepInput].forEach(input => {
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.target.blur();
+                }
+            });
         });
 
         // Filter infractions

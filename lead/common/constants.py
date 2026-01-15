@@ -246,7 +246,7 @@ CARLA_TRANSFUSER_BEV_SEMANTIC_COLOR_CONVERTER = {
 
 # TransFuser++ semantic segmentation colors for CARLA data
 TRANSFUSER_SEMANTIC_COLORS = {
-    TransfuserSemanticSegmentationClass.UNLABELED: rgb(0, 0, 0),
+    TransfuserSemanticSegmentationClass.UNLABELED: rgb(255, 255, 255),
     TransfuserSemanticSegmentationClass.VEHICLE: rgb(31, 119, 180),
     TransfuserSemanticSegmentationClass.ROAD: rgb(128, 64, 128),
     TransfuserSemanticSegmentationClass.TRAFFIC_LIGHT: rgb(250, 170, 30),

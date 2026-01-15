@@ -30,7 +30,7 @@ class ExpertConfig(BaseConfig):
 
     @property
     def target_dataset(self):
-        return TargetDataset.CARLA_LEADERBOARD2_3CAMERAS
+        return TargetDataset.CARLA_LEADERBOARD2_6CAMERAS
 
     # --- Planning Area ---
     # Maximum planning area coordinate in x direction (meters)
