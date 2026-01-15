@@ -183,7 +183,7 @@ Navigate to [http://localhost:5000](http://localhost:5000) to access the dashboa
     <img src="docs/assets/webapp.png" width="100%" />
   </picture>
 
-  **Figure 1:** Interactive infraction analysis tool.
+  **Figure 1:** Interactive infraction analysis tool for model evaluation.
 
 </div>
 <br>
@@ -243,7 +243,7 @@ The [Jupyter notebooks](notebooks) provide some quick scripts to visualize the c
     <img src="docs/assets/point_cloud_visualization.webp" width="49%" />
   </picture>
 
-  **Figure 2:** Outputs of data visualization notebooks.
+  **Figure 2:** Example outputs of data visualization notebooks.
 
 </div>
 <br>

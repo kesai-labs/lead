@@ -153,9 +153,10 @@
     <script>
         // Global state
         let currentRoute = null;
+        let currentDirectory = null;
         let infractions = [];
         let filteredInfractions = [];
-        const VIDEO_FPS = 20; // CARLA runs at 20 FPS
+        let videoFPS = 20; // Default FPS, will be updated from infractions.json
 
         // DOM elements
         const outputDirInput = document.getElementById('output-dir');
@@ -190,11 +191,36 @@
             return infractionTypes[type] || { icon: '●', color: '#94a3b8', label: type };
         }
 
+        // Helper function to convert step number to video timestamp
+        // Accounts for produce_frame_frequency by calculating which video frame contains the step
+        function stepToVideoTime(step) {
+            // CARLA runs at 20 FPS, video runs at videoFPS
+            // produce_frame_frequency = 20 / videoFPS
+            // video_frame = floor(step / produce_frame_frequency) = floor(step * videoFPS / 20)
+            // video_time = video_frame / videoFPS
+            const CARLA_FPS = 20;
+            const videoFrame = Math.floor(step * videoFPS / CARLA_FPS);
+            return videoFrame / videoFPS;
+        }
+
+        // Helper function to convert video frame to CARLA step (inverse of above)
+        function videoFrameToStep(frame) {
+            // step = frame * produce_frame_frequency = frame * (20 / videoFPS)
+            const CARLA_FPS = 20;
+            return Math.floor(frame * CARLA_FPS / videoFPS);
+        }
+
         // Load routes
-        loadRoutesBtn.addEventListener('click', loadRoutes);
+        loadRoutesBtn.addEventListener('click', () => {
+            const dir = outputDirInput.value.trim();
+            if (dir) {
+                currentDirectory = dir;
+            }
+            loadRoutes();
+        });
 
         async function loadRoutes() {
-            const dir = outputDirInput.value;
+            const dir = currentDirectory || outputDirInput.value.trim();
             const url = dir ? `/api/routes?dir=${encodeURIComponent(dir)}` : '/api/routes';
 
             try {
@@ -207,6 +233,12 @@
                     return;
                 }
 
+                // Update directory from backend response if not set
+                if (data.output_dir && !currentDirectory) {
+                    currentDirectory = data.output_dir;
+                    outputDirInput.value = data.output_dir; // Persist in text field
+                }
+
                 if (data.routes.length === 0) {
                     routeList.innerHTML = '<div class="alert alert-warning m-2"><i class="bi bi-inbox"></i> No routes found</div>';
                     return;
@@ -214,6 +246,7 @@
 
                 renderRoutes(data.routes);
                 updateRouteStats(data.routes);
+                updateURL(); // Update URL with directory after loading
             } catch (error) {
                 routeList.innerHTML = `<div class="alert alert-danger m-2"><i class="bi bi-x-circle"></i> Error loading routes: ${error.message}</div>`;
             }
@@ -262,6 +295,7 @@
                         <div class="text-muted small mt-1">
                             ${route.has_debug_video ? '<i class="bi bi-camera-video"></i> Debug ' : ''}
                             ${route.has_demo_video ? '<i class="bi bi-play-circle"></i> Demo' : ''}
+                            ${route.video_fps ? `<i class="bi bi-speedometer2"></i> ${route.video_fps.toFixed(1)} FPS` : ''}
                         </div>
                     </div>
                 </div>
@@ -270,6 +304,7 @@
 
         async function selectRoute(routeName) {
             currentRoute = routeName;
+            updateURL();
 
             // Update UI
             document.getElementById('route-name').textContent = routeName;
@@ -278,25 +313,35 @@
 
             // Load video
             const videoType = videoTypeSelect.value;
-            videoPlayer.src = `/video/${routeName}/${videoType}`;
+            const dir = currentDirectory || outputDirInput.value.trim();
+            const videoUrl = dir ? `/video/${routeName}/${videoType}?dir=${encodeURIComponent(dir)}` : `/video/${routeName}/${videoType}`;
+            videoPlayer.src = videoUrl;
 
-            // Load infractions
+            // Load infractions (this updates videoFPS)
             await loadInfractions(routeName);
 
             // Load checkpoint data (for metrics)
             await loadCheckpointData(routeName);
+
+            // Update FPS display after checkpoint data loads (which resets the metrics innerHTML)
+            updateFPSDisplay();
         }
 
         async function loadInfractions(routeName) {
             try {
                 infractionsList.innerHTML = '<div class="text-center p-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div><p class="mt-2 text-muted">Loading infractions...</p></div>';
-                const response = await fetch(`/api/route/${routeName}/infractions`);
+                const dir = currentDirectory || outputDirInput.value.trim();
+                const url = dir ? `/api/route/${routeName}/infractions?dir=${encodeURIComponent(dir)}` : `/api/route/${routeName}/infractions`;
+                const response = await fetch(url);
                 const data = await response.json();
 
                 if (data.error) {
                     infractionsList.innerHTML = `<div class="alert alert-danger m-3"><i class="bi bi-exclamation-triangle"></i> ${data.error}</div>`;
                     return;
                 }
+
+                // Update video FPS from API (use default if not available)
+                videoFPS = data.video_fps || 20;
 
                 // Filter out min speed and completion infractions completely
                 infractions = data.infractions.filter(inf =>
@@ -313,7 +358,9 @@
 
         async function loadCheckpointData(routeName) {
             try {
-                const response = await fetch(`/api/route/${routeName}/checkpoint`);
+                const dir = currentDirectory || outputDirInput.value.trim();
+                const url = dir ? `/api/route/${routeName}/checkpoint?dir=${encodeURIComponent(dir)}` : `/api/route/${routeName}/checkpoint`;
+                const response = await fetch(url);
                 const data = await response.json();
 
                 if (!data.error && data.values) {
@@ -328,6 +375,16 @@
             }
         }
 
+        function updateFPSDisplay() {
+            const metricsDiv = document.getElementById('route-metrics');
+            const existingFPS = metricsDiv.querySelector('.fps-badge');
+            if (existingFPS) {
+                existingFPS.textContent = `${videoFPS.toFixed(1)} FPS`;
+            } else {
+                metricsDiv.insertAdjacentHTML('beforeend', `<span class="badge bg-secondary fps-badge">${videoFPS.toFixed(1)} FPS</span>`);
+            }
+        }
+
         function renderInfractions() {
             infractionCount.textContent = filteredInfractions.length;
 
@@ -337,7 +394,7 @@
             }
 
             infractionsList.innerHTML = filteredInfractions.map((inf, idx) => {
-                const timestamp = inf.step / VIDEO_FPS;
+                const timestamp = stepToVideoTime(inf.step);
                 const minutes = Math.floor(timestamp / 60);
                 const seconds = (timestamp % 60).toFixed(2);
                 const timeStr = `${minutes}:${seconds.padStart(5, '0')}`;
@@ -354,8 +411,8 @@
                         </div>
                         <div class="small text-muted">
                             <div>
-                                <i class="bi bi-flag"></i> Step: ${inf.step} | 
-                                <i class="bi bi-film"></i> Frame: ${inf.frame} | 
+                                <i class="bi bi-flag"></i> Step: ${inf.step} |
+                                <i class="bi bi-film"></i> Frame: ${inf.frame} |
                                 <i class="bi bi-rulers"></i> Distance: ${metersText}
                             </div>
                             ${inf.message ? `<div class="mt-1 fst-italic">${inf.message}</div>` : ''}
@@ -366,7 +423,7 @@
         }
 
         function jumpToInfraction(step) {
-            const timestamp = step / VIDEO_FPS;
+            const timestamp = stepToVideoTime(step);
             videoPlayer.currentTime = timestamp;
             videoPlayer.play();
         }
@@ -376,7 +433,9 @@
             if (currentRoute) {
                 const videoType = videoTypeSelect.value;
                 const currentTime = videoPlayer.currentTime;
-                videoPlayer.src = `/video/${currentRoute}/${videoType}`;
+                const dir = currentDirectory || outputDirInput.value.trim();
+                const videoUrl = dir ? `/video/${currentRoute}/${videoType}?dir=${encodeURIComponent(dir)}` : `/video/${currentRoute}/${videoType}`;
+                videoPlayer.src = videoUrl;
                 videoPlayer.currentTime = currentTime;
             }
         });
@@ -386,7 +445,7 @@
             btn.addEventListener('click', (e) => {
                 const speed = parseFloat(e.target.dataset.speed);
                 videoPlayer.playbackRate = speed;
-                
+
                 // Update active state
                 document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
                 e.target.classList.add('active');
@@ -412,8 +471,8 @@
         // Update time display
         function updateTimeDisplay() {
             const time = videoPlayer.currentTime;
-            const frame = Math.floor(time * VIDEO_FPS);
-            const step = frame;
+            const frame = Math.floor(time * videoFPS);
+            const step = videoFrameToStep(frame);
 
             // Only update if not currently being edited
             if (document.activeElement !== currentTimeInput) {
@@ -443,7 +502,7 @@
         currentFrameInput.addEventListener('change', (e) => {
             const frame = parseInt(e.target.value);
             if (!isNaN(frame) && frame >= 0) {
-                const time = frame / VIDEO_FPS;
+                const time = frame / videoFPS;
                 if (time <= videoPlayer.duration) {
                     videoPlayer.currentTime = time;
                 } else {
@@ -457,7 +516,7 @@
         currentStepInput.addEventListener('change', (e) => {
             const step = parseInt(e.target.value);
             if (!isNaN(step) && step >= 0) {
-                const time = step / VIDEO_FPS;
+                const time = stepToVideoTime(step);
                 if (time <= videoPlayer.duration) {
                     videoPlayer.currentTime = time;
                 } else {
@@ -499,6 +558,50 @@
         document.getElementById('clear-filter').addEventListener('click', () => {
             filterInput.value = '';
             applyFilters();
+        });
+
+        // URL state management
+        function updateURL() {
+            const params = new URLSearchParams();
+            if (currentDirectory) {
+                params.set('dir', currentDirectory);
+            }
+            if (currentRoute) {
+                params.set('route', currentRoute);
+            }
+            const newURL = params.toString() ? `?${params.toString()}` : '/';
+            window.history.pushState({}, '', newURL);
+        }
+
+        function loadStateFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            const dir = params.get('dir');
+            const route = params.get('route');
+
+            if (dir) {
+                currentDirectory = dir;
+                outputDirInput.value = dir; // Persist in text field
+                loadRoutes().then(() => {
+                    if (route) {
+                        selectRoute(route);
+                    }
+                });
+            }
+        }
+
+        // Handle browser back/forward buttons
+        window.addEventListener('popstate', () => {
+            loadStateFromURL();
+        });
+
+        // Initialize from URL on page load
+        loadStateFromURL();
+
+        // Allow Enter key in output directory input
+        outputDirInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                loadRoutesBtn.click();
+            }
         });
 
         // Keyboard shortcuts

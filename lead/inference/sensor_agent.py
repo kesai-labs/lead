@@ -320,7 +320,7 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
             )
 
         # Add to demo video if enabled
-        if self.config_closed_loop.produce_demo_video:
+        if self.config_closed_loop.produce_demo_video and self.step % self.config_closed_loop.produce_frame_frequency == 0:
             if self.demo_video_writer is None:
                 os.makedirs(os.path.dirname(self.config_closed_loop.demo_video_path), exist_ok=True)
                 self.demo_video_writer = cv2.VideoWriter(
@@ -490,6 +490,18 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
 
                             self.infractions_log.append(infraction_info)
                             LOG.info(f"[SensorAgent] Infraction detected at step {self.step}: {criterion.name}")
+
+            # Save infractions log to JSON
+            if self.config_closed_loop.save_path is not None and hasattr(self, "infractions_log"):
+                infractions_path = self.config_closed_loop.save_path / "infractions.json"
+                infractions_data = {
+                    "infractions": self.infractions_log,
+                    "video_fps": self.config_closed_loop.video_fps,
+                }
+                with open(infractions_path, "w") as f:
+                    json.dump(infractions_data, f, indent=4)
+                LOG.info(f"[SensorAgent] Saved {len(self.infractions_log)} infractions to {infractions_path}")
+
         except Exception as e:
             LOG.warning(f"[SensorAgent] Error checking infractions: {e}")
 
@@ -710,7 +722,7 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         )
 
         # Save input images as PNG and video
-        if self.config_closed_loop.save_path is not None and self.step >= 0:
+        if self.config_closed_loop.save_path is not None and self.step % self.config_closed_loop.produce_frame_frequency == 0:
             # Get the RGB image for visualization (before JPEG compression)
             input_image = input_data["original_rgb"].copy()
             input_image_rgb = cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB)
@@ -726,7 +738,7 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
                 )
 
             # Add to input video
-            if self.config_closed_loop.produce_input_video:
+            if self.config_closed_loop.produce_input_video and self.step % self.config_closed_loop.produce_frame_frequency == 0:
                 if self.input_video_writer is None:
                     os.makedirs(os.path.dirname(self.config_closed_loop.input_video_path), exist_ok=True)
                     self.input_video_writer = cv2.VideoWriter(
@@ -738,7 +750,7 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
                 self.input_video_writer.write(input_image)
 
         # Save demo images
-        if self.config_closed_loop.save_path is not None and self.step >= 0:
+        if self.config_closed_loop.save_path is not None and self.step % self.config_closed_loop.produce_frame_frequency == 0:
             # Get predicted route and waypoints (if available)
             pred_waypoints = (
                 closed_loop_prediction.pred_future_waypoints[0]
@@ -804,13 +816,6 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         return self.control
 
     def destroy(self, _=None):
-        # Save infractions log to JSON
-        if self.config_closed_loop.save_path is not None and hasattr(self, "infractions_log"):
-            infractions_path = self.config_closed_loop.save_path / "infractions.json"
-            with open(infractions_path, "w") as f:
-                json.dump(self.infractions_log, f, indent=4)
-            LOG.info(f"[SensorAgent] Saved {len(self.infractions_log)} infractions to {infractions_path}")
-
         # Clean up demo cameras
         if hasattr(self, "_demo_cameras"):
             for demo_cam_info in self._demo_cameras:

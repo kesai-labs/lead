@@ -107,7 +107,7 @@ class ClosedLoopConfig(OpenLoopConfig):
     random_weather = False
 
     # Frequency of frame production during evaluation
-    produce_frame_frequency = 1
+    produce_frame_frequency = 4
 
     @overridable_property
     def produce_demo_image(self):

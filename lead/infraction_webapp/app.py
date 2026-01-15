@@ -12,8 +12,39 @@ app = Flask(__name__)
 DEFAULT_OUTPUT_DIR = Path(__file__).parent.parent.parent / "outputs" / "local_evaluation"
 
 
+def load_infractions_data(infractions_file: Path) -> dict:
+    """Load infractions data from JSON file.
+
+    Handles both old format (list) and new format (object with 'infractions' and 'video_fps').
+
+    Args:
+        infractions_file: Path to infractions.json file
+
+    Returns:
+        Dictionary with 'infractions' (list), 'video_fps' (float), and 'is_legacy_format' (bool)
+    """
+    with open(infractions_file) as f:
+        data = json.load(f)
+
+    # Handle legacy format (just a list)
+    if isinstance(data, list):
+        return {
+            "infractions": data,
+            "video_fps": None,  # FPS not available in legacy format
+            "is_legacy_format": True,
+        }
+
+    # Handle new format (object with infractions and video_fps)
+    return {
+        "infractions": data.get("infractions", []),
+        "video_fps": data.get("video_fps"),
+        "is_legacy_format": False,
+    }
+
+
 @app.route("/")
-def index():
+@app.route("/<path:output_dir>")
+def index(output_dir=None):
     """Render main dashboard page."""
     return render_template("index.html")
 
@@ -50,18 +81,20 @@ def list_routes():
                 # Load infraction count (excluding min speed and completion)
                 if has_infractions:
                     try:
-                        with open(route_dir / "infractions.json") as f:
-                            infractions = json.load(f)
-                            # Filter out min speed and completion infractions
-                            filtered_infractions = [
-                                inf
-                                for inf in infractions
-                                if "minspeed" not in inf.get("infraction", "").lower()
-                                and "completion" not in inf.get("infraction", "").lower()
-                            ]
-                            route_info["infraction_count"] = len(filtered_infractions)
+                        infraction_data = load_infractions_data(route_dir / "infractions.json")
+                        infractions = infraction_data["infractions"]
+                        # Filter out min speed and completion infractions
+                        filtered_infractions = [
+                            inf
+                            for inf in infractions
+                            if "minspeed" not in inf.get("infraction", "").lower()
+                            and "completion" not in inf.get("infraction", "").lower()
+                        ]
+                        route_info["infraction_count"] = len(filtered_infractions)
+                        route_info["video_fps"] = infraction_data["video_fps"]
                     except Exception:
                         route_info["infraction_count"] = 0
+                        route_info["video_fps"] = None
 
                 routes.append(route_info)
 
@@ -76,14 +109,19 @@ def get_infractions(route_name):
     infractions_file = route_path / "infractions.json"
 
     if not infractions_file.exists():
-        return jsonify({"error": "Infractions file not found", "infractions": []}), 404
+        return jsonify({"error": "Infractions file not found", "infractions": [], "video_fps": None}), 404
 
     try:
-        with open(infractions_file) as f:
-            infractions = json.load(f)
-        return jsonify({"infractions": infractions})
+        infraction_data = load_infractions_data(infractions_file)
+        return jsonify(
+            {
+                "infractions": infraction_data["infractions"],
+                "video_fps": infraction_data["video_fps"],
+                "is_legacy_format": infraction_data["is_legacy_format"],
+            }
+        )
     except Exception as e:
-        return jsonify({"error": str(e), "infractions": []}), 500
+        return jsonify({"error": str(e), "infractions": [], "video_fps": None}), 500
 
 
 @app.route("/api/route/<path:route_name>/checkpoint")
@@ -102,6 +140,28 @@ def get_checkpoint(route_name):
         return jsonify(checkpoint)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/route/<path:route_name>/video_info")
+def get_video_info(route_name):
+    """Get video metadata including FPS from infractions.json."""
+    output_dir = request.args.get("dir", DEFAULT_OUTPUT_DIR)
+    route_path = Path(output_dir) / route_name
+    infractions_file = route_path / "infractions.json"
+
+    if not infractions_file.exists():
+        return jsonify({"error": "Infractions file not found", "video_fps": None}), 404
+
+    try:
+        infraction_data = load_infractions_data(infractions_file)
+        return jsonify(
+            {
+                "video_fps": infraction_data["video_fps"],
+                "is_legacy_format": infraction_data["is_legacy_format"],
+            }
+        )
+    except Exception as e:
+        return jsonify({"error": str(e), "video_fps": None}), 500
 
 
 @app.route("/video/<path:route_name>/<video_type>")
