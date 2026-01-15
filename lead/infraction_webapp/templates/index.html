@@ -12,9 +12,9 @@
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-light bg-warm shadow-sm">
         <div class="container-fluid">
-            <span class="navbar-brand mb-0 h1">
+            <a href="/" class="navbar-brand mb-0 h1" style="cursor: pointer; text-decoration: none;">
                 <i class="bi bi-speedometer2 text-primary"></i> Infraction Dashboard
-            </span>
+            </a>
             <div class="d-flex gap-2 flex-grow-1 ms-3">
                 <input type="text" id="output-dir" class="form-control" placeholder="Evaluation output directory..." />
                 <button id="load-routes" class="btn btn-primary">
@@ -125,6 +125,19 @@
                                     <i class="bi bi-exclamation-triangle text-danger"></i> Infractions
                                     <span id="infraction-count" class="badge bg-danger ms-2">0</span>
                                 </h5>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <input type="radio" class="btn-check" name="jump-offset" id="offset-0" value="0" autocomplete="off">
+                                    <label class="btn btn-outline-secondary" for="offset-0" title="Jump to exact infraction time">0s</label>
+
+                                    <input type="radio" class="btn-check" name="jump-offset" id="offset-1" value="1" autocomplete="off">
+                                    <label class="btn btn-outline-secondary" for="offset-1" title="Jump 1 second before infraction">-1s</label>
+
+                                    <input type="radio" class="btn-check" name="jump-offset" id="offset-3" value="3" checked autocomplete="off">
+                                    <label class="btn btn-outline-secondary" for="offset-3" title="Jump 3 seconds before infraction">-3s</label>
+
+                                    <input type="radio" class="btn-check" name="jump-offset" id="offset-5" value="5" autocomplete="off">
+                                    <label class="btn btn-outline-secondary" for="offset-5" title="Jump 5 seconds before infraction">-5s</label>
+                                </div>
                             </div>
                             <div class="input-group mt-2">
                                 <span class="input-group-text"><i class="bi bi-search"></i></span>
@@ -154,6 +167,7 @@
         // Global state
         let currentRoute = null;
         let currentDirectory = null;
+        let routesData = []; // Store routes data to check video availability
         let infractions = [];
         let filteredInfractions = [];
         let videoFPS = 20; // Default FPS, will be updated from infractions.json
@@ -244,6 +258,7 @@
                     return;
                 }
 
+                routesData = data.routes; // Store routes data globally
                 renderRoutes(data.routes);
                 updateRouteStats(data.routes);
                 updateURL(); // Update URL with directory after loading
@@ -311,8 +326,21 @@
             noRouteSelected.style.display = 'none';
             routeViewer.style.display = 'block';
 
+            // Find route data to check video availability
+            const routeData = routesData.find(r => r.name === routeName);
+
+            // Set default video type: prefer demo if exists, otherwise debug
+            let videoType = videoTypeSelect.value;
+            if (routeData) {
+                if (routeData.has_demo_video) {
+                    videoType = 'demo';
+                } else if (routeData.has_debug_video) {
+                    videoType = 'debug';
+                }
+                videoTypeSelect.value = videoType;
+            }
+
             // Load video
-            const videoType = videoTypeSelect.value;
             const dir = currentDirectory || outputDirInput.value.trim();
             const videoUrl = dir ? `/video/${routeName}/${videoType}?dir=${encodeURIComponent(dir)}` : `/video/${routeName}/${videoType}`;
             videoPlayer.src = videoUrl;
@@ -424,7 +452,11 @@
 
         function jumpToInfraction(step) {
             const timestamp = stepToVideoTime(step);
-            videoPlayer.currentTime = timestamp;
+            // Get selected offset from radio buttons
+            const offsetRadio = document.querySelector('input[name="jump-offset"]:checked');
+            const offset = offsetRadio ? parseFloat(offsetRadio.value) : 3; // Default to 3s
+            const adjustedTime = Math.max(0, timestamp - offset);
+            videoPlayer.currentTime = adjustedTime;
             videoPlayer.play();
         }
 

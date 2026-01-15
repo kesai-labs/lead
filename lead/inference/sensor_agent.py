@@ -461,7 +461,15 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         return img_with_targets
 
     def check_infractions(self) -> None:
-        """Check for infractions that occurred in the current step and log them."""
+        """Check for infractions that occurred in the current step and log them.
+
+        Handles two types of infractions:
+        1. Discrete events (e.g., collisions): Each event is logged once
+        2. Continuous infractions (e.g., OutsideRouteLanesTest): Only logged when first detected
+
+        This matches the behavior of scenario_runner where continuous infractions create
+        a single event that gets updated, while discrete infractions create new events.
+        """
         if self.scenario is None:
             return
 
@@ -470,9 +478,23 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
 
             for criterion in criteria:
                 if hasattr(criterion, "events") and criterion.events:
+                    # Track which criterion is currently active
+                    # For continuous infractions (like OutsideRouteLanesTest), we only log once
+                    # until the infraction is cleared
+                    criterion_key = criterion.name
+
                     for event in criterion.events:
-                        # Create a unique ID for this infraction event
-                        event_id = (criterion.name, event.get_frame())
+                        # For discrete events (collisions), use frame as unique identifier
+                        # For continuous events (route lanes), use only criterion name
+                        # Continuous infractions typically have only 1 event that gets updated
+                        is_continuous = len(criterion.events) == 1
+
+                        if is_continuous:
+                            # Continuous infraction: only log if not currently tracked
+                            event_id = criterion_key
+                        else:
+                            # Discrete infraction: log each unique frame
+                            event_id = (criterion_key, event.get_frame())
 
                         # Only log if we haven't seen this infraction before
                         if event_id not in self.tracked_infraction_ids:
@@ -490,6 +512,11 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
 
                             self.infractions_log.append(infraction_info)
                             LOG.info(f"[SensorAgent] Infraction detected at step {self.step}: {criterion.name}")
+
+                    # If no events remain for this criterion, remove it from tracking
+                    # This allows continuous infractions to be logged again if they reoccur
+                    if not criterion.events and criterion_key in self.tracked_infraction_ids:
+                        self.tracked_infraction_ids.discard(criterion_key)
 
             # Save infractions log to JSON
             if self.config_closed_loop.save_path is not None and hasattr(self, "infractions_log"):

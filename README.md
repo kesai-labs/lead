@@ -19,23 +19,16 @@ https://github.com/user-attachments/assets/9f316ad2-e629-4bb4-bffb-9bb55e225738
   <a href="https://arxiv.org/abs/2512.20563" style="text-decoration: none;">Paper</a>
 </p>
 
-## Overview
-
-We release the complete pipeline required to achieve state-of-the-art closed-loop performance on the Bench2Drive benchmark. Built around the CARLA simulator, the stack features a data-centric design with:
-
-- Extensive visualization suite, runtime type validation and evaluation infraction tracker.
-- Optimized storage format, packs 72 hours of driving in ~260GB.
-- Native support for NAVSIM and Waymo Vision-based E2E.
-
 
 ## Table of Contents
 
+- [Table of Contents](#table-of-contents)
 - [Updates](#updates)
 - [Quick Start](#quick-start)
   - [1. Environment initialization](#1-environment-initialization)
-  - [2. Setup experiment infrastructure](#2-setup-experiment-infrastructure)
-  - [3. Model zoo](#3-model-zoo)
-  - [4. Verify driving stack](#4-verify-driving-stack)
+  - [2. Install dependencies](#2-install-dependencies)
+  - [3. Download checkpoints](#3-download-checkpoints)
+  - [4. Evaluate model](#4-evaluate-model)
   - [5. Verify autopilot](#5-verify-autopilot)
 - [Beyond CARLA: Cross-Benchmark Deployment](#beyond-carla-cross-benchmark-deployment)
 - [Further Documentation](#further-documentation)
@@ -78,7 +71,7 @@ source ~/.bashrc                                        # Reload config
 
 Please verify that ~/.bashrc reflects these paths correctly.
 
-### 2. Setup experiment infrastructure
+### 2. Install dependencies
 
 We utilize [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install), conda-lock and uv:
 
@@ -101,9 +94,9 @@ While waiting for dependencies installation, we recommend CARLA setup on paralle
 bash scripts/setup_carla.sh # Download and setup CARLA at 3rd_party/CARLA_0915
 ```
 
-### 3. Model zoo
+### 3. Download checkpoints
 
-Pre-trained driving policies are hosted on [HuggingFace](https://huggingface.co/ln2697/tfv6) for reproducibility. These checkpoints follow the TFv6 architecture, but differ in their sensor configurations, vision backbones or dataset composition.
+Pre-trained checkpoints are hosted on [HuggingFace](https://huggingface.co/ln2697/tfv6) for reproducibility. These checkpoints follow the TFv6 architecture, but differ in their sensor configurations, vision backbones or dataset composition.
 
 <br>
 <div align="center">
@@ -122,7 +115,7 @@ Pre-trained driving policies are hosted on [HuggingFace](https://huggingface.co/
 </div>
 <br>
 
-To download one checkpoint:
+To download one single checkpoint for test purpose:
 
 ```bash
 bash scripts/download_one_checkpoint.sh
@@ -136,9 +129,9 @@ cd outputs/checkpoints
 git lfs pull
 ```
 
-### 4. Verify driving stack
+### 4. Evaluate model
 
-To initiate closed-loop evaluation and verify the integration of the driving stack, execute the following:
+To initiate closed-loop evaluation and verify the setup, execute the following:
 
 ```bash
 # Start driving environment
@@ -226,7 +219,7 @@ data/expert_debug/
     └── 1_town15_construction_result.json
 ```
 
-The [Jupyter notebooks](notebooks) provide some quick scripts to visualize the collected data:
+The [Jupyter notebooks](notebooks) provide some example scripts to visualize the collected data:
 
 <br>
 <div align="center">
