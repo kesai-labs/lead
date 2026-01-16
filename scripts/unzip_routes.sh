@@ -3,7 +3,7 @@
 #SBATCH --nodes=1
 #SBATCH --time=1-00:00:00
 #SBATCH --cpus-per-task=8
-#SBATCH --partition=L40Sday
+#SBATCH --partition=2080-galvani
 #SBATCH --mail-type=FAIL,END
 #SBATCH --mail-user=long.nguyen@student.uni-tuebingen.de
 #SBATCH --mem=64G

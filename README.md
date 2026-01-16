@@ -99,7 +99,7 @@ conda activate lead
 # Install dependencies and setup git hooks
 pip install uv && uv pip install -r requirements.txt && uv pip install -e .
 # Install other tools needed for development
-conda install conda-forge::ffmpeg conda-forge::parallel conda-forge::tree conda-forge::gcc
+conda install -c conda-forge ffmpeg parallel tree gcc zip unzip
 # Optional: Activate git hooks
 pre-commit install
 ```
@@ -260,8 +260,8 @@ For a more detailed documentation, take a look at the [documentation page](https
 Download the CARLA dataset from [HuggingFace](https://huggingface.co/datasets/ln2697/lead_carla) using git lfs:
 
 ```bash
-git clone https://huggingface.co/datasets/ln2697/lead_carla data/carla_leaderboard2
-cd data/carla_leaderboard2
+git clone https://huggingface.co/datasets/ln2697/lead_carla data/carla_leaderboard2/zip
+cd data/carla_leaderboard2/zip
 git lfs pull
 ```
 
