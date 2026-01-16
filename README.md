@@ -30,6 +30,19 @@ https://github.com/user-attachments/assets/9f316ad2-e629-4bb4-bffb-9bb55e225738
   - [3. Download checkpoints](#3-download-checkpoints)
   - [4. Evaluate model](#4-evaluate-model)
   - [5. Verify autopilot](#5-verify-autopilot)
+- [Training for CARLA Leaderboard](#training-for-carla-leaderboard)
+  - [1. Download training data](#1-download-training-data)
+  - [2. Build data cache](#2-build-data-cache)
+  - [3. Train model](#3-train-model)
+  - [4. Post-train model](#4-post-train-model)
+  - [5. Large-scale training on SLURM](#5-large-scale-training-on-slurm)
+- [Evaluation on CARLA Leaderboard](#evaluation-on-carla-leaderboard)
+  - [1. Start CARLA](#1-start-carla)
+  - [2. Evaluate on Bench2Drive](#2-evaluate-on-bench2drive)
+  - [3. Evaluate on Longest6](#3-evaluate-on-longest6)
+  - [4. Evaluate on Town13](#4-evaluate-on-town13)
+  - [5. Clean CARLA](#5-clean-carla)
+  - [6. Large-scale evaluation on SLURM](#6-large-scale-evaluation-on-slurm)
 - [Beyond CARLA: Cross-Benchmark Deployment](#beyond-carla-cross-benchmark-deployment)
 - [Further Documentation](#further-documentation)
 - [Acknowledgements](#acknowledgements)
@@ -43,6 +56,9 @@ https://github.com/user-attachments/assets/9f316ad2-e629-4bb4-bffb-9bb55e225738
 
 - **`[2026/01/13]`** CARLA dataset and training documentation released
   > We publicly release a CARLA dataset generated with the same pipeline as described in the paper. Note that due to subsequent refactoring and code cleanup, the released dataset differs from the original dataset used in our experiments. Validation is ongoing.
+
+- **`[2026/01/05]`** Removed stop-sign heuristic
+  > We removed explicit stop-sign handling to evaluate the policy in a fully end-to-end setting. This may slightly reduce closed-loop performance compared to earlier runs.
 
 - **`[2026/01/05]`** RoutePlanner bug fix
   > Fixed an index error that caused the driving policy to crash at the end of routes in Town13. Driving scores have been updated accordingly.
@@ -231,6 +247,148 @@ The [Jupyter notebooks](notebooks) provide some example scripts to visualize the
   </picture>
 
   **Figure 2:** Example outputs of data visualization notebooks.
+
+</div>
+<br>
+
+## Training for CARLA Leaderboard
+
+For a more detailed documentation, take a look at the [documentation page](https://ln2697.github.io/lead/docs/carla_training.html).
+
+### 1. Download training data
+
+Download the CARLA dataset from [HuggingFace](https://huggingface.co/datasets/ln2697/lead_carla) using git lfs:
+
+```bash
+git clone https://huggingface.co/datasets/ln2697/lead_carla data/carla_leaderboard2
+cd data/carla_leaderboard2
+git lfs pull
+```
+
+Or download a single route for testing:
+
+```bash
+bash scripts/download_one_route.sh
+```
+
+Unzip the downloaded routes:
+
+```bash
+bash scripts/unzip_routes.sh
+```
+
+### 2. Build data cache
+
+Build persistent cache for faster data loading during training:
+
+```bash
+python scripts/build_cache.py
+```
+
+### 3. Train model
+
+Start pretraining:
+
+```bash
+bash scripts/pretrain.sh
+```
+
+For multi-GPU training with Distributed Data Parallel:
+
+```bash
+bash scripts/pretrain_ddp.sh
+```
+
+Training logs and checkpoints will be saved to `outputs/local_training/pretrain`.
+
+### 4. Post-train model
+
+Fine-tune the pretrained model with planning decoder enabled:
+
+```bash
+bash scripts/posttrain.sh
+```
+
+For multi-GPU training:
+
+```bash
+bash scripts/posttrain_ddp.sh
+```
+
+Post-training checkpoints will be saved to `outputs/local_training/posttrain`. We also include TensorBoard and WandB logging
+
+<br>
+<div align="center">
+  <picture>
+    <img src="docs/assets/eval_wandb.png" />
+  </picture>
+
+  **Figure 3:** Example WandB logging with training visualization.
+
+</div>
+<br>
+
+### 5. Large-scale training on SLURM
+
+For distributed training on SLURM, see this [documentation page](https://ln2697.github.io/lead/docs/slurm_training.html). For a complete SLURM workflow of pre-training, post-training, evaluation, see this [example](slurm/experiments/001_example).
+
+## Evaluation on CARLA Leaderboard
+
+For a more detailed documentation, take a look at the [evaluation documentation](https://ln2697.github.io/lead/docs/evaluation.html).
+
+### 1. Start CARLA
+
+Start the CARLA simulator before running evaluation:
+
+```bash
+bash scripts/start_carla.sh
+```
+
+### 2. Evaluate on Bench2Drive
+
+Run closed-loop evaluation on the Bench2Drive benchmark:
+
+```bash
+bash scripts/eval_bench2drive.sh
+```
+
+### 3. Evaluate on Longest6
+
+Run closed-loop evaluation on the Longest6 v2 benchmark:
+
+```bash
+bash scripts/eval_longest6.sh
+```
+
+### 4. Evaluate on Town13
+
+Run closed-loop evaluation on the Town13 benchmark:
+
+```bash
+bash scripts/eval_town13.sh
+```
+
+Results will be saved to `outputs/local_evaluation/` with videos, infractions, and metrics.
+
+### 5. Clean CARLA
+
+If CARLA becomes unresponsive, clean up zombie processes:
+
+```bash
+bash scripts/clean_carla.sh
+```
+
+### 6. Large-scale evaluation on SLURM
+
+For distributed evaluation across multiple routes and benchmarks, see the [SLURM evaluation documentation](https://ln2697.github.io/lead/docs/slurm_evaluation.html). For large-scale evaluation we also provide a WandB logger.
+
+<br>
+<div align="center">
+  <picture>
+    <img src="docs/assets/logging_wandb.png" />
+  </picture>
+
+  **Figure 4:** Example online WandB logging during evaluation.
 
 </div>
 <br>

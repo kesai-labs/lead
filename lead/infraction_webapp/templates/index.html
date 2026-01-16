@@ -171,6 +171,7 @@
         let infractions = [];
         let filteredInfractions = [];
         let videoFPS = 20; // Default FPS, will be updated from infractions.json
+        let lastClickedInfractionStep = null; // Track the last clicked infraction step
 
         // DOM elements
         const outputDirInput = document.getElementById('output-dir');
@@ -298,7 +299,7 @@
 
         function renderRoutes(routes) {
             routeList.innerHTML = routes.map(route => `
-                <div class="card mb-2 route-card" onclick="selectRoute('${route.name}')" style="cursor: pointer;">
+                <div class="card mb-2 route-card" data-route-name="${route.name}" onclick="selectRoute('${route.name}')" style="cursor: pointer;">
                     <div class="card-body p-2">
                         <div class="d-flex justify-content-between align-items-center">
                             <strong class="text-dark">${route.name}</strong>
@@ -315,11 +316,35 @@
                     </div>
                 </div>
             `).join('');
+
+            // Re-apply highlighting if a route is currently selected
+            if (currentRoute) {
+                highlightCurrentRoute();
+            }
+        }
+
+        function highlightCurrentRoute() {
+            document.querySelectorAll('.route-card').forEach(card => {
+                if (card.dataset.routeName === currentRoute) {
+                    card.classList.add('selected');
+                } else {
+                    card.classList.remove('selected');
+                }
+            });
         }
 
         async function selectRoute(routeName) {
             currentRoute = routeName;
             updateURL();
+
+            // Highlight selected route
+            highlightCurrentRoute();
+
+            // Scroll to selected route
+            const selectedCard = document.querySelector(`.route-card[data-route-name="${routeName}"]`);
+            if (selectedCard) {
+                selectedCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
 
             // Update UI
             document.getElementById('route-name').textContent = routeName;
@@ -430,7 +455,7 @@
                 const metersText = inf.meters_travelled !== undefined ? `${inf.meters_travelled}m` : 'N/A';
 
                 return `
-                    <div class="border-bottom p-3 infraction-item" onclick="jumpToInfraction(${inf.step})" style="cursor: pointer; border-left: 4px solid ${meta.color} !important;">
+                    <div class="border-bottom p-3 infraction-item" id="infraction-${inf.step}" data-step="${inf.step}" onclick="jumpToInfraction(${inf.step})" style="cursor: pointer; border-left: 4px solid ${meta.color} !important;">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <span class="fw-bold" style="color: ${meta.color}">
                                 <i class="bi bi-exclamation-circle"></i> ${meta.label}
@@ -458,6 +483,57 @@
             const adjustedTime = Math.max(0, timestamp - offset);
             videoPlayer.currentTime = adjustedTime;
             videoPlayer.play();
+
+            // Track last clicked infraction and update URL
+            lastClickedInfractionStep = step;
+            updateURL();
+
+            // Highlight clicked infraction
+            highlightInfractions();
+        }
+
+        function highlightInfractions() {
+            // Get current video step
+            const currentTime = videoPlayer.currentTime;
+            const currentFrame = Math.floor(currentTime * videoFPS);
+            const currentStep = videoFrameToStep(currentFrame);
+
+            // Find nearest infraction
+            let nearestInfraction = null;
+            let minDistance = Infinity;
+            filteredInfractions.forEach(inf => {
+                const distance = Math.abs(inf.step - currentStep);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearestInfraction = inf;
+                }
+            });
+
+            // Clear all highlights first
+            document.querySelectorAll('.infraction-item').forEach(item => {
+                item.classList.remove('clicked-infraction', 'nearest-infraction');
+            });
+
+            // Highlight clicked infraction (priority)
+            if (lastClickedInfractionStep !== null) {
+                const clickedElement = document.getElementById(`infraction-${lastClickedInfractionStep}`);
+                if (clickedElement) {
+                    clickedElement.classList.add('clicked-infraction');
+                    clickedElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            }
+
+            // Highlight nearest infraction (secondary)
+            if (nearestInfraction && nearestInfraction.step !== lastClickedInfractionStep) {
+                const nearestElement = document.getElementById(`infraction-${nearestInfraction.step}`);
+                if (nearestElement) {
+                    nearestElement.classList.add('nearest-infraction');
+                    // Only scroll to nearest if no clicked infraction
+                    if (lastClickedInfractionStep === null) {
+                        nearestElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                }
+            }
         }
 
         // Video controls
@@ -481,6 +557,9 @@
                 // Update active state
                 document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
                 e.target.classList.add('active');
+
+                // Update URL with new speed
+                updateURL();
             });
         });
 
@@ -515,6 +594,11 @@
             }
             if (document.activeElement !== currentStepInput) {
                 currentStepInput.value = step;
+            }
+
+            // Update infraction highlights
+            if (filteredInfractions.length > 0) {
+                highlightInfractions();
             }
         }
 
@@ -592,6 +676,13 @@
             applyFilters();
         });
 
+        // Update URL when offset changes
+        document.querySelectorAll('input[name="jump-offset"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                updateURL();
+            });
+        });
+
         // URL state management
         function updateURL() {
             const params = new URLSearchParams();
@@ -601,6 +692,23 @@
             if (currentRoute) {
                 params.set('route', currentRoute);
             }
+            // Add video speed if not default (1.0)
+            if (videoPlayer && videoPlayer.playbackRate !== 1.0) {
+                params.set('speed', videoPlayer.playbackRate.toString());
+            }
+            // Add last clicked infraction step
+            if (lastClickedInfractionStep !== null) {
+                params.set('infraction', lastClickedInfractionStep.toString());
+            }
+            // Add offset value
+            const offsetRadio = document.querySelector('input[name="jump-offset"]:checked');
+            if (offsetRadio) {
+                const offset = parseFloat(offsetRadio.value);
+                // Only add if not default (3s)
+                if (offset !== 3) {
+                    params.set('offset', offset.toString());
+                }
+            }
             const newURL = params.toString() ? `?${params.toString()}` : '/';
             window.history.pushState({}, '', newURL);
         }
@@ -609,13 +717,52 @@
             const params = new URLSearchParams(window.location.search);
             const dir = params.get('dir');
             const route = params.get('route');
+            const speed = params.get('speed');
+            const infractionStep = params.get('infraction');
+            const offset = params.get('offset');
+
+            // Restore video speed
+            if (speed) {
+                const speedValue = parseFloat(speed);
+                if (videoPlayer) {
+                    videoPlayer.playbackRate = speedValue;
+                }
+                // Update UI to reflect speed
+                document.querySelectorAll('.speed-btn').forEach(btn => {
+                    if (parseFloat(btn.dataset.speed) === speedValue) {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                });
+            }
+
+            // Restore offset selection
+            if (offset) {
+                const offsetValue = parseFloat(offset);
+                document.querySelectorAll('input[name="jump-offset"]').forEach(radio => {
+                    if (parseFloat(radio.value) === offsetValue) {
+                        radio.checked = true;
+                    }
+                });
+            }
 
             if (dir) {
                 currentDirectory = dir;
                 outputDirInput.value = dir; // Persist in text field
                 loadRoutes().then(() => {
                     if (route) {
-                        selectRoute(route);
+                        selectRoute(route).then(() => {
+                            // After route is loaded, jump to infraction if specified
+                            if (infractionStep) {
+                                const step = parseInt(infractionStep);
+                                lastClickedInfractionStep = step;
+                                // Wait a bit for video to be ready
+                                setTimeout(() => {
+                                    jumpToInfraction(step);
+                                }, 500);
+                            }
+                        });
                     }
                 });
             }
