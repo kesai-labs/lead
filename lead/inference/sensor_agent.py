@@ -591,6 +591,22 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         rgb = np.transpose(rgb, (2, 0, 1))
         input_data["rgb"] = rgb
 
+        # Horizontal FOV reduction: crop left and right, then resize back
+        if self.training_config.horizontal_fov_reduction > 0:
+            crop_pixels = self.training_config.horizontal_fov_reduction
+            # rgb: (C, H, W)
+            if input_data["rgb"] is not None:
+                _, h, w = input_data["rgb"].shape
+                input_data["rgb"] = input_data["rgb"][:, :, crop_pixels:-crop_pixels]
+                input_data["rgb"] = np.transpose(input_data["rgb"], (1, 2, 0))  # -> (H, W_crop, C)
+                input_data["rgb"] = cv2.resize(input_data["rgb"], (w, h), interpolation=cv2.INTER_LINEAR)
+                input_data["rgb"] = np.transpose(input_data["rgb"], (2, 0, 1))  # -> (C, H, W)
+            # original_rgb: (H, W, C)
+            if input_data["original_rgb"] is not None:
+                h, w = input_data["original_rgb"].shape[:2]
+                input_data["original_rgb"] = input_data["original_rgb"][:, crop_pixels:-crop_pixels, :]
+                input_data["original_rgb"] = cv2.resize(input_data["original_rgb"], (w, h), interpolation=cv2.INTER_LINEAR)
+
         # Cut cameras down to only used cameras
         for modality in ["rgb", "original_rgb"]:
             if self.training_config.num_used_cameras != self.training_config.num_available_cameras:
@@ -691,6 +707,7 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
             ),
             "speed": torch.Tensor([input_data["speed"]]).to(self.device, dtype=torch.float32).view(1),
             "command": torch.Tensor(input_data["command"]).to(self.device, dtype=torch.float32).view(1, 6),
+            "town": np.array([self._world.get_map().name]),
         }
 
         # Add radar data if available

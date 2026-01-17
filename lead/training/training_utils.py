@@ -55,7 +55,7 @@ def initialize_config() -> TrainingConfig:
 def initialize_training_session_cache(config: TrainingConfig) -> Cache | None:
     training_session_cache = None
     if config.use_training_session_cache:
-        training_session_cache = Cache(directory=config.training_session_cache_path, size_limit=int(768 * 1024**3))
+        training_session_cache = Cache(directory=config.training_session_cache_path, size_limit=int(2048 * 1024**3))
     return training_session_cache
 
 
@@ -120,7 +120,7 @@ def initialize_model(config: TrainingConfig) -> tuple[typing.Any | torch.nn.para
         LOG.info("Using channel last memory format")
     if torch.cuda.device_count() > 1:
         model_wrapper = torch.nn.parallel.DistributedDataParallel(
-            model, device_ids=None, output_device=None, broadcast_buffers=False
+            model, device_ids=None, output_device=None, broadcast_buffers=False, bucket_cap_mb=config.bucket_cap_mb
         )
     else:
         model_wrapper = model
@@ -150,10 +150,10 @@ def initialize_optimizer(
     params = model_wrapper.parameters()
     if config.use_zero_redundancy and torch.cuda.device_count() > 1:
         optimizer = ZeroRedundancyOptimizer(
-            params, optimizer_class=torch.optim.AdamW, lr=config.lr, amsgrad=True, weight_decay=config.weight_decay
+            params, optimizer_class=torch.optim.AdamW, lr=config.lr, amsgrad=True, weight_decay=config.weight_decay, fused=True
         )
     else:
-        optimizer = optim.AdamW(params, lr=config.lr, amsgrad=True, weight_decay=config.weight_decay)
+        optimizer = optim.AdamW(params, lr=config.lr, amsgrad=True, weight_decay=config.weight_decay, fused=True)
 
     if config.use_cosine_annealing_with_restarts:
         scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=gradient_steps_per_epoch, T_mult=2)

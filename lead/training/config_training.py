@@ -39,6 +39,8 @@ class TrainingConfig(BaseConfig):
     def target_dataset(self):
         if "expert_debug" in self.carla_root:
             return TargetDataset.CARLA_LEADERBOARD2_3CAMERAS
+        elif "carla_leaderboad2_v3" in self.carla_root:
+            return TargetDataset.CARLA_LEADERBOARD2_3CAMERAS
         elif "carla_leaderboard2" in self.carla_root:
             return TargetDataset.CARLA_LEADERBOARD2_3CAMERAS
         elif "carla_leaderboad2_v8" in self.carla_root:
@@ -155,7 +157,7 @@ class TrainingConfig(BaseConfig):
         """If true produce images during training for visualization."""
         if self.is_on_slurm:
             return True
-        return False
+        return True
 
     # Unique experiment identifier.
     id = "Experiment 1"
@@ -297,8 +299,11 @@ class TrainingConfig(BaseConfig):
         return not self.use_planning_decoder
 
     # --- Training speed and memory optimization ---
+    # bucket_cap_mb
+    bucket_cap_mb = 256
+
     # Number of data loader workers to prefetch batches.
-    prefetch_factor = 8
+    prefetch_factor = 16
 
     @property
     def compile(self):
@@ -616,7 +621,7 @@ class TrainingConfig(BaseConfig):
     # Number of attention heads in BEV cross-attention.
     transfuser_num_bev_cross_attention_heads = 8
     # Dimension of tokens in the transformer.
-    transfuser_token_dim = 256
+    transfuser_token_dim = 64
 
     @property
     def predict_target_speed(self):
@@ -633,6 +638,12 @@ class TrainingConfig(BaseConfig):
 
     # If true model will use the planning decoder.
     use_planning_decoder = False
+
+    # If true will use TFv5's planning decoder
+    use_tfv5_planning_decoder = False
+
+    # Used for TFv5 planning decoder
+    gru_hidden_size = 64
 
     @property
     def target_speed_classes(self):
@@ -688,6 +699,9 @@ class TrainingConfig(BaseConfig):
         raise ValueError("Unknown target dataset. Not sure which planning frequency to use.")
 
     # --- Image config ---
+    # Horizontal FOV reduction: number of pixels to crop from each side (left and right)
+    horizontal_fov_reduction = 0
+
     @property
     def crop_height(self):
         """The amount of pixels cropped from the bottom of the image."""
@@ -1007,8 +1021,8 @@ class TrainingConfig(BaseConfig):
     def workers_per_cpu_cores(self):
         """Number of data loader workers per CPU core."""
         if not self.mixed_data_training and not self.use_carla_data:
-            return 1  # Use more workers for mixed data training. CARLA loader is slow.
-        return 1
+            return 2 
+        return 2
 
     def training_dict(self) -> dict[str, Any]:
         """Convert training configuration to a dictionary for serialization and logging."""

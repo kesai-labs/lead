@@ -2,6 +2,7 @@
 """Flask webapp for visualizing driving infractions from CARLA evaluations."""
 
 import json
+import subprocess
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
@@ -212,6 +213,116 @@ def serve_video(route_name, video_type):
 
     # Return full video if no range requested
     return send_from_directory(route_path, video_file, mimetype="video/mp4")
+
+
+@app.route("/api/open_directory", methods=["POST"])
+def open_directory():
+    """Open the directory containing the route's videos in the file manager."""
+    data = request.json
+    route_name = data.get("route_name")
+    output_dir = data.get("output_dir", DEFAULT_OUTPUT_DIR)
+
+    if not route_name:
+        return jsonify({"error": "Missing route_name parameter"}), 400
+
+    route_path = Path(output_dir) / route_name
+
+    if not route_path.exists():
+        return jsonify({"error": f"Directory not found: {route_path}"}), 404
+
+    try:
+        # Open directory in file manager (works on Linux, Mac, Windows)
+        import platform
+
+        system = platform.system()
+
+        if system == "Linux":
+            subprocess.run(["xdg-open", str(route_path)], check=True)
+        elif system == "Darwin":  # macOS
+            subprocess.run(["open", str(route_path)], check=True)
+        elif system == "Windows":
+            subprocess.run(["explorer", str(route_path)], check=True)
+        else:
+            return jsonify({"error": f"Unsupported operating system: {system}"}), 400
+
+        return jsonify({"success": True, "path": str(route_path)})
+
+    except subprocess.CalledProcessError as e:
+        return jsonify({"error": f"Failed to open directory: {e}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/cut_video", methods=["POST"])
+def cut_video():
+    """Cut a video segment around an infraction timestamp."""
+    data = request.json
+    route_name = data.get("route_name")
+    video_type = data.get("video_type")
+    timestamp = data.get("timestamp")
+    buffer_seconds = data.get("buffer", 3)
+    infraction_number = data.get("infraction_number")
+    output_dir = data.get("output_dir", DEFAULT_OUTPUT_DIR)
+
+    if not all([route_name, video_type, timestamp is not None, infraction_number]):
+        return jsonify({"error": "Missing required parameters"}), 400
+
+    route_path = Path(output_dir) / route_name
+
+    # Get input video file
+    video_files = {
+        "debug": f"{route_name}_debug.mp4",
+        "demo": f"{route_name}_demo.mp4",
+    }
+
+    if video_type not in video_files:
+        return jsonify({"error": "Invalid video type"}), 400
+
+    input_video = route_path / video_files[video_type]
+
+    if not input_video.exists():
+        return jsonify({"error": f"Video file {video_files[video_type]} not found"}), 404
+
+    # Calculate start and duration
+    start_time = max(0, timestamp - buffer_seconds)
+    duration = buffer_seconds * 2  # buffer before + buffer after
+
+    # Output file name
+    output_filename = f"{route_name}_{video_type}_infraction_{infraction_number}.mp4"
+    output_path = route_path / output_filename
+
+    try:
+        # Use ffmpeg to cut the video
+        cmd = [
+            "ffmpeg",
+            "-y",  # Overwrite output file if exists
+            "-ss",
+            str(start_time),  # Start time
+            "-i",
+            str(input_video),  # Input file
+            "-t",
+            str(duration),  # Duration
+            "-c",
+            "copy",  # Copy codec (fast, no re-encoding)
+            str(output_path),  # Output file
+        ]
+
+        subprocess.run(cmd, capture_output=True, text=True, check=True)
+
+        return jsonify(
+            {
+                "success": True,
+                "output_path": str(output_path),
+                "start_time": start_time,
+                "duration": duration,
+                "buffer": buffer_seconds,
+            }
+        )
+
+    except subprocess.CalledProcessError as e:
+        return jsonify({"error": f"FFmpeg error: {e.stderr}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":

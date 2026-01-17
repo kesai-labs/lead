@@ -35,10 +35,15 @@ class AbstractBucketCollection(abc.ABC):
         self.trainable_frames = 0
 
         # Try to load from cache first
+        cache_loaded = False
         if self._does_cache_exist() and not self.config.force_rebuild_bucket:
             LOG.info(f"Loading collection from cache: {self.cache_file_path()}")
-            self._load_from_cache()
-        else:
+            try:
+                self._load_from_cache()
+                cache_loaded = True
+            except lzma.LZMAError as e:
+                LOG.error(f"Error while trying to load bucket from cache {str(e)}")
+        if not cache_loaded:
             LOG.info("Building collection from scratch...")
             self._build_buckets()
             for bucket in self.buckets:

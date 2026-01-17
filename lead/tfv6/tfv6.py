@@ -14,6 +14,7 @@ from lead.tfv6.center_net_decoder import CenterNetBoundingBoxPrediction, CenterN
 from lead.tfv6.perspective_decoder import PerspectiveDecoder
 from lead.tfv6.planning_decoder import PlanningDecoder
 from lead.tfv6.radar_detector import RadarDetector
+from lead.tfv6.tfv5_planning_decoder import TFv5PlanningDecoder
 from lead.tfv6.transfuser_backbone import TransfuserBackbone
 from lead.training.config_training import TrainingConfig
 
@@ -81,9 +82,14 @@ class TFv6(nn.Module):
             )
 
         if self.config.use_planning_decoder:
-            self.planning_decoder = PlanningDecoder(
-                input_bev_channels=self.backbone.num_lidar_features, config=self.config, device=self.device
-            ).to(self.device)
+            if self.config.use_tfv5_planning_decoder:
+                self.planning_decoder = TFv5PlanningDecoder(
+                    input_bev_channels=self.backbone.num_lidar_features, config=self.config, device=self.device
+                ).to(self.device)
+            else:
+                self.planning_decoder = PlanningDecoder(
+                    input_bev_channels=self.backbone.num_lidar_features, config=self.config, device=self.device
+                ).to(self.device)
 
     @beartype
     def forward(self, data: dict[str, typing.Any]) -> Prediction:

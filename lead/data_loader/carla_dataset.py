@@ -622,6 +622,27 @@ class CARLAData(Dataset):
         if data.get("semantic") is not None and not self.config.carla_leaderboard_mode:
             data["semantic"] = self.sim2real_semantic_converter[data["semantic"]]
 
+        # Horizontal FOV reduction: crop left and right, then resize back
+        if self.config.horizontal_fov_reduction > 0:
+            crop_pixels = self.config.horizontal_fov_reduction
+            # RGB: (C, H, W)
+            if data["rgb"] is not None:
+                _, h, w = data["rgb"].shape
+                data["rgb"] = data["rgb"][:, :, crop_pixels:-crop_pixels]
+                data["rgb"] = np.transpose(data["rgb"], (1, 2, 0))  # -> (H, W_crop, C)
+                data["rgb"] = cv2.resize(data["rgb"], (w, h), interpolation=cv2.INTER_LINEAR)
+                data["rgb"] = np.transpose(data["rgb"], (2, 0, 1))  # -> (C, H, W)
+            # Depth: (H, W)
+            if data.get("depth") is not None:
+                h, w = data["depth"].shape
+                data["depth"] = data["depth"][:, crop_pixels:-crop_pixels]
+                data["depth"] = cv2.resize(data["depth"], (w, h), interpolation=cv2.INTER_LINEAR)
+            # Semantic: (H, W)
+            if data.get("semantic") is not None:
+                h, w = data["semantic"].shape
+                data["semantic"] = data["semantic"][:, crop_pixels:-crop_pixels]
+                data["semantic"] = cv2.resize(data["semantic"], (w, h), interpolation=cv2.INTER_NEAREST)
+
         return data
 
     @beartype
@@ -656,22 +677,25 @@ class CARLAData(Dataset):
             or (self.persistent_cache is not None and used_cache_key in self.persistent_cache)
         ) and not self.config.force_rebuild_data_cache:
             # Search cache, from fast to slow.
-            cache = None
-            if self.training_session_cache is not None and used_cache_key in self.training_session_cache:
-                cache = self.training_session_cache
-            elif self.persistent_cache is not None and used_cache_key in self.persistent_cache:
-                cache = self.persistent_cache
+            try:
+                cache = None
+                if self.training_session_cache is not None and used_cache_key in self.training_session_cache:
+                    cache = self.training_session_cache
+                elif self.persistent_cache is not None and used_cache_key in self.persistent_cache:
+                    cache = self.persistent_cache
 
-            # Access cache - now stores CompressedSensorData directly
-            cached_compressed_data = cache[used_cache_key]
+                # Access cache - now stores CompressedSensorData directly
+                cached_compressed_data = cache[used_cache_key]
 
-            if self.training_session_cache is not None and used_cache_key not in self.training_session_cache:
-                self.training_session_cache[used_cache_key] = cached_compressed_data
+                if self.training_session_cache is not None and used_cache_key not in self.training_session_cache:
+                    self.training_session_cache[used_cache_key] = cached_compressed_data
 
-            if self.persistent_cache is not None and used_cache_key not in self.persistent_cache:
-                self.persistent_cache[used_cache_key] = cached_compressed_data
+                if self.persistent_cache is not None and used_cache_key not in self.persistent_cache:
+                    self.persistent_cache[used_cache_key] = cached_compressed_data
 
-            return cached_compressed_data.decompress()
+                return cached_compressed_data.decompress()
+            except EOFError:
+                LOG.warning(f"EOFError when reading cache for key {used_cache_key}. Rebuilding cache for this key.")
 
         # Data not in cache, load from disk. Do this for all 3 views, since we might need them later.
         sensor_data_normal = self._load_sensor_data_and_build_cache(
