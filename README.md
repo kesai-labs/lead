@@ -10,13 +10,20 @@ https://github.com/user-attachments/assets/9f316ad2-e629-4bb4-bffb-9bb55e225738
 </div>
 
 <p align="center">
-  <a href="https://ln2697.github.io/lead" style="text-decoration: none;">Website | </a>
-  <a href="https://ln2697.github.io/lead/docs" style="text-decoration: none;">Documentation | </a>
-  <a href="https://huggingface.co/datasets/ln2697/lead_carla" style="text-decoration: none;">CARLA Dataset | </a>
-  <a href="https://huggingface.co/ln2697/tfv6" style="text-decoration: none;">CARLA Model | </a>
-  <a href="https://huggingface.co/ln2697/tfv6_navsim" style="text-decoration: none;">NAVSIM Model | </a>
-  <a href="https://ln2697.github.io/assets/pdf/Nguyen2026LEADSUPP.pdf" style="text-decoration: none;">Supplementary | </a>
+  <a href="https://ln2697.github.io/lead" style="text-decoration: none;">Website</a> <span style="color: #0969da;">|</span>
+  <a href="https://ln2697.github.io/lead/docs" style="text-decoration: none;">Docs</a> <span style="color: #0969da;">|</span>
+  <a href="https://huggingface.co/datasets/ln2697/lead_carla" style="text-decoration: none;">Dataset</a> <span style="color: #0969da;">|</span>
+  <a href="https://huggingface.co/ln2697/tfv6" style="text-decoration: none;">Model</a> <span style="color: #0969da;">|</span>
+  <a href="https://huggingface.co/ln2697/tfv6_navsim" style="text-decoration: none;">NAVSIM Model</a> <span style="color: #0969da;">|</span>
+  <a href="https://ln2697.github.io/assets/pdf/Nguyen2026LEADSUPP.pdf" style="text-decoration: none;">Supplementary</a> <span style="color: #0969da;">|</span>
   <a href="https://arxiv.org/abs/2512.20563" style="text-decoration: none;">Paper</a>
+  <br><br>
+  An open-source end-to-end driving stack for CARLA, achieving state-of-the-art closed-loop performance across all major Leaderboard 2.0 benchmarks.
+  <br><br>
+<img src="https://img.shields.io/badge/Bench2Drive-95.2-blue?style=flat" alt="Bench2Drive">
+<img src="https://img.shields.io/badge/Longest6 V2-62-blue?style=flat" alt="Longest6 V2">
+<img src="https://img.shields.io/badge/Town13-5.2-blue?style=flat" alt="Town13">
+  <br>
 </p>
 
 
@@ -43,6 +50,7 @@ https://github.com/user-attachments/assets/9f316ad2-e629-4bb4-bffb-9bb55e225738
   - [4. Evaluate on Town13](#4-evaluate-on-town13)
   - [5. Clean CARLA](#5-clean-carla)
   - [6. Large-scale evaluation on SLURM](#6-large-scale-evaluation-on-slurm)
+- [Project Structure](#project-structure)
 - [Beyond CARLA: Cross-Benchmark Deployment](#beyond-carla-cross-benchmark-deployment)
 - [Further Documentation](#further-documentation)
 - [Acknowledgements](#acknowledgements)
@@ -104,7 +112,7 @@ conda install -c conda-forge ffmpeg parallel tree gcc zip unzip
 pre-commit install
 ```
 
-While waiting for dependencies installation, we recommend CARLA setup on parallel:
+While waiting for dependencies installation, we recommend CARLA setup on parallel be:
 
 ```bash
 bash scripts/setup_carla.sh # Download and setup CARLA at 3rd_party/CARLA_0915
@@ -121,9 +129,9 @@ Pre-trained checkpoints are hosted on [HuggingFace](https://huggingface.co/ln269
 | ------------------------------------- | :---------: | :---------: | :------: | :-------------------------------------------------------------------------: |
 | Full TransFuser V6                    |  **95.2**   |   **62**    | **5.24** |    [Link](https://huggingface.co/ln2697/tfv6/tree/main/tfv6_regnety032)     |
 | ResNet34 backbone with 60M parameters |    94.7     |     57      |   5.01   |     [Link](https://huggingface.co/ln2697/tfv6/tree/main/tfv6_resnet34)      |
-| Rear camera as additional input       |    95.1     |     53      |    -     |   [Link](https://huggingface.co/ln2697/tfv6/tree/main/4cameras_resnet34)    |
-| Radar sensor removed                  |    94.7     |     52      |    -     |    [Link](https://huggingface.co/ln2697/tfv6/tree/main/noradar_resnet34)    |
-| Vision only driving                   |    91.6     |     43      |    -     |  [Link](https://huggingface.co/ln2697/tfv6/tree/main/visiononly_resnet34)   |
+| Rear camera as additional input       |    95.1     |     53      |   TBD    |   [Link](https://huggingface.co/ln2697/tfv6/tree/main/4cameras_resnet34)    |
+| Radar sensor removed                  |    94.7     |     52      |   TBD    |    [Link](https://huggingface.co/ln2697/tfv6/tree/main/noradar_resnet34)    |
+| Vision only driving                   |    91.6     |     43      |   TBD    |  [Link](https://huggingface.co/ln2697/tfv6/tree/main/visiononly_resnet34)   |
 | Removed Town13 from training set      |    93.1     |     52      |   3.52   | [Link](https://huggingface.co/ln2697/tfv6/tree/main/town13heldout_resnet34) |
 
 **Table 1:** Performance of pre-trained checkpoints. We report Driving Score, for which higher is better.
@@ -246,7 +254,7 @@ The [Jupyter notebooks](notebooks) provide some example scripts to visualize the
     <img src="docs/assets/point_cloud_visualization.webp" width="49%" />
   </picture>
 
-  **Figure 2:** Example outputs of data visualization notebooks.
+  **Figure 2:** Plotting with visualization notebooks.
 
 </div>
 <br>
@@ -323,7 +331,7 @@ Post-training checkpoints will be saved to `outputs/local_training/posttrain`. W
     <img src="docs/assets/eval_wandb.png" />
   </picture>
 
-  **Figure 3:** Example WandB logging with training visualization.
+  **Figure 3:** WandB logging with debug plot.
 
 </div>
 <br>
@@ -392,6 +400,20 @@ For distributed evaluation across multiple routes and benchmarks, see the [SLURM
 
 </div>
 <br>
+
+## Project Structure
+
+The project is organized into several key directories:
+
+- **`lead`** - Main Python package containing model architecture, training, inference, and expert driver
+- **`3rd_party`** - Third-party dependencies (CARLA, benchmarks, evaluation tools)
+- **`data`** - Route definitions for training and evaluation. Sensor data will also be stored here.
+- **`scripts`** - Utility scripts for data processing, training, and evaluation
+- **`outputs`** - Model checkpoints, evaluation results, and visualizations
+- **`notebooks`** - Jupyter notebooks for data inspection and analysis
+- **`slurm`** - SLURM job scripts for large-scale experiments
+
+For a detailed breakdown of the codebase organization, see the [project structure documentation](https://ln2697.github.io/lead/docs/project_structure.html).
 
 ## Beyond CARLA: Cross-Benchmark Deployment
 

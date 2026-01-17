@@ -99,8 +99,8 @@ class Visualizer:
 
         # Bev
         self._bev_semantic(ground_truth=True)
-        # self._route()
-        # self._future_waypoints()
+        self._route()
+        self._future_waypoints()
         self._ego_bounding_box()
         self._bounding_boxes()
         self._target_point()
