@@ -70,6 +70,7 @@
                                     <select id="video-type" class="form-select">
                                         <option value="debug">Debug Video</option>
                                         <option value="demo">Demo Video</option>
+                                        <option value="grid">Grid Video</option>
                                     </select>
                                 </div>
                                 <div class="col-auto">
@@ -111,18 +112,33 @@
                             </video>
                         </div>
                         <div class="card-footer bg-white text-muted small">
-                            <div class="d-flex gap-3 align-items-center">
-                                <div class="d-flex align-items-center gap-1">
-                                    <i class="bi bi-clock"></i>
-                                    <input type="number" id="current-time" class="form-control form-control-sm" style="width: 80px;" step="0.05" min="0" placeholder="0.00" title="Time (seconds)"> s
+                            <div class="d-flex gap-3 align-items-center justify-content-between">
+                                <div class="d-flex gap-3 align-items-center">
+                                    <div class="d-flex align-items-center gap-1">
+                                        <i class="bi bi-clock"></i>
+                                        <input type="number" id="current-time" class="form-control form-control-sm" style="width: 80px;" step="0.05" min="0" placeholder="0.00" title="Time (seconds)"> s
+                                    </div>
+                                    <div class="d-flex align-items-center gap-1">
+                                        <i class="bi bi-film"></i> Frame:
+                                        <input type="number" id="current-frame" class="form-control form-control-sm" style="width: 70px;" step="1" min="0" placeholder="0" title="Frame number">
+                                    </div>
+                                    <div class="d-flex align-items-center gap-1">
+                                        <i class="bi bi-flag"></i> Step:
+                                        <input type="number" id="current-step" class="form-control form-control-sm" style="width: 70px;" step="1" min="0" placeholder="0" title="Step number">
+                                    </div>
                                 </div>
-                                <div class="d-flex align-items-center gap-1">
-                                    <i class="bi bi-film"></i> Frame:
-                                    <input type="number" id="current-frame" class="form-control form-control-sm" style="width: 70px;" step="1" min="0" placeholder="0" title="Frame number">
-                                </div>
-                                <div class="d-flex align-items-center gap-1">
-                                    <i class="bi bi-flag"></i> Step:
-                                    <input type="number" id="current-step" class="form-control form-control-sm" style="width: 70px;" step="1" min="0" placeholder="0" title="Step number">
+                                <div class="d-flex gap-2 align-items-center">
+                                    <div class="d-flex align-items-center gap-1">
+                                        <label class="mb-0">Start:</label>
+                                        <input type="text" id="cut-start" class="form-control form-control-sm" style="width: 70px;" value="0:00" placeholder="0:00" title="Start time (m:ss)">
+                                    </div>
+                                    <div class="d-flex align-items-center gap-1">
+                                        <label class="mb-0">Stop:</label>
+                                        <input type="text" id="cut-stop" class="form-control form-control-sm" style="width: 70px;" value="0:00" placeholder="0:00" title="Stop time (m:ss)">
+                                    </div>
+                                    <button id="cut-custom" class="btn btn-sm btn-outline-primary" title="Cut video from start to stop">
+                                        <i class="bi bi-scissors"></i> Cut
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -185,6 +201,21 @@
         let lastClickedInfractionStep = null; // Track the last clicked infraction step
         let shouldAutoScroll = false; // Flag to control auto-scroll behavior
         let showInfractionsOnly = false; // Filter to show only routes with infractions
+
+        // Helper function to parse minute:second format to seconds
+        function parseTimeString(timeStr) {
+            const parts = timeStr.split(':');
+            if (parts.length === 1) {
+                // Just seconds
+                return parseFloat(parts[0]) || 0;
+            } else if (parts.length === 2) {
+                // minute:second
+                const minutes = parseInt(parts[0]) || 0;
+                const seconds = parseFloat(parts[1]) || 0;
+                return minutes * 60 + seconds;
+            }
+            return 0;
+        }
 
         // DOM elements
         const outputDirInput = document.getElementById('output-dir');
@@ -334,6 +365,7 @@
                         </div>
                         <div class="text-muted small mt-1">
                             ${route.has_debug_video ? '<i class="bi bi-camera-video"></i> Debug ' : ''}
+                            ${route.has_grid_video ? '<i class="bi bi-grid-3x3"></i> Grid ' : ''}
                             ${route.has_demo_video ? '<i class="bi bi-play-circle"></i> Demo' : ''}
                             ${route.video_fps ? `<i class="bi bi-speedometer2"></i> ${route.video_fps.toFixed(1)} FPS` : ''}
                         </div>
@@ -378,13 +410,15 @@
             // Find route data to check video availability
             const routeData = routesData.find(r => r.name === routeName);
 
-            // Set default video type: prefer demo if exists, otherwise debug
+            // Set default video type: prefer debug, then grid, then demo
             let videoType = videoTypeSelect.value;
             if (routeData) {
-                if (routeData.has_demo_video) {
-                    videoType = 'demo';
-                } else if (routeData.has_debug_video) {
+                if (routeData.has_debug_video) {
                     videoType = 'debug';
+                } else if (routeData.has_grid_video) {
+                    videoType = 'grid';
+                } else if (routeData.has_demo_video) {
+                    videoType = 'demo';
                 }
                 videoTypeSelect.value = videoType;
             }
@@ -929,6 +963,68 @@
                 // Update stats to reflect filtered view
                 const filteredRoutes = showInfractionsOnly ? routesData.filter(r => r.infraction_count > 0) : routesData;
                 updateRouteStats(filteredRoutes);
+            }
+        });
+
+        // Custom cut functionality
+        document.getElementById('cut-custom').addEventListener('click', async () => {
+            if (!currentRoute || !videoPlayer.src) {
+                alert('No route or video loaded');
+                return;
+            }
+
+            const startInput = document.getElementById('cut-start').value.trim();
+            const stopInput = document.getElementById('cut-stop').value.trim();
+
+            if (!startInput || !stopInput) {
+                alert('Please enter both start and stop times');
+                return;
+            }
+
+            const startTime = parseTimeString(startInput);
+            const stopTime = parseTimeString(stopInput);
+
+            if (startTime >= stopTime) {
+                alert('Start time must be before stop time');
+                return;
+            }
+
+            const videoType = videoTypeSelect.value;
+            const dir = currentDirectory || outputDirInput.value.trim();
+
+            // Show loading indicator
+            const button = document.getElementById('cut-custom');
+            const originalHTML = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+            try {
+                const response = await fetch('/api/cut_custom_video', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        route_name: currentRoute,
+                        video_type: videoType,
+                        start_time: startTime,
+                        stop_time: stopTime,
+                        output_dir: dir
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    alert('Error cutting video: ' + data.error);
+                } else {
+                    console.log('Video saved to:', data.output_path);
+                }
+            } catch (error) {
+                alert('Error cutting video: ' + error.message);
+            } finally {
+                button.disabled = false;
+                button.innerHTML = originalHTML;
             }
         });
 

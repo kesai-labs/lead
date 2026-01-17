@@ -1,4 +1,3 @@
-import copy
 import json
 import logging
 import os
@@ -12,7 +11,6 @@ import jaxtyping as jt
 import matplotlib
 import numpy as np
 import numpy.typing as npt
-import PIL
 import torch
 from beartype import beartype
 from leaderboard.autoagents import autonomous_agent
@@ -32,6 +30,7 @@ from lead.inference.closed_loop_inference import (
     ClosedLoopPrediction,
 )
 from lead.inference.config_closed_loop import ClosedLoopConfig
+from lead.inference.video_recorder import VideoRecorder
 from lead.training.config_training import TrainingConfig
 
 matplotlib.use("Agg")  # non-GUI backend for headless servers
@@ -44,37 +43,6 @@ torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.allow_tf32 = True
-
-DEMO_CAMERAS = [
-    {
-        "name": "cinematic_camera",
-        "draw_target_points": False,
-        "draw_planning": False,
-        "image_size_x": "960",
-        "image_size_y": "1080",
-        "fov": "100",
-        "x": -6.5,
-        "y": -0.0,
-        "z": 6.0,
-        "pitch": -30.0,
-        "yaw": 0.0,
-    },
-    {
-        "name": "bev_camera",
-        "draw_target_points": False,
-        "draw_planning": True,
-        "image_size_x": "960",
-        "image_size_y": "1080",
-        "fov": "100",
-        "x": 0.0,
-        "y": 0.0,
-        "z": 22.0,
-        "pitch": -90.0,
-        "yaw": 0.0,
-    },
-]
-
-assert len(DEMO_CAMERAS) == 2, "Expected exactly two demo cameras."
 
 
 def get_entry_point():  # dead: disable
@@ -101,6 +69,9 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
 
         # Generate new config for the case that it has new variables.
         self.training_config = TrainingConfig(json_config)
+
+        # Store training config in base class for Kalman filter decision
+        # This is accessed by BaseAgent._use_kalman_filter()
 
         # Load model files
         self.closed_loop_inference = ClosedLoopInference(
@@ -143,65 +114,14 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         self._vehicle: carla.Actor = CarlaDataProvider.get_hero_actor()
         self._world: carla.World = self._vehicle.get_world()
 
-        # Set up cameras
-        if self.config_closed_loop.save_path is not None:
-            if self.config_closed_loop.produce_debug_video:
-                self.debug_video_writer = None
-
-            # Initialize input video writer
-            if self.config_closed_loop.produce_input_video:
-                self.input_video_writer = None
-
-            if self.config_closed_loop.produce_demo_video or self.config_closed_loop.produce_demo_image:
-                self.demo_video_writer = None
-                self._demo_cameras = []
-                self._demo_camera_images = {}  # Store latest images from demo cameras
-                bp_lib = self._world.get_blueprint_library()
-                for idx, camera_config in enumerate(DEMO_CAMERAS, start=1):
-                    camera_bp = bp_lib.find("sensor.camera.rgb")
-                    camera_bp.set_attribute("image_size_x", camera_config["image_size_x"])
-                    camera_bp.set_attribute("image_size_y", camera_config["image_size_y"])
-                    camera_bp.set_attribute("fov", camera_config["fov"])
-                    camera_bp.set_attribute("motion_blur_intensity", "0.0")
-
-                    # Create transform for this demo camera
-                    demo_camera_location = carla.Location(
-                        x=camera_config["x"],
-                        y=camera_config["y"],
-                        z=camera_config["z"],
-                    )
-                    world_camera_location = common_utils.get_world_coordinate_2d(
-                        self._vehicle.get_transform(), demo_camera_location
-                    )
-                    demo_camera_transform = carla.Transform(
-                        world_camera_location,
-                        carla.Rotation(
-                            pitch=camera_config["pitch"],
-                            yaw=self._vehicle.get_transform().rotation.yaw + camera_config["yaw"],
-                        ),
-                    )
-
-                    demo_camera = self._world.spawn_actor(camera_bp, demo_camera_transform)
-
-                    # Create callback to store image in buffer
-                    def _make_image_callback(camera_idx):
-                        def _store_image(image):
-                            array = np.frombuffer(image.raw_data, dtype=np.uint8)
-                            array = copy.deepcopy(array)
-                            array = np.reshape(array, (image.height, image.width, 4))
-                            bgr = array[:, :, :3]
-                            self._demo_camera_images[camera_idx] = bgr
-
-                        return _store_image
-
-                    demo_camera.listen(_make_image_callback(idx))
-                    self._demo_cameras.append(
-                        {
-                            "camera": demo_camera,
-                            "config": camera_config,
-                            "index": idx,
-                        }
-                    )
+        # Set up video recorder
+        self.video_recorder = VideoRecorder(
+            config_closed_loop=self.config_closed_loop,
+            vehicle=self._vehicle,
+            world=self._world,
+            step_counter=self.step,
+            training_config=self.training_config,
+        )
 
         self.set_weather()
         self.initialized = True
@@ -242,223 +162,6 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
             perturbation_rotation=0.0,
             perturbation_translation=0.0,
         )
-
-    @beartype
-    def move_demo_cameras_with_ego(self) -> None:
-        """Update demo camera transforms to follow ego vehicle position and orientation."""
-        if self.config_closed_loop.save_path is None or not (
-            self.config_closed_loop.produce_demo_video or self.config_closed_loop.produce_demo_image
-        ):
-            return
-
-        for demo_cam_info in self._demo_cameras:
-            if demo_cam_info["camera"].is_alive:
-                camera_config = demo_cam_info["config"]
-                demo_camera_location = carla.Location(
-                    x=camera_config["x"],
-                    y=camera_config["y"],
-                    z=camera_config["z"],
-                )
-                world_camera_location = common_utils.get_world_coordinate_2d(
-                    self._vehicle.get_transform(), demo_camera_location
-                )
-                demo_camera_transform = carla.Transform(
-                    world_camera_location,
-                    carla.Rotation(
-                        pitch=camera_config["pitch"],
-                        yaw=self._vehicle.get_transform().rotation.yaw + camera_config["yaw"],
-                    ),
-                )
-                demo_cam_info["camera"].set_transform(demo_camera_transform)
-
-    @beartype
-    def save_demo_cameras(
-        self,
-        pred_waypoints: jt.Float[torch.Tensor, "n_waypoints 2"] | None = None,
-        target_points: dict[str, jt.Float[npt.NDArray, " 2"] | None] | None = None,
-    ) -> None:
-        """Save concatenated demo cameras (cinematic + BEV) as single JPG/video.
-
-        Args:
-            pred_waypoints: Waypoints in vehicle coords, shape (n_waypoints, 2) with (x, y) in meters.
-            target_points: Route targets {'previous': (x,y), 'current': (x,y), 'next': (x,y)}.
-        """
-        if self.config_closed_loop.save_path is None or not (
-            self.config_closed_loop.produce_demo_video or self.config_closed_loop.produce_demo_image
-        ):
-            return
-
-        processed_images = []
-        for camera_idx in sorted(self._demo_camera_images.keys()):
-            image = self._demo_camera_images[camera_idx]
-            camera_config = DEMO_CAMERAS[camera_idx - 1]  # camera_idx is 1-based
-            camera_name = camera_config.get("name", f"demo_{camera_idx}")
-            draw_target_points = camera_config.get("draw_target_points", False)
-            draw_planning = camera_config.get("draw_planning", False)
-
-            processed_image = image.copy()
-
-            # Add visualizations if enabled
-            if draw_planning and pred_waypoints is not None:
-                processed_image = self.draw_waypoints(processed_image, pred_waypoints, camera_config)
-            if draw_target_points and target_points is not None and camera_name == "bev_camera":
-                processed_image = self.draw_target_points(processed_image, target_points, camera_config)
-
-            processed_images.append(processed_image)
-
-        # Concatenate horizontally: [cinematic | BEV]
-        concatenated = np.hstack(processed_images)
-
-        # Save as PNG for demo (higher quality for presentation)
-        if self.config_closed_loop.produce_demo_image:
-            save_path_demo = str(self.config_closed_loop.save_path / "demo_images")
-            os.makedirs(save_path_demo, exist_ok=True)
-            PIL.Image.fromarray(cv2.cvtColor(concatenated, cv2.COLOR_BGR2RGB)).save(
-                f"{save_path_demo}/{str(self.step).zfill(5)}.png",
-                optimize=False,
-                compress_level=0,  # Really space expensive, do this local only.
-            )
-
-        # Add to demo video if enabled
-        if self.config_closed_loop.produce_demo_video and self.step % self.config_closed_loop.produce_frame_frequency == 0:
-            if self.demo_video_writer is None:
-                os.makedirs(os.path.dirname(self.config_closed_loop.demo_video_path), exist_ok=True)
-                self.demo_video_writer = cv2.VideoWriter(
-                    self.config_closed_loop.demo_video_path,
-                    cv2.VideoWriter_fourcc(*"mp4v"),
-                    self.config_closed_loop.video_fps,
-                    (concatenated.shape[1], concatenated.shape[0]),
-                )
-            self.demo_video_writer.write(concatenated)
-
-    @beartype
-    def draw_waypoints(
-        self,
-        image: jt.UInt8[npt.NDArray, "height width 3"],
-        pred_waypoints: jt.Float[torch.Tensor, "n_waypoints 2"],
-        camera_config: dict[str, str | float | bool],
-    ) -> jt.UInt8[npt.NDArray, "height width 3"]:
-        """Project and draw waypoints from vehicle to image coordinates.
-
-        Args:
-            image: BGR image, shape (height, width, 3).
-            pred_waypoints: Waypoints in vehicle coords, shape (n_waypoints, 2) with (x, y) in meters.
-            camera_config: Camera params {'x','y','z','pitch','yaw','fov'}.
-
-        Returns:
-            Image copy with yellow waypoints and connecting lines.
-        """
-        img_with_viz = image.copy()
-        camera_height = image.shape[0]
-        camera_width = image.shape[1]
-
-        # Extract camera parameters from config
-        camera_fov = float(camera_config["fov"])
-        camera_pos = [camera_config["x"], camera_config["y"], camera_config["z"]]
-        camera_rot = [0.0, camera_config["pitch"], camera_config["yaw"]]  # roll, pitch, yaw
-
-        # Draw route in blue
-        if pred_waypoints is not None and len(pred_waypoints) > 0:
-            route_points = pred_waypoints.detach().cpu().float().numpy()
-            projected_route, points_inside_image = common_utils.project_points_to_image(
-                camera_rot, camera_pos, camera_fov, camera_width, camera_height, route_points
-            )
-
-            # Draw circles for waypoints
-            for pt, inside in zip(projected_route, points_inside_image, strict=True):
-                if inside:
-                    cv2.circle(
-                        img_with_viz,
-                        (int(pt[0]), int(pt[1])),
-                        radius=3,
-                        color=(255, 255, 0),
-                        thickness=-1,  # Red in BGR
-                        lineType=cv2.LINE_AA,
-                    )
-            # # Draw connected line for route
-            for i in range(len(projected_route) - 1):
-                pt1, inside1 = projected_route[i], points_inside_image[i]
-                pt2, inside2 = projected_route[i + 1], points_inside_image[i + 1]
-                if inside1 and inside2:
-                    cv2.line(
-                        img_with_viz,
-                        (int(pt1[0]), int(pt1[1])),
-                        (int(pt2[0]), int(pt2[1])),
-                        (255, 255, 0),  # Blue in BGR
-                        thickness=2,
-                        lineType=cv2.LINE_AA,
-                    )
-
-        return img_with_viz
-
-    @beartype
-    def draw_target_points(
-        self,
-        image: jt.UInt8[npt.NDArray, "height width 3"],
-        target_points: dict[str, jt.Float[npt.NDArray, " 2"] | None],
-        camera_config: dict[str, str | float | bool],
-    ) -> jt.UInt8[npt.NDArray, "height width 3"]:
-        """Project and draw route target points (previous/current/next) as red circles.
-
-        Args:
-            image: BGR image, shape (height, width, 3).
-            target_points: Route targets {'previous': (x,y), 'current': (x,y), 'next': (x,y)} in vehicle coords (meters).
-            camera_config: Camera params {'x','y','z','pitch','yaw','fov'}.
-
-        Returns:
-            Image copy with red target point circles.
-        """
-        img_with_targets = image.copy()
-        camera_height = image.shape[0]
-        camera_width = image.shape[1]
-
-        # Extract camera parameters from config
-        camera_fov = float(camera_config["fov"])
-        camera_pos = [camera_config["x"], camera_config["y"], camera_config["z"]]
-        camera_rot = [0.0, camera_config["pitch"], camera_config["yaw"]]
-
-        # Define colors and sizes for each target point (BGR format)
-        targets_config = [
-            ("previous", (0, 0, 255), 3),  # Gray, smaller square
-            ("current", (0, 0, 255), 3),  # Green, bigger square
-            ("next", (0, 0, 255), 3),  # Cyan, smaller square
-        ]
-
-        for key, color, size in targets_config:
-            if key in target_points and target_points[key] is not None:
-                # Get target point in vehicle coordinates
-                target_point = np.array([[target_points[key][0], target_points[key][1]]])
-
-                # Project to image
-                projected, points_inside_image = common_utils.project_points_to_image(
-                    camera_rot, camera_pos, camera_fov, camera_width, camera_height, target_point
-                )
-
-                if len(projected) > 0:
-                    pt, inside = projected[0], points_inside_image[0]
-                    if inside:
-                        # Draw square (rectangle with equal width and height)
-                        x, y = int(pt[0]), int(pt[1])
-                        cv2.circle(
-                            img_with_targets,
-                            (x, y),
-                            size + 1,
-                            (255, 255, 255),
-                            thickness=-1,
-                            lineType=cv2.LINE_AA,
-                        )
-
-                        # Filled colored circle
-                        cv2.circle(
-                            img_with_targets,
-                            (x, y),
-                            size,
-                            color,
-                            thickness=-1,
-                            lineType=cv2.LINE_AA,
-                        )
-
-        return img_with_targets
 
     def check_infractions(self) -> None:
         """Check for infractions that occurred in the current step and log them.
@@ -544,7 +247,11 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
 
         @beartype
         def transform(point: list[float]) -> jt.Float[npt.NDArray, " 2"]:
-            return common_utils.inverse_conversion_2d(np.array(point), np.array(self.filtered_state[:2]), self.compass)
+            # Use filtered or noisy position based on training config
+            ego_position = (
+                self.filtered_state[:2] if self.training_config.use_kalman_filter_for_gps else input_data["noisy_state"][:2]
+            )
+            return common_utils.inverse_conversion_2d(np.array(point), np.array(ego_position), self.compass)
 
         previous_target_points = [tp.tolist() for tp in planner.previous_target_points]
         next_target_points = [tp[0].tolist() for tp in planner.route]
@@ -580,7 +287,7 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
     @torch.inference_mode()
     def tick(self, input_data: dict) -> dict:
         """Pre-processes sensor data"""
-        input_data = super().tick(input_data)
+        input_data = super().tick(input_data, use_kalman_filter=self.training_config.use_kalman_filter_for_gps)
 
         # Simulate JPEG compression to avoid train-test mismatch
         rgb = input_data["rgb"]
@@ -685,11 +392,10 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
             input_data = self.tick(input_data)
             return self.control
 
-        # Update demo cameras
-        if self.config_closed_loop.save_path is not None and (
-            self.config_closed_loop.produce_demo_video or self.config_closed_loop.produce_demo_image
-        ):
-            self.move_demo_cameras_with_ego()
+        # Update video recorder step and demo cameras
+        if hasattr(self, "video_recorder"):
+            self.video_recorder.update_step(self.step)
+            self.video_recorder.move_demo_cameras_with_ego()
 
         # Need to run this every step for GPS filtering
         input_data = self.tick(input_data)
@@ -769,29 +475,11 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         if self.config_closed_loop.save_path is not None and self.step % self.config_closed_loop.produce_frame_frequency == 0:
             # Get the RGB image for visualization (before JPEG compression)
             input_image = input_data["original_rgb"].copy()
-            input_image_rgb = cv2.cvtColor(input_image, cv2.COLOR_BGR2RGB)
 
-            # Save input image as PNG
-            if self.config_closed_loop.produce_input_image:
-                save_path_input = str(self.config_closed_loop.save_path / "input_images")
-                os.makedirs(save_path_input, exist_ok=True)
-                PIL.Image.fromarray(input_image_rgb).save(
-                    f"{save_path_input}/{str(self.step).zfill(5)}.png",
-                    optimize=True,
-                    compress_level=0,
-                )
-
-            # Add to input video
-            if self.config_closed_loop.produce_input_video and self.step % self.config_closed_loop.produce_frame_frequency == 0:
-                if self.input_video_writer is None:
-                    os.makedirs(os.path.dirname(self.config_closed_loop.input_video_path), exist_ok=True)
-                    self.input_video_writer = cv2.VideoWriter(
-                        self.config_closed_loop.input_video_path,
-                        cv2.VideoWriter_fourcc(*"mp4v"),
-                        self.config_closed_loop.video_fps,
-                        (input_image.shape[1], input_image.shape[0]),
-                    )
-                self.input_video_writer.write(input_image)
+            # Save input image and video using VideoRecorder
+            if hasattr(self, "video_recorder"):
+                self.video_recorder.save_input_image(input_image)
+                self.video_recorder.save_input_video_frame(input_image)
 
         # Save demo images
         if self.config_closed_loop.save_path is not None and self.step % self.config_closed_loop.produce_frame_frequency == 0:
@@ -809,8 +497,14 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
                 "next": input_data.get("target_point_next"),
             }
 
-            # Save demo cameras with visualization
-            self.save_demo_cameras(pred_waypoints, target_points)
+            # Save demo cameras with visualization using VideoRecorder
+            if hasattr(self, "video_recorder"):
+                self.video_recorder.save_demo_cameras(pred_waypoints, target_points)
+                # Save grid (demo + input stacked vertically) with planning visualization
+                self.video_recorder.save_grid_image_and_video(
+                    pred_waypoints=pred_waypoints,
+                    target_points=target_points,
+                )
 
         # Save abstract debug images
         if (
@@ -828,28 +522,10 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
             ).visualize_inference_prediction()
             image = np.array(image).astype(np.uint8)
 
-            # Save image as video
-            if self.config_closed_loop.produce_debug_video:
-                if self.debug_video_writer is None:
-                    os.makedirs(os.path.dirname(self.config_closed_loop.debug_video_path), exist_ok=True)
-                    self.debug_video_writer = cv2.VideoWriter(
-                        str(self.config_closed_loop.debug_video_path),
-                        cv2.VideoWriter_fourcc(*"mp4v"),
-                        self.config_closed_loop.video_fps,
-                        (image.shape[1], image.shape[0]),
-                    )
-
-                self.debug_video_writer.write(cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
-
-            # Save image as png
-            if self.config_closed_loop.produce_debug_image:
-                save_dir = self.config_closed_loop.save_path / "debug_images"
-                os.makedirs(save_dir, exist_ok=True)
-                PIL.Image.fromarray(image).save(
-                    f"{save_dir}/{str(self.step).zfill(5)}.png",
-                    optimize=False,
-                    compress_level=0,  # Really space expensive, do this local only.
-                )
+            # Save debug image and video using VideoRecorder
+            if hasattr(self, "video_recorder"):
+                self.video_recorder.save_debug_video_frame(image)
+                self.video_recorder.save_debug_image(image)
 
         # Save metric info if in Bench2Drive mode
         if self.config_closed_loop.is_bench2drive and hasattr(self, "get_metric_info"):
@@ -860,64 +536,9 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         return self.control
 
     def destroy(self, _=None):
-        # Clean up demo cameras
-        if hasattr(self, "_demo_cameras"):
-            for demo_cam_info in self._demo_cameras:
-                if demo_cam_info["camera"].is_alive:
-                    demo_cam_info["camera"].stop()
-                    demo_cam_info["camera"].destroy()
-                    LOG.info(f"[SensorAgent] Destroyed demo camera {demo_cam_info['index']}")
-
-        # Clean up video writers
-        if self.config_closed_loop.save_path is not None:
-            # Input video - high quality for presentation
-            if (
-                self.config_closed_loop.produce_input_video
-                and hasattr(self, "input_video_writer")
-                and self.input_video_writer is not None
-            ):
-                self.input_video_writer.release()
-                self.compress_video(
-                    temp_path=self.config_closed_loop.temp_input_video_path,
-                    final_path=self.config_closed_loop.input_video_path,
-                    crf=18,
-                    preset="slow",
-                )
-
-            if self.config_closed_loop.produce_debug_video:
-                # Debug video - low quality for disk space
-                self.debug_video_writer.release()
-                self.compress_video(
-                    temp_path=self.config_closed_loop.temp_debug_video_path,
-                    final_path=self.config_closed_loop.debug_video_path,
-                    crf=38,
-                    preset="veryslow",
-                )
-
-            # Demo video - high quality for presentation
-            if self.config_closed_loop.produce_demo_video:
-                self.demo_video_writer.release()
-                self.compress_video(
-                    temp_path=self.config_closed_loop.temp_demo_video_path,
-                    final_path=self.config_closed_loop.demo_video_path,
-                    crf=18,
-                    preset="slow",
-                )
-
-    @beartype
-    def compress_video(self, temp_path: str, final_path: str, crf: int, preset: str):
-        """Compresses a video using ffmpeg.
-
-        Args:
-            temp_path: Path to the uncompressed video.
-            final_path: Path to save the compressed video.
-            crf: Constant Rate Factor for ffmpeg compression (lower is better quality).
-            preset: Preset for ffmpeg compression speed/quality trade-off.
-        """
-        # Check if ffmpeg is installed
-        command = f"ffmpeg -i {final_path} -c:v libx264 -crf {crf} -preset {preset} -an {temp_path} -y"
-        os.system(command)
-        os.replace(temp_path, final_path)
+        # Clean up video recorder
+        if hasattr(self, "video_recorder"):
+            self.video_recorder.cleanup_and_compress()
 
 
 class ForceMovePostProcessor:

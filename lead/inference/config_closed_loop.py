@@ -152,6 +152,20 @@ class ClosedLoopConfig(OpenLoopConfig):
         return False
 
     @overridable_property
+    def produce_grid_image(self):
+        """If true produce grid image output (demo + input stacked vertically)."""
+        if self.is_on_slurm:
+            return False
+        return True
+
+    @overridable_property
+    def produce_grid_video(self):
+        """If true produce grid video output (demo + input stacked vertically)."""
+        if self.is_on_slurm:
+            return False
+        return True
+
+    @overridable_property
     def produce_input_log(self):
         """If true produce input logging."""
         if self.is_on_slurm:
@@ -213,6 +227,16 @@ class ClosedLoopConfig(OpenLoopConfig):
     def temp_input_video_path(self):
         """Get the path for temporary input video output."""
         return os.path.join(self.save_path, f"{self.route_id}_input_temp.mp4")
+
+    @property
+    def grid_video_path(self):
+        """Get the path for grid video output."""
+        return os.path.join(self.save_path, f"{self.route_id}_grid.mp4")
+
+    @property
+    def temp_grid_video_path(self):
+        """Get the path for temporary grid video output."""
+        return os.path.join(self.save_path, f"{self.route_id}_grid_temp.mp4")
 
     @overridable_property
     def video_fps(self):

@@ -53,7 +53,7 @@ class BaseAgent:
             self.gps_waypoint_planners_dict[dist] = planner
 
     @beartype
-    def tick(self, input_data: dict) -> dict:
+    def tick(self, input_data: dict, use_kalman_filter: bool = True) -> dict:
         # Get the vehicle's speed from sensor
         speed = input_data["speed"][1]["speed"]
         self.speeds_queue.append(speed)
@@ -72,8 +72,11 @@ class BaseAgent:
         )
         self.smooth_history = self.kalman_filter.smooth()
         self.filtered_history = np.array([self.kalman_filter.history_x]).reshape(-1, 4)[:, :2]
+
+        # Use filtered or noisy position based on config (for sensor agents at inference time)
+        position_for_planner = self.filtered_state[:2] if use_kalman_filter else noisy_gps_pos[:2]
         for planner in self.gps_waypoint_planners_dict.values():
-            planner.run_step(np.append(self.filtered_state[:2], noisy_gps_pos[2]))
+            planner.run_step(np.append(position_for_planner, noisy_gps_pos[2]))
 
         # Create a dictionary containing the vehicle's state
         input_data.update(

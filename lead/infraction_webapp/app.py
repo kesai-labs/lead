@@ -67,15 +67,17 @@ def list_routes():
             has_infractions = (route_dir / "infractions.json").exists()
             has_debug = (route_dir / f"{route_name}_debug.mp4").exists()
             has_demo = (route_dir / f"{route_name}_demo.mp4").exists()
+            has_grid = (route_dir / f"{route_name}_grid.mp4").exists()
             has_checkpoint = (route_dir / "checkpoint_endpoint.json").exists()
 
-            if has_infractions or has_debug or has_demo:
+            if has_infractions or has_debug or has_demo or has_grid:
                 route_info = {
                     "name": route_name,
                     "path": str(route_dir),
                     "has_infractions": has_infractions,
                     "has_debug_video": has_debug,
                     "has_demo_video": has_demo,
+                    "has_grid_video": has_grid,
                     "has_checkpoint": has_checkpoint,
                 }
 
@@ -175,6 +177,7 @@ def serve_video(route_name, video_type):
     video_files = {
         "debug": f"{route_name}_debug.mp4",
         "demo": f"{route_name}_demo.mp4",
+        "grid": f"{route_name}_grid.mp4",
     }
 
     if video_type not in video_files:
@@ -273,6 +276,7 @@ def cut_video():
     video_files = {
         "debug": f"{route_name}_debug.mp4",
         "demo": f"{route_name}_demo.mp4",
+        "grid": f"{route_name}_grid.mp4",
     }
 
     if video_type not in video_files:
@@ -321,6 +325,93 @@ def cut_video():
 
     except subprocess.CalledProcessError as e:
         return jsonify({"error": f"FFmpeg error: {e.stderr}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/cut_custom_video", methods=["POST"])
+def cut_custom_video():
+    """Cut a custom video segment between start and stop times."""
+    data = request.json
+    route_name = data.get("route_name")
+    video_type = data.get("video_type")
+    start_time = data.get("start_time")
+    stop_time = data.get("stop_time")
+    output_dir = data.get("output_dir", DEFAULT_OUTPUT_DIR)
+
+    if not all([route_name, video_type, start_time is not None, stop_time is not None]):
+        return jsonify({"error": "Missing required parameters"}), 400
+
+    route_path = Path(output_dir) / route_name
+
+    # Get input video file
+    video_files = {
+        "debug": f"{route_name}_debug.mp4",
+        "demo": f"{route_name}_demo.mp4",
+        "grid": f"{route_name}_grid.mp4",
+    }
+
+    if video_type not in video_files:
+        return jsonify({"error": "Invalid video type"}), 400
+
+    input_video = route_path / video_files[video_type]
+
+    if not input_video.exists():
+        return jsonify({"error": "Video file not found"}), 404
+
+    # Find next available number for output file
+    desktop_path = Path.home() / "Desktop"
+    desktop_path.mkdir(exist_ok=True)
+
+    counter = 1
+    while True:
+        output_filename = f"{counter:03d}.mp4"
+        output_path = desktop_path / output_filename
+        if not output_path.exists():
+            break
+        counter += 1
+
+    duration = stop_time - start_time
+
+    try:
+        import subprocess
+
+        # Use ffmpeg with re-encoding for precise cuts and consistent quality
+        cmd = [
+            "ffmpeg",
+            "-y",  # Overwrite output file
+            "-ss",
+            str(start_time),
+            "-i",
+            str(input_video),
+            "-t",
+            str(duration),
+            "-c:v",
+            "libx264",  # H.264 video codec
+            "-crf",
+            "18",  # High quality (0-51, lower is better, 18 is visually lossless)
+            "-preset",
+            "fast",  # Faster preset (fast, medium, slow)
+            "-c:a",
+            "aac",  # AAC audio codec
+            "-b:a",
+            "192k",  # Audio bitrate
+            str(output_path),
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=120)
+
+        return jsonify(
+            {
+                "success": True,
+                "output_path": str(output_path),
+                "filename": output_filename,
+                "duration": duration,
+            }
+        )
+
+    except subprocess.CalledProcessError as e:
+        return jsonify({"error": f"ffmpeg failed: {e.stderr}"}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

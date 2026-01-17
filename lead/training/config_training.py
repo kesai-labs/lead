@@ -530,7 +530,7 @@ class TrainingConfig(BaseConfig):
             return 4
         raise ValueError("Unknown target dataset. Not sure how many discrete commands there are.")
 
-    # If true add noise to target points for robustness.
+    # If true train model with noisy target points. The level of noise depends on use_kalman_filter_for_gps.
     use_noisy_tp = False
     # If true, use the Kalman filter for less noisy ego state estimation.
     use_kalman_filter_for_gps = True
@@ -1021,7 +1021,7 @@ class TrainingConfig(BaseConfig):
     def workers_per_cpu_cores(self):
         """Number of data loader workers per CPU core."""
         if not self.mixed_data_training and not self.use_carla_data:
-            return 2 
+            return 2
         return 2
 
     def training_dict(self) -> dict[str, Any]:
