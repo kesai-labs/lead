@@ -1,8 +1,8 @@
 #!/usr/bin/bash
 
-source slurm/inits.sh
+source slurm/init.sh
 
-export TRAINING_CONFIG="$TRAINING_CONFIG use_planning_decoder=true"
-posttrain outputs/training/734_scaled_resnet34/000_pretrain1_0/251018_093017
+export TRAINING_CONFIG="$TRAINING_CONFIG use_planning_decoder=true orizontal_fov_reduction=250"
+posttrain outputs/training/005_tfv5_rig/000_pretrain1_0/260117_121230
 
 train --cpus-per-task=64 --partition=L40Sday --time=3-00:00:00 --gres=gpu:4

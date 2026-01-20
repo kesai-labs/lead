@@ -18,6 +18,7 @@ from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
 
 from lead.common import common_utils
 from lead.common.base_agent import BaseAgent
+from lead.common.constants import TransfuserBoundingBoxClass
 from lead.common.logging_config import setup_logging
 from lead.common.route_planner import RoutePlanner
 from lead.common.sensor_setup import av_sensor_setup
@@ -85,6 +86,11 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
 
         # Post-processing heuristics
         self.bb_buffer = deque(maxlen=1)
+        self.stop_sign_post_processor = StopSignPostProcessor(
+            config=self.training_config,
+            config_test_time=self.config_closed_loop,
+            bb_buffer=self.bb_buffer,
+        )
         self.force_move_post_processor = ForceMovePostProcessor(
             config=self.training_config, config_test_time=self.config_closed_loop, lidar_queue=self.lidar_pc_queue
         )
@@ -249,7 +255,7 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         def transform(point: list[float]) -> jt.Float[npt.NDArray, " 2"]:
             # Use filtered or noisy position based on training config
             ego_position = (
-                self.filtered_state[:2] if self.training_config.use_kalman_filter_for_gps else input_data["noisy_state"][:2]
+                self.filtered_state[:2] if self.config_closed_loop.use_kalman_filter else input_data["noisy_state"][:2]
             )
             return common_utils.inverse_conversion_2d(np.array(point), np.array(ego_position), self.compass)
 
@@ -437,7 +443,13 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
             self.bb_buffer.append(closed_loop_prediction.pred_bounding_box_vehicle_system)
 
         # Post-processing heuristic
+        self.stop_sign_post_processor.update_stop_box(
+            self.ego_past_positions[-2][0], self.ego_past_positions[-2][1], self.ego_past_yaws[-2], 0.0, 0.0, 0.0
+        )
         closed_loop_prediction.throttle, closed_loop_prediction.brake = self.force_move_post_processor.adjust(
+            input_data["speed"].item(), closed_loop_prediction.throttle, closed_loop_prediction.brake
+        )
+        closed_loop_prediction.throttle, closed_loop_prediction.brake = self.stop_sign_post_processor.adjust(
             input_data["speed"].item(), closed_loop_prediction.throttle, closed_loop_prediction.brake
         )
         self.meters_travelled += input_data["speed"].item() * self.config_closed_loop.carla_frame_rate
@@ -462,6 +474,13 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
                 "steer": torch.Tensor([self.control.steer]),
                 "throttle": torch.Tensor([self.control.throttle]),
                 "brake": torch.Tensor([self.control.brake]),
+                "distance_to_stop_sign": torch.Tensor(
+                    [
+                        self.stop_sign_post_processor.stop_sign_buffer[0].norm
+                        if len(self.stop_sign_post_processor.stop_sign_buffer) > 0
+                        else np.inf
+                    ]
+                ),
                 "stuck_detector": torch.Tensor([self.force_move_post_processor.stuck_detector]),
                 "force_move": torch.Tensor([self.force_move_post_processor.force_move]),
                 "route_curvature": torch.Tensor(
@@ -539,6 +558,106 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         # Clean up video recorder
         if hasattr(self, "video_recorder"):
             self.video_recorder.cleanup_and_compress()
+
+
+class StopSignPostProcessor:
+    """Heuristics to obey stop sign law."""
+
+    @beartype
+    def __init__(
+        self,
+        config: TrainingConfig,
+        config_test_time: ClosedLoopConfig,
+        bb_buffer: deque,
+    ):
+        self.config = config
+        self.config_test_time = config_test_time
+        self.bb_buffer = bb_buffer
+        self.stop_sign_buffer: deque = deque(maxlen=1)
+        self.clear_stop_sign_cool_down = 0  # Counter if we recently cleared a stop sign
+        self.slower_stop_sign_count = 0
+        self.slower_for_stop_sign_cool_down = 0
+
+    @beartype
+    def adjust(self, ego_speed: float, current_throttle: float, current_brake: float):
+        """Checks whether the car is intersecting with one of the detected stop signs"""
+        if not self.config_test_time.slower_for_stop_sign or len(self.bb_buffer) == 0:
+            # LOG.info("No bounding box")
+            return current_throttle, current_brake
+
+        if self.clear_stop_sign_cool_down > 0:
+            self.clear_stop_sign_cool_down -= 1
+        if self.slower_for_stop_sign_cool_down > 0:
+            self.slower_for_stop_sign_cool_down -= 1
+        stop_sign_stop_predicted = False
+
+        for bb in self.bb_buffer[-1]:
+            if bb.clazz == TransfuserBoundingBoxClass.STOP_SIGN:  # Stop sign detected
+                # LOG.info("Stop sign detected.")
+                self.stop_sign_buffer.append(bb)
+
+        if len(self.stop_sign_buffer) > 0:
+            # Check if we need to stop
+            stop_box = self.stop_sign_buffer[0]
+            stop_origin = carla.Location(x=stop_box.x, y=stop_box.y, z=0.0)
+            stop_extent = carla.Vector3D(stop_box.w, stop_box.h, 1.0)
+            stop_carla_box = carla.BoundingBox(stop_origin, stop_extent)
+            stop_carla_box.rotation = carla.Rotation(0.0, np.rad2deg(stop_box.yaw), 0.0)
+
+            stop_sign_distance = np.linalg.norm([stop_box.x, stop_box.y])
+            boxes_intersect = stop_sign_distance < self.config_test_time.slower_for_stop_sign_dist_threshold
+            if boxes_intersect and self.clear_stop_sign_cool_down <= 0:
+                if ego_speed > 0.01:
+                    # LOG.info("Stop sign intersection detected.")
+                    stop_sign_stop_predicted = True
+                else:
+                    # LOG.info("Stop sign intersection detected but car is already stopped.")
+                    # We have cleared the stop sign
+                    stop_sign_stop_predicted = False
+                    self.stop_sign_buffer.pop()
+                    # Stop signs don't come in herds, so we know we don't need to clear one for a while.
+                    self.clear_stop_sign_cool_down = self.config_test_time.slower_for_stop_sign_cool_down
+                    self.slower_stop_sign_count = 0
+            elif (
+                self.slower_for_stop_sign_cool_down <= 0
+                and stop_sign_distance < self.config_test_time.slower_for_stop_sign_dist_threshold
+            ):
+                # LOG.info("Stop sign in range for slower.")
+                self.slower_stop_sign_count = self.config_test_time.slower_for_stop_sign_count
+                self.slower_for_stop_sign_cool_down = self.config_test_time.slower_for_stop_sign_cool_down
+
+        if len(self.stop_sign_buffer) > 0:
+            # Remove boxes that are too far away
+            if self.stop_sign_buffer[0].norm > abs(self.config.max_x):
+                # LOG.info("Stop sign removed")
+                self.stop_sign_buffer.pop()
+
+        if stop_sign_stop_predicted:
+            # LOG.info("Stopping for stop sign.")
+            current_throttle = 0.0
+            current_brake = True
+
+        if self.config_test_time.slower_for_stop_sign and self.slower_stop_sign_count > 0:
+            # LOG.info("Slowing down for stop sign.")
+            current_throttle = np.clip(
+                current_throttle,
+                0.0,
+                self.config_test_time.slower_for_stop_sign_throttle_threshold,
+            )
+            self.slower_stop_sign_count -= 1
+
+        return current_throttle, current_brake
+
+    @beartype
+    def update_stop_box(
+        self, x: float, y: float, orientation: float, x_target: float, y_target: float, orientation_target: float
+    ):
+        if not self.config_test_time.slower_for_stop_sign:
+            return
+        if len(self.stop_sign_buffer) != 0:
+            self.stop_sign_buffer.append(
+                self.stop_sign_buffer[0].update(x, y, orientation, x_target, y_target, orientation_target)
+            )
 
 
 class ForceMovePostProcessor:

@@ -48,6 +48,11 @@ body {
     transform: translateX(4px);
 }
 
+/* Read-only mode - hide file operations */
+.read-only-hide {
+    display: none !important;
+}
+
 .route-card.selected {
     background: #e3f2fd !important;
     border-left: 4px solid #1976d2 !important;

@@ -341,7 +341,7 @@ class Visualizer:
 
     def _process_all_perspectives(self, training=False):
         self.perspectives = {}
-        for perspective_modality in ["rgb", "semantic", "depth"]:
+        for perspective_modality in ["rgb", "semantic"]:  # , "depth"]:
             if not training:
                 perspective = self.data.get(perspective_modality)
             else:
@@ -398,7 +398,7 @@ class Visualizer:
         perspective_images = []
         target_width = lidar_image.shape[1]  # Use BEV width as reference
 
-        for modality in ["rgb", "semantic", "depth"]:  # Define order
+        for modality in ["rgb", "semantic"]:  # , "depth"]:  # Define order
             if modality in self.perspectives:
                 img = np.ascontiguousarray(self.perspectives[modality], dtype=np.uint8)
                 # Resize to match target width

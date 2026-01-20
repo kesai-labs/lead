@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Flask webapp for visualizing driving infractions from CARLA evaluations."""
 
+import argparse
 import json
 import subprocess
 from pathlib import Path
@@ -11,6 +12,9 @@ app = Flask(__name__)
 
 # Default evaluation output directory
 DEFAULT_OUTPUT_DIR = Path(__file__).parent.parent.parent / "outputs" / "local_evaluation"
+
+# Read-only mode (disable file operations like open folder, cut video)
+READ_ONLY_MODE = False
 
 
 def load_infractions_data(infractions_file: Path) -> dict:
@@ -47,7 +51,76 @@ def load_infractions_data(infractions_file: Path) -> dict:
 @app.route("/<path:output_dir>")
 def index(output_dir=None):
     """Render main dashboard page."""
-    return render_template("index.html")
+    return render_template("index.html", read_only_mode=READ_ONLY_MODE)
+
+
+@app.route("/api/output_directories")
+def list_output_directories():
+    """List all output directories from outputs/evaluation."""
+    base_path = Path(__file__).parent.parent.parent / "outputs" / "evaluation"
+
+    if not base_path.exists():
+        return jsonify({"error": "Evaluation directory not found", "directories": []}), 404
+
+    directories = []
+
+    # Iterate through experiment_name/benchmark_seed/timestamp structure
+    for experiment_dir in sorted(base_path.iterdir()):
+        if not experiment_dir.is_dir():
+            continue
+
+        experiment_name = experiment_dir.name
+
+        for benchmark_dir in sorted(experiment_dir.iterdir()):
+            if not benchmark_dir.is_dir():
+                continue
+
+            benchmark_seed = benchmark_dir.name
+
+            for timestamp_dir in sorted(benchmark_dir.iterdir()):
+                if not timestamp_dir.is_dir():
+                    continue
+
+                timestamp = timestamp_dir.name
+                relative_path = f"outputs/evaluation/{experiment_name}/{benchmark_seed}/{timestamp}"
+
+                # Count total infractions in all routes within this directory
+                total_infractions = 0
+                has_data = False
+
+                for route_dir in timestamp_dir.iterdir():
+                    if not route_dir.is_dir():
+                        continue
+
+                    infractions_file = route_dir / "infractions.json"
+                    if infractions_file.exists():
+                        has_data = True
+                        try:
+                            infraction_data = load_infractions_data(infractions_file)
+                            infractions = infraction_data["infractions"]
+                            filtered_infractions = [
+                                inf
+                                for inf in infractions
+                                if "minspeed" not in inf.get("infraction", "").lower()
+                                and "completion" not in inf.get("infraction", "").lower()
+                            ]
+                            total_infractions += len(filtered_infractions)
+                        except Exception:
+                            pass
+
+                if has_data:
+                    directories.append(
+                        {
+                            "path": relative_path,
+                            "full_path": str(timestamp_dir),
+                            "experiment": experiment_name,
+                            "benchmark": benchmark_seed,
+                            "timestamp": timestamp,
+                            "infraction_count": total_infractions,
+                        }
+                    )
+
+    return jsonify({"directories": directories, "base_path": str(base_path)})
 
 
 @app.route("/api/routes")
@@ -221,6 +294,9 @@ def serve_video(route_name, video_type):
 @app.route("/api/open_directory", methods=["POST"])
 def open_directory():
     """Open the directory containing the route's videos in the file manager."""
+    if READ_ONLY_MODE:
+        return jsonify({"error": "File operations disabled in read-only mode"}), 403
+
     data = request.json
     route_name = data.get("route_name")
     output_dir = data.get("output_dir", DEFAULT_OUTPUT_DIR)
@@ -259,6 +335,9 @@ def open_directory():
 @app.route("/api/cut_video", methods=["POST"])
 def cut_video():
     """Cut a video segment around an infraction timestamp."""
+    if READ_ONLY_MODE:
+        return jsonify({"error": "File operations disabled in read-only mode"}), 403
+
     data = request.json
     route_name = data.get("route_name")
     video_type = data.get("video_type")
@@ -291,12 +370,13 @@ def cut_video():
     start_time = max(0, timestamp - buffer_seconds)
     duration = buffer_seconds * 2  # buffer before + buffer after
 
-    # Output file name
-    output_filename = f"{route_name}_{video_type}_infraction_{infraction_number}.mp4"
-    output_path = route_path / output_filename
+    # Output file name - save to desktop as infraction.mp4
+    desktop_path = Path.home() / "Desktop"
+    output_path = desktop_path / "infraction.mp4"
 
     try:
-        # Use ffmpeg to cut the video
+        # Use ffmpeg to cut and re-encode video for Notion compatibility
+        # Comprehensive settings for maximum web/Notion compatibility
         cmd = [
             "ffmpeg",
             "-y",  # Overwrite output file if exists
@@ -306,8 +386,22 @@ def cut_video():
             str(input_video),  # Input file
             "-t",
             str(duration),  # Duration
-            "-c",
-            "copy",  # Copy codec (fast, no re-encoding)
+            "-vcodec",
+            "libx264",  # H.264 video codec
+            "-pix_fmt",
+            "yuv420p",  # Pixel format (critical for web compatibility)
+            "-profile:v",
+            "baseline",  # Use baseline profile for maximum compatibility
+            "-level",
+            "3.0",  # H.264 level
+            "-movflags",
+            "+faststart",  # Move moov atom to beginning for streaming
+            "-acodec",
+            "aac",  # AAC audio codec
+            "-ar",
+            "44100",  # Audio sample rate
+            "-strict",
+            "experimental",  # Allow experimental encoders
             str(output_path),  # Output file
         ]
 
@@ -399,7 +493,7 @@ def cut_custom_video():
             str(output_path),
         ]
 
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=120)
+        subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=120)
 
         return jsonify(
             {
@@ -417,7 +511,18 @@ def cut_custom_video():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Infraction Dashboard - CARLA Evaluation Viewer")
+    parser.add_argument(
+        "--read-only", action="store_true", help="Enable read-only mode (disable file operations like open folder, cut video)"
+    )
+    parser.add_argument("--port", type=int, default=5000, help="Port to run the server on (default: 5000)")
+    parser.add_argument("--host", default="0.0.0.0", help="Host to run the server on (default: 0.0.0.0)")
+    args = parser.parse_args()
+
+    READ_ONLY_MODE = args.read_only
+
     print("Starting Infraction Dashboard...")
     print(f"Default output directory: {DEFAULT_OUTPUT_DIR}")
-    print("Open http://localhost:5000 in your browser")
-    app.run(debug=True, port=5000, host="0.0.0.0")
+    print(f"Read-only mode: {'ENABLED' if READ_ONLY_MODE else 'DISABLED'}")
+    print(f"Open http://localhost:{args.port} in your browser")
+    app.run(debug=True, port=args.port, host=args.host)

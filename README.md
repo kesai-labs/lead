@@ -59,14 +59,14 @@ https://github.com/user-attachments/assets/9f316ad2-e629-4bb4-bffb-9bb55e225738
 
 ## Updates
 
-- **`[COMING SOON]`** Cross-benchmark datasets and training tools
-  > Datasets and documentation for NAVSIM and Waymo training coming soon.
+- **`[2026/01/18]`** Deactivated Kalman filter
+  > By default, we deactivate the Kalman filter used for ego state estimation and GPS target-point smoothing to evaluate the policy in a fully end-to-end setting. While this may slightly reduce closed-loop performance, it avoids unrealistically noise-free target points.
 
 - **`[2026/01/13]`** CARLA dataset and training documentation released
-  > We publicly release a CARLA dataset generated with the same pipeline as described in the paper. Note that due to subsequent refactoring and code cleanup, the released dataset differs from the original dataset used in our experiments. Validation is ongoing.
+  > We publicly release a CARLA dataset generated with the same pipeline as described in the paper. Note that due to subsequent refactoring and code cleanup, the released dataset differs from the original dataset used in our experiments. Performance on the new dataset is similar to the reported performance.
 
-- **`[2026/01/05]`** Removed stop-sign heuristic
-  > We removed explicit stop-sign handling to evaluate the policy in a fully end-to-end setting. This may slightly reduce closed-loop performance compared to earlier runs.
+- **`[2026/01/05]`** Deactivated stop-sign heuristic
+  > By default, we deactivate explicit stop-sign handling to evaluate the policy in a fully end-to-end setting. This may slightly reduce closed-loop performance compared to earlier runs.
 
 - **`[2026/01/05]`** RoutePlanner bug fix
   > Fixed an index error that caused the driving policy to crash at the end of routes in Town13. Driving scores have been updated accordingly.

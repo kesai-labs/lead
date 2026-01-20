@@ -11,6 +11,8 @@ class ClosedLoopConfig(OpenLoopConfig):
         self.load_from_environment(
             loaded_config=None, env_key="LEAD_CLOSED_LOOP_CONFIG", raise_error_on_missing_key=raise_error_on_missing_key
         )
+    # --- Kalman Filter Settings ---
+    use_kalman_filter = False
 
     # --- Image Processing ---
     # JPEG quality for saving images (0-100)
@@ -51,6 +53,14 @@ class ClosedLoopConfig(OpenLoopConfig):
     sensor_agent_stuck_move_duration = 20
     # Throttle value for creeping when stuck
     sensor_agent_stuck_throttle = 0.4
+
+    # --- Stop Sign Heuristic ---
+    # If true enable stop sign controller
+    slower_for_stop_sign = True
+    # Distance threshold for stop sign controller activation
+    slower_for_stop_sign_dist_threshold = 1.0
+    # Cool down period for stop sign controller (frames)
+    slower_for_stop_sign_cool_down = 120
 
     # --- PID Controller Parameters ---
     # Maximum change in speed input to longitudinal controller
