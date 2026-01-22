@@ -193,4 +193,5 @@ outputs/checkpoints
 outputs/local_evaluation
 3rd_party/alpamayo
 ar1_venv
-3rd_party/carla_route_generator 
+3rd_party/carla_route_generator
+alpasim-metric-bench2drive/

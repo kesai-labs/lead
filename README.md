@@ -43,8 +43,12 @@ https://github.com/user-attachments/assets/9f316ad2-e629-4bb4-bffb-9bb55e225738
   - [3. Train model](#3-train-model)
   - [4. Post-train model](#4-post-train-model)
   - [5. Large-scale training on SLURM](#5-large-scale-training-on-slurm)
-- [Evaluation on CARLA Leaderboard](#evaluation-on-carla-leaderboard)
+- [Data Collection](#data-collection)
   - [1. Start CARLA](#1-start-carla)
+  - [2. Start expert](#2-start-expert)
+  - [3. Data structure](#3-data-structure)
+- [Evaluation on CARLA Leaderboard](#evaluation-on-carla-leaderboard)
+  - [1. Start CARLA](#1-start-carla-1)
   - [2. Evaluate on Bench2Drive](#2-evaluate-on-bench2drive)
   - [3. Evaluate on Longest6](#3-evaluate-on-longest6)
   - [4. Evaluate on Town13](#4-evaluate-on-town13)
@@ -202,6 +206,7 @@ https://github.com/user-attachments/assets/81954b7c-4153-45d1-90a8-80cb426ccb70
 > [!TIP]
 > 1. Disable video recording in [config_closed_loop](lead/inference/config_closed_loop.py) by turning off `produce_demo_video` and `produce_debug_video`.
 > 2. If memory is limited, modify the file prefixes to load only the first checkpoint seed. By default, the pipeline loads all three seeds as an ensemble.
+> 3. To save time, decrease video FPS in [config_closed_loop](lead/inference/config_closed_loop.py) by increasing `produce_frame_frequency`.
 
 ### 5. Verify autopilot
 
@@ -242,22 +247,6 @@ data/expert_debug/
 └── results
     └── 1_town15_construction_result.json
 ```
-
-The [Jupyter notebooks](notebooks) provide some example scripts to visualize the collected data:
-
-<br>
-<div align="center">
-  <picture>
-    <img src="docs/assets/visualization.webp" width="49%" />
-  </picture>
-  <picture>
-    <img src="docs/assets/point_cloud_visualization.webp" width="49%" />
-  </picture>
-
-  **Figure 2:** Plotting with visualization notebooks.
-
-</div>
-<br>
 
 ## Training for CARLA Leaderboard
 
@@ -339,6 +328,62 @@ Post-training checkpoints will be saved to `outputs/local_training/posttrain`. W
 ### 5. Large-scale training on SLURM
 
 For distributed training on SLURM, see this [documentation page](https://ln2697.github.io/lead/docs/slurm_training.html). For a complete SLURM workflow of pre-training, post-training, evaluation, see this [example](slurm/experiments/001_example).
+
+## Data Collection
+
+To collect your own dataset, you can run the rule-based expert driver. To setup own camera/lidar/radar calibration, see [config_base.py](lead/common/config_base.py) and [config_expert.py](lead/expert/config_expert.py).
+
+### 1. Start CARLA
+
+```bash
+bash scripts/start_carla.sh
+```
+
+### 2. Start expert
+
+```bash
+bash scripts/run_expert.sh
+```
+
+### 3. Data structure
+
+Collected data will be saved to `data/expert_debug/` with the following sensor outputs:
+
+
+```html
+├── bboxes/                  # Per-frame 3D bounding boxes for all actors
+├── depth/                   # Compressed and quantized depth maps
+├── depth_perturbated        # Depth from a perturbated ego state
+├── hdmap/                   # Ego-centric rasterized HD map
+├── hdmap_perturbated        # HD map aligned to perturbated ego pose
+├── lidar/                   # LiDAR point clouds
+├── metas/                   # Per-frame metadata and ego state
+├── radar/                   # Radar detections
+├── radar_perturbated        # Radar detections from perturbated ego state
+├── rgb/                     # RGB images
+├── rgb_perturbated          # RGB images from perturbated ego state
+├── semantics/               # Semantic segmentation maps
+├── semantics_perturbated    # Semantics from perturbated ego state
+└── results.json             # Route-level summary and evaluation metadata
+```
+
+For large-scale data collection on SLURM clusters, see the [data collection documentation](https://ln2697.github.io/lead/docs/data_collection.html).
+
+The [Jupyter notebooks](notebooks) provide some example scripts to visualize the collected data:
+
+<br>
+<div align="center">
+  <picture>
+    <img src="docs/assets/visualization.webp" width="49%" />
+  </picture>
+  <picture>
+    <img src="docs/assets/point_cloud_visualization.webp" width="49%" />
+  </picture>
+
+  **Figure 2:** Plotting with visualization notebooks.
+
+</div>
+<br>
 
 ## Evaluation on CARLA Leaderboard
 

@@ -6,16 +6,22 @@ from lead.inference.config_open_loop import OpenLoopConfig
 
 
 class ClosedLoopConfig(OpenLoopConfig):
+    """Configuration class for closed-loop inference settings in CARLA.
+
+    See more details at https://ln2697.github.io/lead/docs/config_system.html
+    """
+
     def __init__(self, raise_error_on_missing_key: bool = True):
         super().__init__(raise_error_on_missing_key=raise_error_on_missing_key)
         self.load_from_environment(
             loaded_config=None, env_key="LEAD_CLOSED_LOOP_CONFIG", raise_error_on_missing_key=raise_error_on_missing_key
         )
+
     # --- Kalman Filter Settings ---
     use_kalman_filter = False
 
     # --- Image Processing ---
-    # JPEG quality for saving images (0-100)
+    # JPEG quality used in inference (0-100)
     jpeg_quality = 90
 
     # --- Control which output is used for controlling ---
@@ -111,13 +117,13 @@ class ClosedLoopConfig(OpenLoopConfig):
     tuned_aim_distance = False
 
     # --- Evaluation Visualization Settings ---
-    # If true, set nice weather
+    # If not None, set a custom weather for evaluation
     custom_weather = None  # e.g., "ClearNoon"
     # If true, use random weather
     random_weather = False
 
     # Frequency of frame production during evaluation
-    produce_frame_frequency = 4
+    produce_frame_frequency = 1
 
     @overridable_property
     def produce_demo_image(self):

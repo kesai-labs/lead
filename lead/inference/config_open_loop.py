@@ -2,6 +2,11 @@ from lead.common.config_base import BaseConfig
 
 
 class OpenLoopConfig(BaseConfig):
+    """Configuration class for open-loop inference settings.
+
+    See more details at https://ln2697.github.io/lead/docs/config_system.html
+    """
+
     def __init__(self, raise_error_on_missing_key: bool = True):
         super().__init__()
         self.load_from_environment(

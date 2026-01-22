@@ -1,4 +1,5 @@
 import io
+import numbers
 import os
 from copy import deepcopy
 
@@ -91,14 +92,15 @@ class Visualizer:
 
         self.meta_panel = 255 * np.ones((639, 1492, 3), dtype=np.uint8)
         if self.test_time:
-            self.meta_panel = 255 * np.ones((250, 1492, 3), dtype=np.uint8)
+            self.meta_panel = 255 * np.ones((115, 1492, 3), dtype=np.uint8)
 
     def visualize_training_labels(self):
         # Perspectives
         self._process_all_perspectives()
 
-        # Bev
+        # BEV
         self._bev_semantic(ground_truth=True)
+        self.draw_tokenization_grid()
         self._route()
         self._future_waypoints()
         self._ego_bounding_box()
@@ -107,7 +109,6 @@ class Visualizer:
         self._radars(plot_detection_label=True, plot_detection_prediction=False)
         self.bev_image = np.rot90(self.bev_image, k=1)
         self.bev_image = np.ascontiguousarray(self.bev_image)
-        self.draw_tokenization_grid()
 
         # Text
         self._meta()
@@ -119,8 +120,9 @@ class Visualizer:
         # Perspective
         self._process_all_perspectives(training=True)
 
-        # Image
+        # BEV
         self._bev_semantic(ground_truth=False)
+        self.draw_tokenization_grid()
         self._target_point()
         if self.config.use_planning_decoder:
             self._pred_future_waypoints()
@@ -131,8 +133,6 @@ class Visualizer:
         self._radars(plot_detection_label=False, plot_detection_prediction=True)
         self.bev_image = np.rot90(self.bev_image, k=1)
         self.bev_image = np.ascontiguousarray(self.bev_image)
-
-        self.draw_tokenization_grid()
 
         # Text
         self._meta()
@@ -146,16 +146,15 @@ class Visualizer:
 
         # BEV
         self._bev_semantic(ground_truth=False)
+        self.draw_tokenization_grid()
         self._pred_route()
-        self._pred_future_waypoints()
+        # self._pred_future_waypoints()
         self._target_point()
         self._radars(plot_detection_label=False, plot_detection_prediction=True)
         self._ego_bounding_box()
         self._pred_bounding_box()
         self.bev_image = np.rot90(self.bev_image, k=1)
         self.bev_image = np.ascontiguousarray(self.bev_image)
-
-        self.draw_tokenization_grid()
 
         # Text
         self._meta()
@@ -376,6 +375,54 @@ class Visualizer:
                 log_image /= log_image.max() + 1e-6
                 log_image = (log_image * 255).astype(np.uint8)
                 perspective_image = cv2.applyColorMap(log_image, cv2.COLORMAP_WINTER)
+
+            # Draw target speed prediction on RGB image
+            if perspective_modality == "rgb" and training and self.predictions is not None:
+                if (
+                    hasattr(self.predictions, "pred_target_speed_scalar")
+                    and self.predictions.pred_target_speed_scalar is not None
+                ):
+                    pred_speed = float(self.predictions.pred_target_speed_scalar.detach().cpu().float()[0])
+
+                    # Position: lower middle of the image
+                    img_height, img_width = perspective_image.shape[:2]
+                    text = f"Target Speed: {pred_speed:.1f} m/s"
+
+                    # Use PIL for better text rendering
+                    img_pil = Image.fromarray(perspective_image)
+                    draw = ImageDraw.Draw(img_pil)
+
+                    try:
+                        font = ImageFont.truetype("3rd_party/Roboto-Bold.ttf", 20)
+                    except:
+                        font = ImageFont.load_default()
+
+                    # Get text size
+                    bbox = draw.textbbox((0, 0), text, font=font)
+                    text_width = bbox[2] - bbox[0]
+                    text_height = bbox[3] - bbox[1]
+
+                    # Position at lower middle
+                    x = (img_width - text_width) // 2
+                    y = img_height - text_height - 20
+
+                    # Draw background rectangle for better visibility
+                    padding_horizontal = 6
+                    padding_top = 3
+                    padding_bottom = 6
+                    draw.rectangle(
+                        [
+                            (x - padding_horizontal, y - padding_top),
+                            (x + text_width + padding_horizontal, y + text_height + padding_bottom),
+                        ],
+                        fill=(0, 0, 0, 180),
+                    )
+
+                    # Draw text in white
+                    draw.text((x, y), text, font=font, fill=(255, 255, 255))
+
+                    perspective_image = np.array(img_pil)
+
             self.perspectives[perspective_modality] = perspective_image
 
     def _concatenate_all_perspectives_and_bev(self, border_size: int = 10, border_color: tuple = (255, 255, 255)) -> np.ndarray:
@@ -562,30 +609,38 @@ class Visualizer:
         target_point_next = self.data.get("target_point_next")
         target_point_previous = self.data.get("target_point_previous")
 
-        def draw_square(x, y, color, size):
-            """Draw a square"""
-            half_size = size // 2
+        def draw_circle_with_number(x, y, color, radius, number):
+            """Draw a circle with a number inside"""
+            # Draw filled circle
+            cv2.circle(self.bev_image, (x, y), radius, color, thickness=-1)
 
-            # Define square corners
-            top_left = (x - half_size, y - half_size)
-            bottom_right = (x + half_size, y + half_size)
+            # Draw white number in the center
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 0.8
+            thickness = 2
+            text = str(number)
 
-            cv2.rectangle(self.bev_image, top_left, bottom_right, color, thickness=-1)
+            # Get text size to center it
+            text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
+            text_x = x - text_size[0] // 2
+            text_y = y + text_size[1] // 2
+
+            cv2.putText(self.bev_image, text, (text_x, text_y), font, font_scale, (255, 255, 255), thickness)
 
         if target_point_previous is not None:
             x_tp = target_point_previous[0][0] * self.loc_pixels_per_meter + self.origin[0]
             y_tp = target_point_previous[0][1] * self.loc_pixels_per_meter + self.origin[1]
-            draw_square(int(x_tp), int(y_tp), constants.TP_DEFAULT_COLOR, size=16)
+            draw_circle_with_number(int(x_tp), int(y_tp), constants.TP_DEFAULT_COLOR, radius=12, number=0)
 
         if target_point_next is not None:
             x_tp = target_point_next[0][0] * self.loc_pixels_per_meter + self.origin[0]
             y_tp = target_point_next[0][1] * self.loc_pixels_per_meter + self.origin[1]
-            draw_square(int(x_tp), int(y_tp), constants.TP_DEFAULT_COLOR, size=16)
+            draw_circle_with_number(int(x_tp), int(y_tp), constants.TP_DEFAULT_COLOR, radius=12, number=2)
 
         if target_point is not None:
             x_tp = target_point[0][0] * self.loc_pixels_per_meter + self.origin[0]
             y_tp = target_point[0][1] * self.loc_pixels_per_meter + self.origin[1]
-            draw_square(int(x_tp), int(y_tp), constants.TP_DEFAULT_COLOR, size=36)
+            draw_circle_with_number(int(x_tp), int(y_tp), constants.TP_DEFAULT_COLOR, radius=18, number=1)
 
     @beartype
     def _draw_points_in_perspective(self, points: NDArray, size: int, connected: bool, color: tuple[int, int, int]):
@@ -671,7 +726,10 @@ class Visualizer:
                     thickness=constants.PREDICTION_ROUTE_RADIUS,
                     lineType=cv2.LINE_AA,
                 )
-            self._draw_points_in_perspective(points=wps, size=3, connected=True, color=constants.PREDICTION_ROUTE_COLOR)
+            # self._draw_points_in_perspective(points=wps,
+            #                                  size=3,
+            #                                  connected=True,
+            #                                  color=constants.PREDICTION_ROUTE_COLOR)
 
     def _future_waypoints(self):
         if self.config.use_planning_decoder or self.config.visualize_dataset:
@@ -691,7 +749,10 @@ class Visualizer:
                             color=color,
                             thickness=-1,
                         )
-                self._draw_points_in_perspective(points=wps, size=5, connected=False, color=constants.PREDICTION_WAYPOINT_COLOR)
+                # self._draw_points_in_perspective(points=wps,
+                #                                  size=5,
+                #                                  connected=False,
+                #                                  color=constants.PREDICTION_WAYPOINT_COLOR)
 
             past_waypoints = self.data.get("past_waypoints")
             # past_yaws = self.data.get("past_yaws")
@@ -724,7 +785,7 @@ class Visualizer:
                     color=color,
                     thickness=-1,
                 )
-            self._draw_points_in_perspective(points=wps, size=3, connected=True, color=constants.PREDICTION_ROUTE_COLOR)
+            # self._draw_points_in_perspective(points=wps, size=3, connected=True, color=constants.PREDICTION_ROUTE_COLOR)
 
     def _pred_future_waypoints(self):
         pred_waypoints = self.predictions.pred_future_waypoints
@@ -741,9 +802,10 @@ class Visualizer:
                     color=color,
                     thickness=-1,
                 )
-            self._draw_points_in_perspective(points=wps, size=5, connected=False, color=constants.PREDICTION_WAYPOINT_COLOR)
+            # self._draw_points_in_perspective(points=wps, size=5, connected=False, color=constants.PREDICTION_WAYPOINT_COLOR)
 
     def _ego_bounding_box(self):
+        """Visualize ego bounding box on BEV image."""
         ego_box = np.array(
             [
                 int(self.bev_image.shape[1] * (-self.config.min_x_meter / (self.config.max_x_meter - self.config.min_x_meter))),
@@ -757,6 +819,7 @@ class Visualizer:
         self.bev_image = draw_box(self.bev_image, ego_box, color=constants.EGO_BB_COLOR, thickness=4)
 
     def _pred_bounding_box(self):
+        """Visualize predicted bounding boxes on BEV image."""
         if self.config.detect_boxes:
             if isinstance(self.predictions, OpenLoopPrediction):
                 pred_bounding_boxes: list[PredictedBoundingBox] = self.predictions.pred_bounding_box_image_system
@@ -769,7 +832,7 @@ class Visualizer:
                     color_box = list(color_box)
                     color_box[1] = color_box[1] * inv_brake
                     box = box.scale(self.scale_factor)
-                    self.bev_image = draw_box(self.bev_image, box, color=color_box)
+                    self.bev_image = draw_box(self.bev_image, box, color=color_box, speed=box.velocity)
 
             elif isinstance(self.predictions, Prediction) and self.predictions.pred_bounding_box is not None:
                 bb = self.predictions.pred_bounding_box.pred_bounding_box_image_system[0]
@@ -788,6 +851,7 @@ class Visualizer:
                         self.bev_image = draw_box(self.bev_image, box, color=color_box)
 
     def _bounding_boxes(self):
+        """Visualize ground truth bounding boxes on BEV image."""
         bounding_boxes = self.data.get("center_net_bounding_boxes")
         if bounding_boxes is not None:
             bounding_boxes = bounding_boxes.detach().cpu().numpy()[0]
@@ -829,8 +893,8 @@ class Visualizer:
                     )
 
     def _meta(self):
+        """Render meta information panel."""
         # Configuration variables
-        max_rows_per_column = 30
         column_width = 400
 
         # Starting position
@@ -839,11 +903,42 @@ class Visualizer:
         line_height = 20
         separator = "-" * 45
 
+        # Define units for attributes
+        units_map = {
+            # Velocities
+            "speed": "m/s",
+            "target_speed": "m/s",
+            "second_highest_speed": "m/s",
+            "speed_limit": "m/s",
+            "target_speed_limit": "m/s",
+            "second_highest_speed_limit": "m/s",
+            # Accelerations
+            "accel_x": "m/s²",
+            "accel_y": "m/s²",
+            "accel_z": "m/s²",
+            "privileged_acceleration": "m/s²",
+            # Distances
+            "distance_to_next_junction": "m",
+            "distance_to_junction": "m",
+            "signed_dist_to_lane_change": "m",
+            "distance_to_stop_sign": "m",
+            "meters_travelled": "m",
+            "ego_lane_width": "m",
+            "perturbation_translation": "m",
+            # Angles
+            "theta": "rad",
+            "privileged_yaw": "rad",
+            "perturbation_rotation": "rad",
+            # Angular velocities
+            "angular_velocity_x": "rad/s",
+            "angular_velocity_y": "rad/s",
+            "angular_velocity_z": "rad/s",
+        }
+
         # Collect all text lines
         text_lines = []
 
-        # First group - float values with 2 decimal places
-        group_text_lines = []
+        # Collect all attributes - float values with 2 decimal places
         for attr_name in [
             "steer",
             "throttle",
@@ -879,14 +974,11 @@ class Visualizer:
                 attr_data = attr_data[0]
                 if isinstance(attr_data, torch.Tensor):
                     attr_data = attr_data.item()
-                group_text_lines.append(f"{attr_name} {attr_data:.2f}")
+                unit = units_map.get(attr_name, "")
+                unit_str = f" {unit}" if unit else ""
+                text_lines.append(f"{attr_name} {attr_data:.2f}{unit_str}")
 
-        text_lines += sorted(group_text_lines)
-        if len(group_text_lines) > 0 and not self.test_time:
-            text_lines.append(separator)
-
-        # Second group - other values
-        group_text_lines = []
+        # Collect other values
         for attr_name in [
             "vehicle_hazard",
             "light_hazard",
@@ -930,12 +1022,9 @@ class Visualizer:
                 attr_data = attr_data[0]
                 if isinstance(attr_data, torch.Tensor):
                     attr_data = attr_data.item()
-                group_text_lines.append(f"{attr_name} {attr_data}")
-        text_lines += sorted(group_text_lines)
-        if len(group_text_lines) > 0 and not self.test_time:
-            text_lines.append(separator)
+                text_lines.append(f"{attr_name} {attr_data}")
 
-        # Third group - Long Stuff
+        # Collect long text attributes
         for attr_name in [
             "route_number",
             "current_active_scenario_type",
@@ -949,47 +1038,107 @@ class Visualizer:
                     attr_data = attr_data.item()
                 text_lines.append(f"{attr_name} {attr_data}")
 
-        # Fourth group - Prediction
+        # Collect prediction values
         if self.predictions is not None:
-            text_lines.append("new_column")
             if self.predictions.pred_target_speed_scalar is not None:
-                text_lines += [
-                    f"pred_target_speed: {float(self.predictions.pred_target_speed_scalar.detach().cpu().float()[0]):.2f} m/s"
-                ]
+                text_lines.append(
+                    f"pred_target_speed {float(self.predictions.pred_target_speed_scalar.detach().cpu().float()[0]):.2f} m/s"
+                )
 
+        # Collect target points
         for attr_name in ["target_point_previous", "target_point", "target_point_next"]:
             attr_data = self.data.get(attr_name)
             if attr_data is not None:
                 attr_data = attr_data[0]
                 if isinstance(attr_data, torch.Tensor):
                     attr_data = attr_data.detach().cpu().numpy()
-                text_lines.append(f"{attr_name}: {np.array2string(attr_data, precision=2, separator=', ')}")
+                text_lines.append(f"{attr_name} (x={attr_data[0]:.1f}m, y={attr_data[1]:.1f}m)")
 
-        # Load font once
-        font = ImageFont.truetype("3rd_party/Roboto-Regular.ttf", 17)
+        # Sort all lines alphabetically
+        text_lines = sorted(text_lines)
 
-        # Draw all text lines
-        current_column = 0
-        current_row = 0
+        # Load fonts once
+        font_regular = ImageFont.truetype("3rd_party/Roboto-Regular.ttf", 17)
+        font_bold = ImageFont.truetype("3rd_party/Roboto-Bold.ttf", 17)
+
         img_pil = Image.fromarray(self.meta_panel)
         draw = ImageDraw.Draw(img_pil)
 
+        # Fixed layout parameters
+        column_width = 350
+        num_columns = 4
+        start_x = 10
+        start_y = 30
+        line_height = 20
+
+        # Process text lines and prepare items
+        items = []
         for text in text_lines:
             if text == "new_column":
-                current_row = 0
-                current_column += 1
+                continue
+            if text == separator:
+                items.append({"type": "separator", "text": text})
                 continue
 
-            x = start_x + current_column * column_width
-            y = start_y + current_row * line_height
+            # Split text into attribute name and value
+            if " " in text or ":" in text:
+                split_idx = text.find(" ") if " " in text else text.find(":")
+                if text.find(":") != -1 and (text.find(" ") == -1 or text.find(":") < text.find(" ")):
+                    split_idx = text.find(":")
+                    attr_name_part = text[: split_idx + 1]
+                    value_part = text[split_idx + 1 :].strip()
+                else:
+                    attr_name_part = text[:split_idx]
+                    value_part = text[split_idx:].strip()
 
-            # Draw text with PIL instead of cv2.putText
-            draw.text((x, y), text, font=font, fill=(0, 0, 0))
+                # Calculate widths for right-alignment
+                value_bbox = draw.textbbox((0, 0), value_part, font=font_regular)
+                value_width = value_bbox[2] - value_bbox[0]
 
-            current_row += 1
-            if current_row >= max_rows_per_column:
-                current_row = 0
-                current_column += 1
+                items.append(
+                    {
+                        "type": "item",
+                        "name": attr_name_part,
+                        "value": value_part,
+                        "value_width": value_width,
+                    }
+                )
+            else:
+                items.append({"type": "other", "text": text})
+
+        # Draw all text lines (left to right, top to bottom)
+        item_index = 0
+        for item in items:
+            if item["type"] == "separator":
+                # Draw separator across all columns on current row
+                row = item_index // num_columns
+                y = start_y + row * line_height
+                draw.text((start_x, y), item["text"], font=font_regular, fill=(0, 0, 0))
+                item_index += 1
+                continue
+
+            if item["type"] == "other":
+                row = item_index // num_columns
+                col = item_index % num_columns
+                x = start_x + col * column_width
+                y = start_y + row * line_height
+                draw.text((x, y), item["text"], font=font_regular, fill=(0, 0, 0))
+                item_index += 1
+                continue
+
+            if item["type"] == "item":
+                row = item_index // num_columns
+                col = item_index % num_columns
+                x = start_x + col * column_width
+                y = start_y + row * line_height
+
+                # Draw attribute name in bold, left aligned
+                draw.text((x, y), item["name"], font=font_bold, fill=(0, 0, 0))
+
+                # Draw value right-aligned within this column's space
+                value_x = x + column_width - item["value_width"] - 20
+                draw.text((value_x, y), item["value"], font=font_regular, fill=(0, 0, 0))
+                item_index += 1
 
         # Convert back to cv2
         self.meta_panel = np.array(img_pil)
@@ -1014,12 +1163,25 @@ class Visualizer:
 
 
 def draw_box(
-    img,
-    box,
-    color=(255, 255, 255),
-    thickness=2,
-    corner_radius=2,
+    img: np.ndarray,
+    box: np.ndarray,
+    color: tuple = (255, 255, 255),
+    thickness: numbers.Real = 2,
+    corner_radius: numbers.Real = 2,
+    speed: numbers.Real | None = None,
 ):
+    """Utility function to draw a rotated bounding box on BEV image with rounded corners.
+
+    Args:
+        img: The BEV image to draw on.
+        box: The bounding box parameters [center_x, center_y, width, height, yaw]
+        color: Color of the box (BGR).
+        thickness: Thickness of the box lines.
+        corner_radius: Radius of the rounded corners.
+        speed: Optional speed value to draw a speed line from the center.
+    Returns:
+        img: The BEV image with the box drawn.
+    """
     translation = np.array([[box[1], box[0]]])
     width = box[TransfuserBoundingBoxIndex.W]
     height = box[TransfuserBoundingBoxIndex.H]
@@ -1076,6 +1238,34 @@ def draw_box(
                 thickness=thickness,
                 lineType=cv2.LINE_AA,
             )
+
+    # Draw speed line from center
+    if speed is not None and speed > 0:
+        # Calculate center of the box (translation is [row, col])
+        center_x = int(translation[0][1])  # col (x in image)
+        center_y = int(translation[0][0])  # row (y in image)
+
+        # Scale factor: pixels per m/s (adjust as needed)
+        scale_factor = 5.0
+        line_length = speed * scale_factor
+
+        # Calculate direction vector using the same rotation as the box
+        # The direction vector starts at [line_length, 0] and is rotated by yaw
+        direction = rot @ np.array([[line_length], [0]])
+
+        # Calculate end point (direction is [row_offset, col_offset])
+        end_x = int(center_x + direction[1][0])  # col + col_offset
+        end_y = int(center_y + direction[0][0])  # row + row_offset
+
+        # Draw speed line (OpenCV uses (x, y) = (col, row) format)
+        cv2.line(
+            img,
+            (center_x, center_y),
+            (end_x, end_y),
+            (255, 0, 0),  # Red color for speed
+            thickness=3,
+            lineType=cv2.LINE_AA,
+        )
 
     return img
 

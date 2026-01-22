@@ -1,3 +1,5 @@
+"""Class that provides data collection functionalities for expert agents."""
+
 import copy
 import json
 import logging
@@ -132,7 +134,7 @@ class ExpertData(ExpertBase):
             planner.set_route(self._global_plan_world_coord)
             self._command_planners_dict[dist] = planner
 
-        # Use camera
+        # Debug camera setup
         if (
             self.config_expert.save_3rd_person_camera
             and (not self.config_expert.is_on_slurm or self.save_path is not None)
@@ -840,6 +842,21 @@ class ExpertData(ExpertBase):
             results: Any additional results to be processed or saved.
         """
         torch.cuda.empty_cache()
+        self._offline_process_data()
+
+        if results is not None and self.save_path is not None:
+            with open(os.path.join(self.save_path, "results.json"), "w", encoding="utf-8") as f:
+                json.dump(results.__dict__, f, indent=2)
+
+        if hasattr(self, "_3rd_person_camera"):
+            self._3rd_person_camera.stop()
+            self._3rd_person_camera.destroy()
+
+    def _offline_process_data(self) -> None:
+        """
+        Offline process the collected data for additional annotations or processing.
+        This method is called after the data collection is completed.
+        """
 
         # Re-save metas with privileged information for data filtering later
         # This step is necessary so we can obtain higher qualitative data
@@ -954,14 +971,6 @@ class ExpertData(ExpertBase):
                     box["future_yaws"] = np.array(future_yaws, dtype=np.float16)
 
                 common_utils.write_pickle(path=self.save_path / "bboxes" / f"{frame:04}.pkl", data=bounding_boxes)
-
-        if results is not None and self.save_path is not None:
-            with open(os.path.join(self.save_path, "results.json"), "w", encoding="utf-8") as f:
-                json.dump(results.__dict__, f, indent=2)
-
-        if hasattr(self, "_3rd_person_camera"):
-            self._3rd_person_camera.stop()
-            self._3rd_person_camera.destroy()
 
     @beartype
     def get_bounding_boxes(self, input_data: dict) -> list[dict]:

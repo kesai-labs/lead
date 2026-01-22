@@ -212,7 +212,7 @@ def rgb(r, g, b):
 
 
 # Other visualization
-LIDAR_COLOR = rgb(90, 107, 249)
+LIDAR_COLOR = rgb(0, 0, 0)
 EGO_BB_COLOR = rgb(151, 15, 48)
 TP_DEFAULT_COLOR = rgb(255, 10, 10)
 RADAR_COLOR = rgb(24, 237, 3)

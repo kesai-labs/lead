@@ -1,3 +1,5 @@
+"""Base class that provide basic properties and methods for expert agents."""
+
 import logging
 import os
 import pathlib

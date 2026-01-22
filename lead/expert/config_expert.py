@@ -30,6 +30,7 @@ class ExpertConfig(BaseConfig):
 
     @property
     def target_dataset(self):
+        """Set this to the target dataset for data collection. Will affect sensor setup."""
         return TargetDataset.CARLA_LEADERBOARD2_3CAMERAS
 
     # --- Planning Area ---

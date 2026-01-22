@@ -259,7 +259,6 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
             )
             return common_utils.inverse_conversion_2d(np.array(point), np.array(ego_position), self.compass)
 
-        previous_target_points = [tp.tolist() for tp in planner.previous_target_points]
         next_target_points = [tp[0].tolist() for tp in planner.route]
         next_commands = [int(planner.route[i][1]) for i in range(len(planner.route))]
 
@@ -281,10 +280,7 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
             assert len(next_target_points) == 2
             input_data["target_point_next"] = transform(next_target_points[1][:2])
             input_data["target_point"] = transform(next_target_points[1][:2])
-            if len(previous_target_points) > 0:
-                input_data["target_point_previous"] = transform(previous_target_points[-1][:2])
-            else:
-                input_data["target_point_previous"] = transform(next_target_points[0][:2])
+            input_data["target_point_previous"] = transform(next_target_points[0][:2])
 
         input_data["command"] = carla_dataset_utils.command_to_one_hot(next_commands[0])
         input_data["next_command"] = carla_dataset_utils.command_to_one_hot(next_commands[1])
@@ -419,7 +415,7 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
             ),
             "speed": torch.Tensor([input_data["speed"]]).to(self.device, dtype=torch.float32).view(1),
             "command": torch.Tensor(input_data["command"]).to(self.device, dtype=torch.float32).view(1, 6),
-            "town": np.array([self._world.get_map().name]),
+            "town": np.array([self._world.get_map().name.split("/")[-1]]),
         }
 
         # Add radar data if available
@@ -473,7 +469,7 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
             {
                 "steer": torch.Tensor([self.control.steer]),
                 "throttle": torch.Tensor([self.control.throttle]),
-                "brake": torch.Tensor([self.control.brake]),
+                "brake": torch.Tensor([self.control.brake]).bool(),
                 "distance_to_stop_sign": torch.Tensor(
                     [
                         self.stop_sign_post_processor.stop_sign_buffer[0].norm
@@ -481,8 +477,8 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
                         else np.inf
                     ]
                 ),
-                "stuck_detector": torch.Tensor([self.force_move_post_processor.stuck_detector]),
-                "force_move": torch.Tensor([self.force_move_post_processor.force_move]),
+                "stuck_detector": torch.Tensor([int(self.force_move_post_processor.stuck_detector)]).int(),
+                "force_move": torch.Tensor([int(self.force_move_post_processor.force_move)]).int(),
                 "route_curvature": torch.Tensor(
                     [common_utils.waypoints_curvature(closed_loop_prediction.pred_route.squeeze())]
                 ),

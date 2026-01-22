@@ -9,6 +9,11 @@ from lead.common.constants import WAYMO_E2E_INTRINSIC, TargetDataset
 
 
 class BaseConfig:
+    """Base configuration class that provides default settings for both data collection and model training.
+
+    See more details at https://ln2697.github.io/lead/docs/config_system.html
+    """
+
     @property
     def target_dataset(self):
         raise NotImplementedError("Subclasses must implement the target_dataset property.")
