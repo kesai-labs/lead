@@ -46,23 +46,27 @@ def write_pickle(path: str, data: Any) -> None:
         f.write(pickle_str)
 
 
-def ligher_shade(color: tuple[int, int, int], i: int, max_len: int, max_lighter: int = 100) -> tuple[int, int, int]:
-    """Create a lighter shade of a color based on position in sequence.
+def angle2class(angle: float, num_dir_bins: int) -> tuple[int, float]:
+    """Convert continuous angle to discrete class and residual.
+
+    Encodes a continuous angle into a discrete class and a small regression
+    residual from the class center to the actual angle.
 
     Args:
-        color: RGB color tuple.
-        i: Current position in sequence.
-        max_len: Maximum length of sequence.
-        max_lighter: Maximum lightening factor.
+        angle: Continuous angle in radians (0-2π or -π~π).
+        num_dir_bins: Number of discrete direction bins for encoding.
 
     Returns:
-        Lighter RGB color tuple.
+        A tuple containing:
+            - Discrete angle class as integer
+            - Angle residual as float (difference from class center)
     """
-    factor = i / max(1, max_len - 1)
-
-    color = np.array(color, dtype=np.int32)
-    lighter_color = np.clip(color + factor * max_lighter, 0, 255)
-    return tuple(lighter_color.astype(int).tolist())
+    angle = angle % (2 * np.pi)
+    angle_per_class = 2 * np.pi / float(num_dir_bins)
+    shifted_angle = (angle + angle_per_class / 2) % (2 * np.pi)
+    angle_cls = shifted_angle // angle_per_class
+    angle_res = shifted_angle - (angle_cls * angle_per_class + angle_per_class / 2)
+    return int(angle_cls), angle_res
 
 
 @beartype
@@ -255,53 +259,6 @@ def filter_lidar_points_in_obb(
     in_box = in_x & in_y
 
     return lidar_points[in_box]
-
-
-def class2angle(
-    angle_cls: torch.Tensor, angle_res: torch.Tensor, config: TrainingConfig, limit_period: bool = True
-) -> torch.Tensor:
-    """Convert discrete angle class and residual back to continuous angle.
-
-    Inverse function to angle2class for decoding predicted angle values.
-
-    Args:
-        angle_cls: Discrete angle class tensor to decode.
-        angle_res: Angle residual tensor to decode.
-        config: Training configuration containing num_dir_bins.
-        limit_period: Whether to limit angle to [-π, π] range.
-
-    Returns:
-        Decoded continuous angle tensor.
-    """
-    angle_per_class = 2 * np.pi / float(config.num_dir_bins)
-    angle_center = angle_cls.float() * angle_per_class
-    angle = angle_center + angle_res
-    if limit_period:
-        angle[angle > np.pi] -= 2 * np.pi
-        return angle
-
-
-def angle2class(angle: float, num_dir_bins: int) -> tuple[int, float]:
-    """Convert continuous angle to discrete class and residual.
-
-    Encodes a continuous angle into a discrete class and a small regression
-    residual from the class center to the actual angle.
-
-    Args:
-        angle: Continuous angle in radians (0-2π or -π~π).
-        num_dir_bins: Number of discrete direction bins for encoding.
-
-    Returns:
-        A tuple containing:
-            - Discrete angle class as integer
-            - Angle residual as float (difference from class center)
-    """
-    angle = angle % (2 * np.pi)
-    angle_per_class = 2 * np.pi / float(num_dir_bins)
-    shifted_angle = (angle + angle_per_class / 2) % (2 * np.pi)
-    angle_cls = shifted_angle // angle_per_class
-    angle_res = shifted_angle - (angle_cls * angle_per_class + angle_per_class / 2)
-    return int(angle_cls), angle_res
 
 
 def normalize_angle(x: float) -> float:

@@ -14,7 +14,6 @@ import torch
 from beartype import beartype
 
 from lead.common import common_utils
-from lead.common.config_base import BaseConfig
 from lead.inference.config_closed_loop import ClosedLoopConfig
 from lead.training.config_training import TrainingConfig
 
@@ -546,9 +545,7 @@ class VideoRecorder:
             num_cameras = self.training_config.num_cameras
             camera_width = input_width // num_cameras
 
-            assert self.training_config.carla_leaderboard_mode, (
-                "Grid video is currently supported for CARLA leaderboard mode."
-            )
+            assert self.training_config.carla_leaderboard_mode, "Grid video is currently supported for CARLA leaderboard mode."
             # Mapping from image section index to calibration index
             # Image order: [LEFT_FRONT, CENTER_FRONT, RIGHT_FRONT, RIGHT_REAR, CENTER_REAR, LEFT_REAR]
             # Calib order: [RIGHT_FRONT, CENTER_FRONT, LEFT_FRONT, LEFT_REAR, CENTER_REAR, RIGHT_REAR]
@@ -652,7 +649,7 @@ class VideoRecorder:
         command = f"ffmpeg -i {final_path} -c:v libx264 -crf {crf} -preset {preset} -an {temp_path} -y"
         os.system(command)
         os.replace(temp_path, final_path)
-        LOG.info(f"[VideoRecorder] Compressed video: {final_path}")
+        LOG.info(f"Compressed video: {final_path}")
 
     @beartype
     def cleanup_and_compress(self) -> None:
@@ -663,7 +660,7 @@ class VideoRecorder:
                 if demo_cam_info["camera"].is_alive:
                     demo_cam_info["camera"].stop()
                     demo_cam_info["camera"].destroy()
-                    LOG.info(f"[VideoRecorder] Destroyed demo camera {demo_cam_info['index']}")
+                    LOG.info(f"Destroyed demo camera {demo_cam_info['index']}")
 
         # Clean up video writers
         if self.config.save_path is not None:
@@ -683,8 +680,8 @@ class VideoRecorder:
                 self.compress_video(
                     temp_path=self.config.temp_debug_video_path,
                     final_path=self.config.debug_video_path,
-                    crf=38,
-                    preset="veryslow",
+                    crf=28,
+                    preset="slower",
                 )
 
             # Demo video - high quality for presentation

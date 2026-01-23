@@ -8,9 +8,9 @@ from beartype import beartype
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.tensorboard import SummaryWriter
 
-from lead.common.visualizer import visualize_sample
 from lead.tfv6.tfv6 import Prediction, TFv6
 from lead.training.config_training import TrainingConfig
+from lead.visualization.visualizer import visualize_sample
 
 LOG = logging.getLogger(__name__)
 

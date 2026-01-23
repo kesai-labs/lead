@@ -22,17 +22,14 @@ from lead.common.constants import TransfuserBoundingBoxClass
 from lead.common.logging_config import setup_logging
 from lead.common.route_planner import RoutePlanner
 from lead.common.sensor_setup import av_sensor_setup
-from lead.common.visualizer import Visualizer
 from lead.data_loader import carla_dataset_utils, training_cache
 from lead.data_loader.carla_dataset_utils import rasterize_lidar
 from lead.expert import expert_utils
-from lead.inference.closed_loop_inference import (
-    ClosedLoopInference,
-    ClosedLoopPrediction,
-)
+from lead.inference.closed_loop_inference import ClosedLoopInference, ClosedLoopPrediction
 from lead.inference.config_closed_loop import ClosedLoopConfig
 from lead.inference.video_recorder import VideoRecorder
 from lead.training.config_training import TrainingConfig
+from lead.visualization.visualizer import Visualizer
 
 matplotlib.use("Agg")  # non-GUI backend for headless servers
 
@@ -415,6 +412,7 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
             ),
             "speed": torch.Tensor([input_data["speed"]]).to(self.device, dtype=torch.float32).view(1),
             "command": torch.Tensor(input_data["command"]).to(self.device, dtype=torch.float32).view(1, 6),
+            "next_command": torch.Tensor(input_data["next_command"]).to(self.device, dtype=torch.float32).view(1, 6),
             "town": np.array([self._world.get_map().name.split("/")[-1]]),
         }
 
@@ -624,7 +622,7 @@ class StopSignPostProcessor:
 
         if len(self.stop_sign_buffer) > 0:
             # Remove boxes that are too far away
-            if self.stop_sign_buffer[0].norm > abs(self.config.max_x):
+            if self.stop_sign_buffer[0].norm > abs(self.config.max_x_meter):
                 # LOG.info("Stop sign removed")
                 self.stop_sign_buffer.pop()
 

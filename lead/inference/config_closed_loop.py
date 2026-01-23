@@ -62,11 +62,15 @@ class ClosedLoopConfig(OpenLoopConfig):
 
     # --- Stop Sign Heuristic ---
     # If true enable stop sign controller
-    slower_for_stop_sign = True
+    slower_for_stop_sign = False
     # Distance threshold for stop sign controller activation
     slower_for_stop_sign_dist_threshold = 1.0
     # Cool down period for stop sign controller (frames)
     slower_for_stop_sign_cool_down = 120
+    # Number of frames to apply slower behavior
+    slower_for_stop_sign_count = 40
+    # Throttle threshold for slower stop sign behavior
+    slower_for_stop_sign_throttle_threshold = 0.1
 
     # --- PID Controller Parameters ---
     # Maximum change in speed input to longitudinal controller
@@ -130,14 +134,14 @@ class ClosedLoopConfig(OpenLoopConfig):
         """If true produce demo image output."""
         if self.is_on_slurm:
             return False
-        return True
+        return False
 
     @overridable_property
     def produce_demo_video(self):
         """If true produce demo video output."""
         if self.is_on_slurm:
             return False
-        return True
+        return False
 
     @overridable_property
     def produce_debug_image(self):
@@ -158,7 +162,7 @@ class ClosedLoopConfig(OpenLoopConfig):
         """If true produce input image output."""
         if self.is_on_slurm:
             return False
-        return True
+        return False
 
     @overridable_property
     def produce_input_video(self):
@@ -172,21 +176,21 @@ class ClosedLoopConfig(OpenLoopConfig):
         """If true produce grid image output (demo + input stacked vertically)."""
         if self.is_on_slurm:
             return False
-        return True
+        return False
 
     @overridable_property
     def produce_grid_video(self):
         """If true produce grid video output (demo + input stacked vertically)."""
         if self.is_on_slurm:
             return False
-        return True
+        return False
 
     @overridable_property
     def produce_input_log(self):
         """If true produce input logging."""
         if self.is_on_slurm:
             return False
-        return True
+        return False
 
     @property
     def save_path(self):

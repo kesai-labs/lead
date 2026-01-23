@@ -216,7 +216,7 @@
         // Read-only mode (set by server)
         const READ_ONLY_MODE = {{ 'true' if read_only_mode else 'false' }};
         console.log('READ_ONLY_MODE:', READ_ONLY_MODE);
-        
+
         // Global state
         let currentRoute = null;
         let currentDirectory = null;
@@ -314,7 +314,7 @@
             } else {
                 console.log('Read-only mode disabled - file operations available');
             }
-            
+
             loadOutputDirectories();
         });
 
@@ -392,14 +392,14 @@
         async function selectOutputDirectory(dirPath) {
             currentDirectory = dirPath;
             outputDirInput.value = dirPath;
-            
+
             // Hide directory selection, keep route viewer hidden until route is selected
             directorySelection.style.display = 'none';
-            
+
             // Show active sidebar state
             document.getElementById('sidebar-initial').style.display = 'none';
             document.getElementById('sidebar-active').style.display = 'block';
-            
+
             // Load routes from this output directory (will populate sidebar)
             await loadRoutes();
         }
@@ -543,7 +543,7 @@
             document.getElementById('route-name').textContent = routeName;
             directorySelection.style.display = 'none';
             routeViewer.style.display = 'block';
-            
+
             // Hide file operation buttons if in read-only mode (needs to be done after showing route-viewer)
             if (READ_ONLY_MODE) {
                 const openDirBtn = document.getElementById('open-directory-btn');
@@ -669,7 +669,7 @@
                 const meta = getInfractionMeta(inf.infraction);
                 const metersText = inf.meters_travelled !== undefined ? `${inf.meters_travelled}m` : 'N/A';
                 const infractionNumber = idx + 1;
-                
+
                 const cutButton = READ_ONLY_MODE ? '' : `
                     <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); cutVideo(${inf.step}, ${infractionNumber})" title="Cut video around this infraction">
                         <i class="bi bi-scissors"></i> Cut
@@ -1063,11 +1063,11 @@
                     params.set('offset', offset.toString());
                 }
             }
-            
+
             // Update the current URL
             const newURL = params.toString() ? `?${params.toString()}` : '/';
             window.history.pushState({}, '', newURL);
-            
+
             // Copy full URL to clipboard
             const fullURL = `${window.location.origin}${window.location.pathname}${newURL}`;
             navigator.clipboard.writeText(fullURL).then(() => {
@@ -1125,12 +1125,12 @@
             if (dir) {
                 currentDirectory = dir;
                 outputDirInput.value = dir; // Persist in text field
-                
+
                 // Update UI: hide directory selection, show sidebar with routes
                 directorySelection.style.display = 'none';
                 document.getElementById('sidebar-initial').style.display = 'none';
                 document.getElementById('sidebar-active').style.display = 'block';
-                
+
                 loadRoutes().then(() => {
                     if (route) {
                         selectRoute(route).then(() => {

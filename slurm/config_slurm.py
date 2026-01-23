@@ -2,8 +2,10 @@
 
 import os
 
+from lead.common.config_base import BaseConfig
 
-class ConfigSlurm:
+
+class ConfigSlurm(BaseConfig):
     """Configuration for SLURM evaluation jobs and environment."""
 
     @property
@@ -59,12 +61,12 @@ class ConfigSlurm:
     @property
     def max_num_attempts_path(self) -> str:
         """Path to config file specifying max retry attempts for failed jobs."""
-        return f"slurm/configs/max_num_attempts_{self.evaluation_dataset}.txt"
+        return os.path.join(self.lead_project_root, f"slurm/configs/max_num_attempts_{self.evaluation_dataset}.txt")
 
     @property
     def max_num_parallel_jobs_path(self) -> str:
         """Path to config file specifying max parallel jobs allowed."""
-        return f"slurm/configs/max_num_parallel_jobs_{self.evaluation_dataset}.txt"
+        return os.path.join(self.lead_project_root, f"slurm/configs/max_num_parallel_jobs_{self.evaluation_dataset}.txt")
 
     @property
     def merged_results_path(self) -> str:
@@ -75,10 +77,12 @@ class ConfigSlurm:
     def route_files_by_dataset(self) -> dict[str, str]:
         """Map dataset names to their route XML files."""
         return {
-            "Town13": "data/routes/Town13/Town13_bench_v2.0_3cameras_6hz.xml",
-            "longest6": "3rd_party/leaderboard/data/longest6.xml",
-            "bench2drive220": "3rd_party/Bench2Drive/leaderboard/data/bench2drive_220.xml",
-            "fail2drive210": "3rd_party/Bench2Drive/leaderboard/data/fail2drive_210.xml",
+            "Town13": os.path.join(self.lead_project_root, "data/routes/Town13/Town13_bench_v2.0_3cameras_6hz.xml"),
+            "longest6": os.path.join(self.lead_project_root, "3rd_party/leaderboard/data/longest6.xml"),
+            "bench2drive220": os.path.join(
+                self.lead_project_root, "3rd_party/Bench2Drive/leaderboard/data/bench2drive_220.xml"
+            ),
+            "fail2drive210": os.path.join(self.lead_project_root, "3rd_party/Bench2Drive/leaderboard/data/fail2drive_210.xml"),
         }
 
     @property

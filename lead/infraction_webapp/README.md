@@ -1,17 +1,6 @@
-# LEAD Infraction Dashboard
+# Infraction Dashboard
 
 A web-based viewer for analyzing driving infractions from CARLA evaluations.
-
-## Features
-
-- **Video Player** - Watch debug/demo videos with enhanced controls
-- **Infraction List** - Scrollable list of all detected infractions
-- **Jump to Timestamp** - Click any infraction to jump to that moment in the video
-- **Playback Controls** - Speed control (0.5x, 1x, 2x) and frame-by-frame navigation
-- **Filter** - Search and filter infractions by type
-- **Route Stats** - View driving scores and metrics
-- **Keyboard Shortcuts** - Space to play/pause, arrows to seek
-
 ## Quick Start
 
 ### 1. Install Flask

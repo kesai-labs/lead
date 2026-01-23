@@ -15,9 +15,9 @@ cleanup() {
 trap cleanup INT TERM
 
 # Enter data here
-export ROUTE_DIR=data
-export SCENARIO_NAME=debug_routes
-export ROUTE_NUMBER=1_town15_construction
+export ROUTE_DIR=data/data_routes/leaderboard1
+export SCENARIO_NAME=BlockedIntersection
+export ROUTE_NUMBER=Town06_13
 export LEAD_LOG_LEVEL="DEBUG"
 
 # Set standard environment variables

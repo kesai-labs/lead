@@ -18,6 +18,11 @@ class BaseConfig:
     def target_dataset(self):
         raise NotImplementedError("Subclasses must implement the target_dataset property.")
 
+    @property
+    def lead_project_root(self):
+        """Get the LEAD project root directory from environment variable or default to current working directory."""
+        return os.getenv("LEAD_PROJECT_ROOT")
+
     # --- Autopilot ---
     # Frame rate used for the bicycle models in the autopilot
     bicycle_frame_rate = 20
@@ -382,7 +387,6 @@ class BaseConfig:
         return os.getenv("TCML") is not None
 
     # --- Configuration Parsing Methods ---
-
     def load_from_args(self, loaded_config: Any, raise_error_on_missing_key: bool):
         """Load configuration from command-line arguments.
 
@@ -461,19 +465,6 @@ class BaseConfig:
                 f"Can't set unknown attribute '{name}'. Please check if this variable might have been renamed."
             )
         super().__setattr__(name, value)
-
-    def base_dict(self):
-        out = {}
-        for k in dir(self):
-            if k.startswith("_"):
-                continue
-            try:
-                v = getattr(self, k)
-                if not callable(v):
-                    out[k] = v
-            except Exception:
-                pass
-        return out
 
 
 def overridable_property(fn):

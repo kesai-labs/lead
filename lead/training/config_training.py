@@ -204,7 +204,7 @@ class TrainingConfig(BaseConfig):
         """Path to SSD cache directory."""
         tmp_folder = "/scratch/" + str(os.environ.get("SLURM_JOB_ID"))
         if not self.is_on_tcml:
-            tmp_folder = str(os.environ.get("SCRATCH", "/tmp"))
+            tmp_folder = str(os.environ.get("SCRATCH", f"/tmp/{os.environ['USER']}"))
         return tmp_folder
 
     # Root directory for CARLA sensor data.
@@ -388,11 +388,19 @@ class TrainingConfig(BaseConfig):
     def carla_bucket_collection(self):
         """Name of the bucket collection to use for training data."""
         from lead.data_buckets.failed_bucket_collection import FailedBucketCollection
-        from lead.data_buckets.full_posttrain_bucket_collection import FullPosttrainBucketCollection
-        from lead.data_buckets.full_pretrain_bucket_collection import FullPretrainBucketCollection
+        from lead.data_buckets.full_posttrain_bucket_collection import (
+            FullPosttrainBucketCollection,
+        )
+        from lead.data_buckets.full_pretrain_bucket_collection import (
+            FullPretrainBucketCollection,
+        )
         from lead.data_buckets.navsim_bucket_collection import NavSimBucketCollection
-        from lead.data_buckets.town13_heldout_posttrain_bucket_collection import Town13HeldoutPosttrainBucketCollection
-        from lead.data_buckets.town13_heldout_pretrain_bucket_collection import Town13HeldOutPretrainBucketCollection
+        from lead.data_buckets.town13_heldout_posttrain_bucket_collection import (
+            Town13HeldoutPosttrainBucketCollection,
+        )
+        from lead.data_buckets.town13_heldout_pretrain_bucket_collection import (
+            Town13HeldOutPretrainBucketCollection,
+        )
         from lead.data_buckets.waymo_bucket_collection import WaymoBucketCollection
 
         if (
@@ -489,7 +497,10 @@ class TrainingConfig(BaseConfig):
     # If true use the bounding box auxiliary task.
     detect_boxes = True
     # List of static object types to include in bounding box detection.
-    data_bb_static_types_white_list = ["static.prop.constructioncone", "static.prop.trafficwarning"]
+    data_bb_static_types_white_list = [
+        "static.prop.constructioncone",
+        "static.prop.trafficwarning",
+    ]
     # Confidence of a bounding box that is needed for the detection to be accepted.
     bb_confidence_threshold = 0.3
     # Maximum number of bounding boxes our system can detect.
@@ -940,7 +951,12 @@ class TrainingConfig(BaseConfig):
         if not self.is_on_slurm:
             return 1
         try:
-            with open("slurm/configs/wandb_log_frequency_training_scalar.txt") as f:
+            with open(
+                os.path.join(
+                    self.lead_project_root,
+                    "slurm/configs/wandb_log_frequency_training_scalar.txt",
+                )
+            ) as f:
                 return int(f.readline().strip())
         except Exception as e:
             LOG.error(f"Error reading log frequency file: {e}.")
@@ -952,7 +968,12 @@ class TrainingConfig(BaseConfig):
         if not self.is_on_slurm:
             return 100
         try:
-            with open("slurm/configs/wandb_log_frequency_training_images.txt") as f:
+            with open(
+                os.path.join(
+                    self.lead_project_root,
+                    "slurm/configs/wandb_log_frequency_training_images.txt",
+                )
+            ) as f:
                 return int(f.readline().strip())
         except Exception as e:
             LOG.error(f"Error reading log frequency file: {e}.")
@@ -1021,8 +1042,8 @@ class TrainingConfig(BaseConfig):
     def workers_per_cpu_cores(self):
         """Number of data loader workers per CPU core."""
         if not self.mixed_data_training and not self.use_carla_data:
-            return 2
-        return 2
+            return 1
+        return 1
 
     def training_dict(self) -> dict[str, Any]:
         """Convert training configuration to a dictionary for serialization and logging."""

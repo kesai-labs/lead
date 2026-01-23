@@ -389,7 +389,6 @@ class CARLAData(Dataset):
             noisy_version = "_gps"
         next_tp_list = meta[f"next{noisy_version}_target_points_{self.config.tp_pop_distance}"]
         next_command_list = meta[f"next{noisy_version}_commands_{self.config.tp_pop_distance}"]
-        previous_tp_list = meta[f"previous{noisy_version}_target_points_{self.config.tp_pop_distance}"]
         # Merge duplicates target point
         filtered_tp_list = []
         filtered_command_list = []
@@ -405,55 +404,16 @@ class CARLAData(Dataset):
             data["target_point_next"] = transform_and_augment(next_tp_list[2][:2])
             data["target_point"] = transform_and_augment(next_tp_list[1][:2])
             data["target_point_previous"] = transform_and_augment(next_tp_list[0][:2])
-            if len(next_tp_list) > 3:
-                data["target_point_subsequent"] = transform_and_augment(next_tp_list[3][:2])
-            else:
-                data["target_point_subsequent"] = transform_and_augment(next_tp_list[2][:2])
         else:
             assert len(next_tp_list) == 2
             data["target_point"] = transform_and_augment(next_tp_list[1][:2])
-            data["target_point_subsequent"] = transform_and_augment(next_tp_list[1][:2])
             data["target_point_next"] = transform_and_augment(next_tp_list[1][:2])
             data["target_point_previous"] = transform_and_augment(next_tp_list[0][:2])
 
-        if len(previous_tp_list) > 0:
-            data["target_point_previous_previous"] = transform_and_augment(previous_tp_list[-1][:2])
-        else:
-            data["target_point_previous_previous"] = transform_and_augment(next_tp_list[0][:2])
-
         if self.config.use_discrete_command or self.config.visualize_dataset:
-            if len(next_command_list) > 2:
-                data["command"] = carla_dataset_utils.command_to_one_hot(next_command_list[0])
-                data["next_command"] = carla_dataset_utils.command_to_one_hot(next_command_list[1])
-                data["previous_command"] = carla_dataset_utils.command_to_one_hot(next_command_list[0])
-            else:
-                assert len(next_command_list) == 2
-                data["command"] = carla_dataset_utils.command_to_one_hot(next_command_list[0])
-                data["next_command"] = carla_dataset_utils.command_to_one_hot(next_command_list[1])
-                data["previous_command"] = carla_dataset_utils.command_to_one_hot(next_command_list[0])
-
-        # Mine urgent lane change scenarios
-        urgent_lane_change = (
-            0.1 < np.linalg.norm(data["target_point"] - data["target_point_next"]) < 10
-            and np.linalg.norm(data["target_point"]) < 11
-            and np.linalg.norm(data["target_point_next"]) < 15
-        ) or np.linalg.norm(data["target_point"] - data["target_point_previous"]) < 10
-        post_urgent_lane_change = pre_urgent_lane_change = False
-        if not urgent_lane_change:
-            pre_urgent_lane_change = (
-                0.1 < np.linalg.norm(data["target_point_next"] - data["target_point"]) < 10
-                and 8.5 <= np.linalg.norm(data["target_point"]) < 25.0
-                and 13.5 <= np.linalg.norm(data["target_point_next"]) < 30.0
-            )
-            if not pre_urgent_lane_change:
-                post_urgent_lane_change = (
-                    0.1 < np.linalg.norm(data["target_point_previous"] - data["target_point_previous_previous"]) < 10
-                    and np.linalg.norm(data["target_point_previous"]) < 10
-                )
-        data["urgent_lane_change"] = bool(urgent_lane_change)
-        data["pre_urgent_lane_change"] = bool(pre_urgent_lane_change)
-        data["post_urgent_lane_change"] = bool(post_urgent_lane_change)
-        data["near_urgent_lane_change"] = bool(urgent_lane_change or pre_urgent_lane_change or post_urgent_lane_change)
+            data["command"] = carla_dataset_utils.command_to_one_hot(next_command_list[0])
+            data["next_command"] = carla_dataset_utils.command_to_one_hot(next_command_list[1])
+            data["previous_command"] = carla_dataset_utils.command_to_one_hot(next_command_list[0])
 
         loading_meta_time = time.time() - start_loading_time
         data["loading_meta_time"] = loading_meta_time

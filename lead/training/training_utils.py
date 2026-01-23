@@ -22,7 +22,7 @@ from torch.utils.data import DataLoader
 from lead.data_loader.carla_dataset import CARLAData
 from lead.data_loader.navsim_dataset import NavsimData
 from lead.data_loader.waymo_e2e_dataset import WODE2EData
-from lead.tfv6 import fn
+from lead.tfv6 import transfuser_utils as fn
 from lead.training import mixed_training_utils
 from lead.training.config_training import TrainingConfig
 
@@ -55,6 +55,7 @@ def initialize_config() -> TrainingConfig:
 def initialize_training_session_cache(config: TrainingConfig) -> Cache | None:
     training_session_cache = None
     if config.use_training_session_cache:
+        LOG.info("Initializing training session cache at %s", config.training_session_cache_path)
         training_session_cache = Cache(directory=config.training_session_cache_path, size_limit=int(2048 * 1024**3))
     return training_session_cache
 

@@ -1,5 +1,4 @@
 import io
-import numbers
 import os
 from copy import deepcopy
 
@@ -14,10 +13,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 import lead.common.common_utils as common_utils
 import lead.common.constants as constants
-from lead.common.constants import (
-    RadarLabels,
-    TransfuserBoundingBoxIndex,
-)
+from lead.common.constants import CARLA_NAVIGATION_COMMAND_STR_MAP, RadarLabels, TransfuserBoundingBoxIndex
 from lead.data_loader import carla_dataset_utils
 from lead.inference.closed_loop_inference import ClosedLoopPrediction
 from lead.inference.config_closed_loop import ClosedLoopConfig
@@ -25,19 +21,12 @@ from lead.inference.open_loop_inference import OpenLoopPrediction
 from lead.tfv6.center_net_decoder import PredictedBoundingBox
 from lead.tfv6.tfv6 import Prediction
 from lead.training.config_training import TrainingConfig
+from lead.visualization import viz_utils
 
 
 class Visualizer:
     """Visualizer for LEAD training and inference results. This class provides methods to visualize various aspects
     of the LEAD model's groundtruths and predictions
-
-    Args:
-        config: Training configuration object.
-        data: Dictionary containing input data tensors.
-        prediction: Prediction object containing model outputs.
-        training: Boolean indicating if in training mode.
-        config_test_time: Configuration for test-time settings.
-        test_time: Boolean indicating if in test-time mode.
     """
 
     @beartype
@@ -50,6 +39,17 @@ class Visualizer:
         config_test_time: ClosedLoopConfig | None = None,
         test_time: bool = False,
     ):
+        """
+        Initialize the Visualizer.
+
+        Args:
+            config: Training configuration object.
+            data: Dictionary containing input data tensors.
+            prediction: Prediction object containing model outputs.
+            training: Boolean indicating if in training mode.
+            config_test_time: Configuration for test-time settings.
+            test_time: Boolean indicating if in test-time mode.
+        """
         self.test_time = test_time
         self.training = training
         self.config = config
@@ -95,12 +95,12 @@ class Visualizer:
             self.meta_panel = 255 * np.ones((115, 1492, 3), dtype=np.uint8)
 
     def visualize_training_labels(self):
+        """Visualize groundtruth labels during training."""
         # Perspectives
         self._process_all_perspectives()
 
         # BEV
         self._bev_semantic(ground_truth=True)
-        self.draw_tokenization_grid()
         self._route()
         self._future_waypoints()
         self._ego_bounding_box()
@@ -117,12 +117,12 @@ class Visualizer:
         return self._concatenate_all_perspectives_and_bev()
 
     def visualize_training_prediction(self):
+        """Visualize model predictions during training."""
         # Perspective
         self._process_all_perspectives(training=True)
 
         # BEV
         self._bev_semantic(ground_truth=False)
-        self.draw_tokenization_grid()
         self._target_point()
         if self.config.use_planning_decoder:
             self._pred_future_waypoints()
@@ -141,12 +141,12 @@ class Visualizer:
         return self._concatenate_all_perspectives_and_bev()
 
     def visualize_inference_prediction(self):
+        """Visualize model predictions during inference."""
         # Perspective
         self._process_all_perspectives(training=True)
 
         # BEV
         self._bev_semantic(ground_truth=False)
-        self.draw_tokenization_grid()
         self._pred_route()
         # self._pred_future_waypoints()
         self._target_point()
@@ -161,21 +161,6 @@ class Visualizer:
 
         return self._concatenate_all_perspectives_and_bev()
 
-    def draw_tokenization_grid(self, grid_size_meters=8):
-        """Draw light grid lines on the BEV image to demonstrate tokenization process."""
-        grid_spacing_pixels = int(grid_size_meters * self.loc_pixels_per_meter)
-        height, width = self.bev_image.shape[:2]
-        line_color = (220, 220, 220)
-        line_thickness = 2
-
-        # Draw vertical lines
-        for x in range(0, width, grid_spacing_pixels):
-            cv2.line(self.bev_image, (x, 0), (x, height), line_color, line_thickness)
-
-        # Draw horizontal lines
-        for y in range(0, height, grid_spacing_pixels):
-            cv2.line(self.bev_image, (0, y), (width, y), line_color, line_thickness)
-
     def _radars(self, plot_detection_label: bool, plot_detection_prediction: bool):
         if not self.config.use_radars:
             return
@@ -186,39 +171,6 @@ class Visualizer:
 
         vmax = 20.0  # m/s for scaling radius
         min_r, max_r = 1.0, 20  # px
-
-        def draw_gaussian_blob(x, y, size, color, filled=True):
-            """Draw a 2D Gaussian blob"""
-            # Create a small patch around the point
-            patch_size = int(size * 2.5)  # Make patch larger than the blob
-
-            # Create coordinate grids
-            xx, yy = np.meshgrid(np.arange(-patch_size, patch_size + 1), np.arange(-patch_size, patch_size + 1))
-
-            # 2D Gaussian formula
-            sigma = size  # Standard deviation
-            gaussian = np.exp(-(xx**2 + yy**2) / (2 * sigma**2))
-
-            # Normalize to 0-255 range
-            if filled:
-                gaussian = (gaussian * 255).astype(np.uint8)
-            else:
-                # For outline, create a ring-like effect
-                gaussian = ((gaussian > 0.1) & (gaussian < 0.5)).astype(np.uint8) * 255
-
-            # Apply the blob to the image
-            y1, y2 = max(0, y - patch_size), min(bev.shape[0], y + patch_size + 1)
-            x1, x2 = max(0, x - patch_size), min(bev.shape[1], x + patch_size + 1)
-
-            # Adjust gaussian patch to fit within image bounds
-            gy1, gy2 = max(0, patch_size - y), min(gaussian.shape[0], patch_size + bev.shape[0] - y)
-            gx1, gx2 = max(0, patch_size - x), min(gaussian.shape[1], patch_size + bev.shape[1] - x)
-
-            if y2 > y1 and x2 > x1 and gy2 > gy1 and gx2 > gx1:
-                # Blend the gaussian with the existing image
-                for c in range(3):  # For each color channel
-                    alpha = gaussian[gy1:gy2, gx1:gx2] / 255.0
-                    bev[y1:y2, x1:x2, c] = (bev[y1:y2, x1:x2, c] * (1 - alpha) + color[c] * alpha).astype(np.uint8)
 
         # Visualize raw radars
         for i in range(1, self.config.num_radar_sensors + 1):
@@ -244,7 +196,7 @@ class Visualizer:
                 rpx = int(np.clip(min_r + (abs(vk) / vmax) * (max_r - min_r), min_r, max_r))
                 filled = vk > 0  # filled = approaching, outline = receding
 
-                draw_gaussian_blob(px, py, rpx, constants.RADAR_COLOR, filled)
+                viz_utils.draw_gaussian_blob(bev, px, py, rpx, constants.RADAR_COLOR, filled)
 
         # Visualize radar detections labels
         if plot_detection_label:
@@ -268,7 +220,7 @@ class Visualizer:
 
                         rpx = 1 + int(np.clip(min_r + (abs(vk) / vmax) * (max_r - min_r), min_r, max_r))
                         filled = vk > 0  # filled = approaching, outline = receding
-                        draw_gaussian_blob(px, py, rpx, constants.RADAR_DETECTION_COLOR, filled)
+                        viz_utils.draw_gaussian_blob(bev, px, py, rpx, constants.RADAR_DETECTION_COLOR, filled)
 
                 # Draw waypoints for valid detections
                 if radar_detection_waypoints is not None and radar_detection_num_waypoints is not None:
@@ -336,7 +288,7 @@ class Visualizer:
 
                     rpx = 1 + int(np.clip(min_r + (abs(vk) / vmax) * (max_r - min_r), min_r, max_r))
                     filled = vk > 0  # filled = approaching, outline = receding
-                    draw_gaussian_blob(px, py, rpx, constants.RADAR_DETECTION_COLOR, filled)
+                    viz_utils.draw_gaussian_blob(bev, px, py, rpx, constants.RADAR_DETECTION_COLOR, filled)
 
     def _process_all_perspectives(self, training=False):
         self.perspectives = {}
@@ -609,38 +561,26 @@ class Visualizer:
         target_point_next = self.data.get("target_point_next")
         target_point_previous = self.data.get("target_point_previous")
 
-        def draw_circle_with_number(x, y, color, radius, number):
-            """Draw a circle with a number inside"""
-            # Draw filled circle
-            cv2.circle(self.bev_image, (x, y), radius, color, thickness=-1)
-
-            # Draw white number in the center
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            font_scale = 0.8
-            thickness = 2
-            text = str(number)
-
-            # Get text size to center it
-            text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
-            text_x = x - text_size[0] // 2
-            text_y = y + text_size[1] // 2
-
-            cv2.putText(self.bev_image, text, (text_x, text_y), font, font_scale, (255, 255, 255), thickness)
-
         if target_point_previous is not None:
             x_tp = target_point_previous[0][0] * self.loc_pixels_per_meter + self.origin[0]
             y_tp = target_point_previous[0][1] * self.loc_pixels_per_meter + self.origin[1]
-            draw_circle_with_number(int(x_tp), int(y_tp), constants.TP_DEFAULT_COLOR, radius=12, number=0)
+            viz_utils.draw_circle_with_number(
+                self.bev_image, int(x_tp), int(y_tp), constants.TP_DEFAULT_COLOR, radius=14, number=0
+            )
 
         if target_point_next is not None:
             x_tp = target_point_next[0][0] * self.loc_pixels_per_meter + self.origin[0]
             y_tp = target_point_next[0][1] * self.loc_pixels_per_meter + self.origin[1]
-            draw_circle_with_number(int(x_tp), int(y_tp), constants.TP_DEFAULT_COLOR, radius=12, number=2)
+            viz_utils.draw_circle_with_number(
+                self.bev_image, int(x_tp), int(y_tp), constants.TP_DEFAULT_COLOR, radius=14, number=2
+            )
 
         if target_point is not None:
             x_tp = target_point[0][0] * self.loc_pixels_per_meter + self.origin[0]
             y_tp = target_point[0][1] * self.loc_pixels_per_meter + self.origin[1]
-            draw_circle_with_number(int(x_tp), int(y_tp), constants.TP_DEFAULT_COLOR, radius=18, number=1)
+            viz_utils.draw_circle_with_number(
+                self.bev_image, int(x_tp), int(y_tp), constants.TP_DEFAULT_COLOR, radius=18, number=1
+            )
 
     @beartype
     def _draw_points_in_perspective(self, points: NDArray, size: int, connected: bool, color: tuple[int, int, int]):
@@ -717,7 +657,7 @@ class Visualizer:
                 x2 = int(wps[i + 1][0] * self.loc_pixels_per_meter + self.origin[0])
                 y2 = int(wps[i + 1][1] * self.loc_pixels_per_meter + self.origin[1])
 
-                color = common_utils.ligher_shade(constants.PREDICTION_ROUTE_COLOR, i, len(wps))
+                color = viz_utils.lighter_shade(constants.PREDICTION_ROUTE_COLOR, i, len(wps))
                 cv2.line(
                     self.bev_image,
                     (x1, y1),
@@ -741,7 +681,7 @@ class Visualizer:
                     for i, wp in enumerate(wps):
                         wp_x = wp[0] * self.loc_pixels_per_meter + self.origin[0]
                         wp_y = wp[1] * self.loc_pixels_per_meter + self.origin[1]
-                        color = common_utils.ligher_shade(constants.GROUNDTRUTH_FUTURE_WAYPOINT_COLOR, i, len(wps))
+                        color = viz_utils.lighter_shade(constants.GROUNDTRUTH_FUTURE_WAYPOINT_COLOR, i, len(wps))
                         cv2.circle(
                             self.bev_image,
                             (int(wp_x), int(wp_y)),
@@ -761,7 +701,7 @@ class Visualizer:
                 for i, wp in enumerate(wps):
                     wp_x = wp[0] * self.loc_pixels_per_meter + self.origin[0]
                     wp_y = wp[1] * self.loc_pixels_per_meter + self.origin[1]
-                    color = common_utils.ligher_shade(constants.GROUND_TRUTH_PAST_WAYPOINT_COLOR, i, len(wps))
+                    color = viz_utils.lighter_shade(constants.GROUND_TRUTH_PAST_WAYPOINT_COLOR, i, len(wps))
                     cv2.circle(
                         self.bev_image,
                         (int(wp_x), int(wp_y)),
@@ -777,7 +717,7 @@ class Visualizer:
             for i in range(len(wps) - 1):
                 x1 = int(wps[i][0] * self.loc_pixels_per_meter + self.origin[0])
                 y1 = int(wps[i][1] * self.loc_pixels_per_meter + self.origin[1])
-                color = common_utils.ligher_shade(constants.PREDICTION_ROUTE_COLOR, i, len(wps))
+                color = viz_utils.lighter_shade(constants.PREDICTION_ROUTE_COLOR, i, len(wps))
                 cv2.circle(
                     self.bev_image,
                     (x1, y1),
@@ -794,7 +734,7 @@ class Visualizer:
             for i, wp in enumerate(wps):
                 wp_x = wp[0] * self.loc_pixels_per_meter + self.origin[0]
                 wp_y = wp[1] * self.loc_pixels_per_meter + self.origin[1]
-                color = common_utils.ligher_shade(constants.PREDICTION_WAYPOINT_COLOR, i, len(wps))
+                color = viz_utils.lighter_shade(constants.PREDICTION_WAYPOINT_COLOR, i, len(wps))
                 cv2.circle(
                     self.bev_image,
                     (int(wp_x), int(wp_y)),
@@ -813,10 +753,10 @@ class Visualizer:
                 self.config.ego_extent_x * self.loc_pixels_per_meter,
                 self.config.ego_extent_y * self.loc_pixels_per_meter,
                 np.deg2rad(0.0),
-                0.0,
+                self.data.get("speed")[0].item(),
             ]
         )
-        self.bev_image = draw_box(self.bev_image, ego_box, color=constants.EGO_BB_COLOR, thickness=4)
+        self.bev_image = viz_utils.draw_box(self.bev_image, ego_box, color=constants.EGO_BB_COLOR, thickness=4)
 
     def _pred_bounding_box(self):
         """Visualize predicted bounding boxes on BEV image."""
@@ -832,7 +772,7 @@ class Visualizer:
                     color_box = list(color_box)
                     color_box[1] = color_box[1] * inv_brake
                     box = box.scale(self.scale_factor)
-                    self.bev_image = draw_box(self.bev_image, box, color=color_box, speed=box.velocity)
+                    self.bev_image = viz_utils.draw_box(self.bev_image, box, color=color_box)
 
             elif isinstance(self.predictions, Prediction) and self.predictions.pred_bounding_box is not None:
                 bb = self.predictions.pred_bounding_box.pred_bounding_box_image_system[0]
@@ -848,7 +788,7 @@ class Visualizer:
                         color_box = list(color_box)
                         color_box[1] = color_box[1] * inv_brake
                         box[:4] = box[:4] * self.scale_factor
-                        self.bev_image = draw_box(self.bev_image, box, color=color_box)
+                        self.bev_image = viz_utils.draw_box(self.bev_image, box, color=color_box)
 
     def _bounding_boxes(self):
         """Visualize ground truth bounding boxes on BEV image."""
@@ -863,7 +803,7 @@ class Visualizer:
                 color_box = deepcopy(
                     list(constants.TRANSFUSER_BOUNDING_BOX_COLORS.values())[int(box[TransfuserBoundingBoxIndex.CLASS])]
                 )
-                self.bev_image = draw_box(self.bev_image, box, color=color_box)
+                self.bev_image = viz_utils.draw_box(self.bev_image, box, color=color_box)
         vehicles_future_waypoints = self.data.get("vehicles_future_waypoints")
         vehicle_future_yaws = self.data.get("vehicles_future_yaws")
 
@@ -873,7 +813,7 @@ class Visualizer:
                 for i, wp in enumerate(wps):
                     wp_x = wp[0] * self.loc_pixels_per_meter + self.origin[0]
                     wp_y = wp[1] * self.loc_pixels_per_meter + self.origin[1]
-                    color = common_utils.ligher_shade(constants.GROUNDTRUTH_BB_WP_COLOR, i, len(wps))
+                    color = viz_utils.lighter_shade(constants.GROUNDTRUTH_BB_WP_COLOR, i, len(wps))
                     cv2.circle(
                         self.bev_image,
                         (int(wp_x), int(wp_y)),
@@ -887,7 +827,7 @@ class Visualizer:
                 wps = future_box_waypoints[0]
                 yaws = future_box_yaws[0]
                 for i, wp in enumerate(wps):
-                    color = common_utils.ligher_shade(constants.GROUNDTRUTH_BB_WP_COLOR, i, len(wps))
+                    color = viz_utils.lighter_shade(constants.GROUNDTRUTH_BB_WP_COLOR, i, len(wps))
                     self._draw_bounding_box_from_waypoint(
                         wp[0], wp[1], yaws[i], self.config.ego_extent_x, self.config.ego_extent_y, color=color
                     )
@@ -899,7 +839,7 @@ class Visualizer:
 
         # Starting position
         start_x = 10
-        start_y = 30
+        start_y = 10
         line_height = 20
         separator = "-" * 45
 
@@ -978,6 +918,18 @@ class Visualizer:
                 unit_str = f" {unit}" if unit else ""
                 text_lines.append(f"{attr_name} {attr_data:.2f}{unit_str}")
 
+        # Add navigation command in natural language
+        for nav in ["command", "next_command"]:
+            nav_command_data = self.data.get(nav)
+            if nav_command_data is not None:
+                nav_command_value = nav_command_data[0].argmax()
+                if isinstance(nav_command_value, torch.Tensor):
+                    nav_command_value = int(nav_command_value.item())
+                else:
+                    nav_command_value = int(nav_command_value)
+                nav_command_text = CARLA_NAVIGATION_COMMAND_STR_MAP.get(nav_command_value)
+                text_lines.append(f"{nav} {nav_command_text}")
+
         # Collect other values
         for attr_name in [
             "vehicle_hazard",
@@ -1010,10 +962,6 @@ class Visualizer:
             "rear_adversarial_id",
             "stuck_detector",
             "force_move",
-            "urgent_lane_change",
-            "pre_urgent_lane_change",
-            "post_urgent_lane_change",
-            "near_urgent_lane_change",
             "bucket_identity",
             "perturbate_sensor",
         ]:
@@ -1068,7 +1016,7 @@ class Visualizer:
         column_width = 350
         num_columns = 4
         start_x = 10
-        start_y = 30
+        start_y = 10
         line_height = 20
 
         # Process text lines and prepare items
@@ -1154,120 +1102,12 @@ class Visualizer:
             min_y=self.config.min_y_meter,
         )[0]
         bb[:4] = bb[:4] * self.scale_factor
-        self.bev_image = draw_box(
+        self.bev_image = viz_utils.draw_box(
             self.bev_image,
             bb,
             color=color,
             thickness=1,
         )
-
-
-def draw_box(
-    img: np.ndarray,
-    box: np.ndarray,
-    color: tuple = (255, 255, 255),
-    thickness: numbers.Real = 2,
-    corner_radius: numbers.Real = 2,
-    speed: numbers.Real | None = None,
-):
-    """Utility function to draw a rotated bounding box on BEV image with rounded corners.
-
-    Args:
-        img: The BEV image to draw on.
-        box: The bounding box parameters [center_x, center_y, width, height, yaw]
-        color: Color of the box (BGR).
-        thickness: Thickness of the box lines.
-        corner_radius: Radius of the rounded corners.
-        speed: Optional speed value to draw a speed line from the center.
-    Returns:
-        img: The BEV image with the box drawn.
-    """
-    translation = np.array([[box[1], box[0]]])
-    width = box[TransfuserBoundingBoxIndex.W]
-    height = box[TransfuserBoundingBoxIndex.H]
-    yaw = -box[TransfuserBoundingBoxIndex.YAW] + np.pi / 2
-    rot = np.array([[np.cos(yaw), -np.sin(yaw)], [np.sin(yaw), np.cos(yaw)]])
-    corners = np.array([[-width, -height], [width, -height], [width, height], [-width, height]])
-    corner_global = (rot @ corners.T).T + translation
-    corner_global = corner_global.astype(int)
-
-    # Draw edges with rounded corners
-    for i in range(4):
-        r0, c0 = corner_global[i]
-        r1, c1 = corner_global[(i + 1) % 4]
-        r2, c2 = corner_global[(i + 2) % 4]
-
-        # Calculate shortened line segment (leave space for arc)
-        vec1 = np.array([c1 - c0, r1 - r0])
-        vec2 = np.array([c2 - c1, r2 - r1])
-
-        len1 = np.linalg.norm(vec1)
-        len2 = np.linalg.norm(vec2)
-
-        if len1 > corner_radius and len2 > corner_radius:
-            # Shorten lines by corner_radius
-            unit1 = vec1 / len1
-            unit2 = vec2 / len2
-
-            start_point = (int(c0 + unit1[0] * corner_radius), int(r0 + unit1[1] * corner_radius))
-            end_point = (int(c1 - unit1[0] * corner_radius), int(r1 - unit1[1] * corner_radius))
-
-            # Draw the shortened line
-            cv2.line(img, start_point, end_point, color, thickness=thickness, lineType=cv2.LINE_AA)
-
-            # Draw arc at corner
-            # Calculate arc parameters
-            center = (c1, r1)
-            start_angle = np.degrees(np.arctan2(-unit1[1], -unit1[0]))
-            end_angle = np.degrees(np.arctan2(unit2[1], unit2[0]))
-
-            # Handle angle wraparound
-            if end_angle - start_angle > 180:
-                end_angle -= 360
-            elif start_angle - end_angle > 180:
-                start_angle -= 360
-
-            cv2.ellipse(
-                img,
-                center,
-                (corner_radius, corner_radius),
-                0,
-                start_angle,
-                end_angle,
-                color,
-                thickness=thickness,
-                lineType=cv2.LINE_AA,
-            )
-
-    # Draw speed line from center
-    if speed is not None and speed > 0:
-        # Calculate center of the box (translation is [row, col])
-        center_x = int(translation[0][1])  # col (x in image)
-        center_y = int(translation[0][0])  # row (y in image)
-
-        # Scale factor: pixels per m/s (adjust as needed)
-        scale_factor = 5.0
-        line_length = speed * scale_factor
-
-        # Calculate direction vector using the same rotation as the box
-        # The direction vector starts at [line_length, 0] and is rotated by yaw
-        direction = rot @ np.array([[line_length], [0]])
-
-        # Calculate end point (direction is [row_offset, col_offset])
-        end_x = int(center_x + direction[1][0])  # col + col_offset
-        end_y = int(center_y + direction[0][0])  # row + row_offset
-
-        # Draw speed line (OpenCV uses (x, y) = (col, row) format)
-        cv2.line(
-            img,
-            (center_x, center_y),
-            (end_x, end_y),
-            (255, 0, 0),  # Red color for speed
-            thickness=3,
-            lineType=cv2.LINE_AA,
-        )
-
-    return img
 
 
 def visualize_sample(

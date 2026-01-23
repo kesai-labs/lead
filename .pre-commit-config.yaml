@@ -59,17 +59,6 @@ repos:
         pass_filenames: false
         always_run: true
 
-  # - repo: local
-  #   hooks:
-  #     - id: pytest
-  #       name: pytest
-  #       entry: pytest
-  #       language: system
-  #       types: [python]
-  #       pass_filenames: false
-  #       always_run: true
-  #       args: [tests/, -v]
-
     # Markdown linting
   - repo: https://github.com/executablebooks/mdformat
     rev: 0.7.17

@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from beartype import beartype
 from torch import nn
 
-from lead.tfv6 import fn
+from lead.tfv6 import transfuser_utils as fn
 from lead.training.config_training import TrainingConfig
 
 

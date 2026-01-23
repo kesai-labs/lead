@@ -7,7 +7,7 @@ from scipy.optimize import linear_sum_assignment
 from torch import nn
 
 from lead.common.constants import RadarDataIndex, RadarLabels
-from lead.tfv6 import fn
+from lead.tfv6 import transfuser_utils as fn
 from lead.training.config_training import TrainingConfig
 
 

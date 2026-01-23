@@ -59,7 +59,6 @@ class WaymoSim2RealBuckets(IntEnum):
     ENTERING_JUNCTION = auto()
     CLOSE_TO_JUNCTION = auto()
     RED_OVERHEAD_TRAFFIC_LIGHT = auto()
-    NEAR_URGENT_LANE_CHANGE = auto()
     STOP_SIGN_HAZARD = auto()
     LARGE_LATERAL_DEVIATION = auto()
     VEHICLE_HAZARD = auto()
@@ -131,10 +130,6 @@ class WaymoBucketCollection(AbstractBucketCollection):
                 sample, max_distance=20.0
             ):
                 self.buckets[WaymoSim2RealBuckets.DYNAMIC_OBJECT_CROSSING_SCENARIO].add(route_dir, frame_number)
-            elif sample["current_active_scenario_type"] == "EnterActorFlow" and bool(sample["near_urgent_lane_change"]):
-                self.buckets[WaymoSim2RealBuckets.ENTER_ACTOR_FLOW_SCENARIO].add(route_dir, frame_number)
-            elif sample["current_active_scenario_type"] == "EnterActorFlowV2" and bool(sample["near_urgent_lane_change"]):
-                self.buckets[WaymoSim2RealBuckets.ENTER_ACTOR_FLOW_V2_SCENARIO].add(route_dir, frame_number)
             elif sample["current_active_scenario_type"] == "HardBreakRoute" and self._check_is_hard_break_route(sample):
                 self.buckets[WaymoSim2RealBuckets.HARD_BREAK_ROUTE_SCENARIO].add(route_dir, frame_number)
             elif sample["current_active_scenario_type"] == "HazardAtSideLane" and self._check_scenario_actor_close(
@@ -147,8 +142,6 @@ class WaymoBucketCollection(AbstractBucketCollection):
                 self.buckets[WaymoSim2RealBuckets.HAZARD_AT_SIDE_LANE_TWO_WAYS_SCENARIO].add(route_dir, frame_number)
             elif self._check_highway_cutin_scenario(sample):
                 self.buckets[WaymoSim2RealBuckets.HIGHWAY_CUT_IN_SCENARIO].add(route_dir, frame_number)
-            elif sample["current_active_scenario_type"] == "HighwayExit" and bool(sample["near_urgent_lane_change"]):
-                self.buckets[WaymoSim2RealBuckets.HIGHWAY_EXIT_SCENARIO].add(route_dir, frame_number)
             elif (
                 sample["current_active_scenario_type"] == "InterurbanActorFlow"
                 and len(sample["scenario_actors_ids"]) > 0
@@ -163,11 +156,6 @@ class WaymoBucketCollection(AbstractBucketCollection):
                 self.buckets[WaymoSim2RealBuckets.INTERURBAN_ADVANCED_ACTOR_FLOW_SCENARIO].add(route_dir, frame_number)
             elif sample["scenario_type"] == "InvadingTurn" and self._check_invading_turn_scenario(sample):
                 self.buckets[WaymoSim2RealBuckets.INVADING_TURN_SCENARIO].add(route_dir, frame_number)
-            elif sample["current_active_scenario_type"] == "MergerIntoSlowTraffic" and bool(sample["near_urgent_lane_change"]):
-                self.buckets[WaymoSim2RealBuckets.MERGER_INTO_SLOW_TRAFFIC_SCENARIO].add(route_dir, frame_number)
-            elif sample["current_active_scenario_type"] == "MergerIntoSlowTrafficV2" and bool(
-                sample["near_urgent_lane_change"]
-            ):
                 self.buckets[WaymoSim2RealBuckets.MERGER_INTO_SLOW_TRAFFIC_V2_SCENARIO].add(route_dir, frame_number)
             elif (
                 sample["current_active_scenario_type"] == "NonSignalizedJunctionLeftTurn"
@@ -260,8 +248,6 @@ class WaymoBucketCollection(AbstractBucketCollection):
                 self.buckets[WaymoSim2RealBuckets.RED_EUROPE_TRAFFIC_LIGHT].add(route_dir, frame_number)
             elif bool(sample["slower_occluded_junction"]) and float(sample["distance_to_next_junction"]) < 5.0:
                 self.buckets[WaymoSim2RealBuckets.OCCLUDED_JUNCTION].add(route_dir, frame_number)
-            elif bool(sample["near_urgent_lane_change"]):
-                self.buckets[WaymoSim2RealBuckets.NEAR_URGENT_LANE_CHANGE].add(route_dir, frame_number)
             elif abs(float(sample["privileged_acceleration"])) > 17.5:
                 self.buckets[WaymoSim2RealBuckets.HIGH_ACCELERATION].add(route_dir, frame_number)
             elif self._check_large_lateral_deviation(sample):
@@ -524,7 +510,6 @@ class WaymoBucketCollection(AbstractBucketCollection):
         mixture[WaymoSim2RealBuckets.MERGER_INTO_SLOW_TRAFFIC_SCENARIO] = 0.0  # Useless
         mixture[WaymoSim2RealBuckets.MERGER_INTO_SLOW_TRAFFIC_V2_SCENARIO] = 0.0  # Useless
         mixture[WaymoSim2RealBuckets.HAZARD_AT_SIDE_LANE_SCENARIO] = 0.0
-        mixture[WaymoSim2RealBuckets.NEAR_URGENT_LANE_CHANGE] = 0.0  # Useless
         mixture[WaymoSim2RealBuckets.CROSSING_BICYCLE_FLOW_SCENARIO] = 0.0
         mixture[WaymoSim2RealBuckets.HIGHWAY_CUT_IN_SCENARIO] = 0.0
         mixture[WaymoSim2RealBuckets.PARKING_EXIT_SCENARIO] = 0.0

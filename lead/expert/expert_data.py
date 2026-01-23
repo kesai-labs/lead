@@ -26,13 +26,13 @@ from lead.common.constants import (
     TargetDataset,
     TransfuserSemanticSegmentationClass,
 )
-from lead.common.kinematic_bicycle_model import KinematicBicycleModel
 from lead.common.pid_controller import ExpertLongitudinalController
 from lead.common.route_planner import RoutePlanner
 from lead.common.sensor_setup import av_sensor_setup
 from lead.expert.expert_base import ExpertBase
 from lead.expert.hdmap.chauffeurnet import ObsManager
 from lead.expert.hdmap.run_stop_sign import RunStopSign
+from lead.expert.kinematic_bicycle_model import KinematicBicycleModel
 
 LOG = logging.getLogger(__name__)
 

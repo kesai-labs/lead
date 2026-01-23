@@ -9,7 +9,7 @@ from torch import nn
 
 import lead.common.common_utils as common_utils
 from lead.common.constants import RadarLabels
-from lead.tfv6 import fn
+from lead.tfv6 import transfuser_utils as fn
 from lead.training.config_training import TrainingConfig
 
 logger = logging.getLogger(__name__)

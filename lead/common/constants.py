@@ -97,6 +97,18 @@ class CarlaNavigationCommand(IntEnum):
     CHANGELANERIGHT = 6
 
 
+# Mapping from CARLA navigation command to natural language string
+CARLA_NAVIGATION_COMMAND_STR_MAP = {
+    CarlaNavigationCommand.UNKNOWN: "Unknown",
+    CarlaNavigationCommand.LEFT: "Turn Left",
+    CarlaNavigationCommand.RIGHT: "Turn Right",
+    CarlaNavigationCommand.STRAIGHT: "Straight",
+    CarlaNavigationCommand.LANEFOLLOW: "Follow Lane",
+    CarlaNavigationCommand.CHANGELANELEFT: "Change Lane Left",
+    CarlaNavigationCommand.CHANGELANERIGHT: "Change Lane Right",
+}
+
+
 class ChaffeurNetBEVSemanticClass(IntEnum):
     """Indices to access BEV semantic map produced by ChaffeurNet."""
 

@@ -20,8 +20,8 @@ if [ ${#EXPERIMENT_RUN_ID} -gt 64 ]; then
 fi
 
 # Run's outputs will be directed too this directory.
-export EVALUATION_OUTPUT_DIR=outputs/evaluation/$EXPERIMENT_RUN_DIR
-export TRAINING_OUTPUT_DIR=outputs/training/$EXPERIMENT_RUN_DIR
+export EVALUATION_OUTPUT_DIR=$LEAD_PROJECT_ROOT/outputs/evaluation/$EXPERIMENT_RUN_DIR
+export TRAINING_OUTPUT_DIR=$LEAD_PROJECT_ROOT/outputs/training/$EXPERIMENT_RUN_DIR
 EXPERIMENT_SEED=$(basename "$0" ".sh" | awk -F'_' '{print $NF}') # Last part of the script name is the seed
 export EXPERIMENT_SEED
 
@@ -41,7 +41,7 @@ function resume() {
 	# Construct necessary variables
 	export EXPERIMENT_RUN_ID=${EXPERIMENT_NAME}_${SCRIPT_NAME}_${SLURM_JOB_DATE}
 	export EXPERIMENT_RUN_DIR=${EXPERIMENT_NAME}/${SCRIPT_NAME}/${SLURM_JOB_DATE}
-	export TRAINING_OUTPUT_DIR=training/$EXPERIMENT_RUN_DIR
+	export TRAINING_OUTPUT_DIR=$LEAD_PROJECT_ROOT/outputs/training/$EXPERIMENT_RUN_DIR
 
 	# Find the latest model checkpoint
 	MODEL_FILE=$(find "$LAST_TRAINING_OUTPUT_DIR" -name "model_*.pth" | sort | tail -n 1)

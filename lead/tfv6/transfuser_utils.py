@@ -3,6 +3,7 @@ import math
 from collections.abc import Callable
 
 import jaxtyping as jt
+import numpy as np
 import numpy.typing as npt
 import torch
 import torch.nn as nn
@@ -201,3 +202,27 @@ def bev_grid_sample(
     sampled = F.grid_sample(bev, grid, mode="bilinear", align_corners=True)  # (B, D, N, 1)
 
     return sampled.squeeze(-1).permute(0, 2, 1)  # (B, N, D)
+
+
+def class2angle(
+    angle_cls: torch.Tensor, angle_res: torch.Tensor, config: TrainingConfig, limit_period: bool = True
+) -> torch.Tensor:
+    """Convert discrete angle class and residual back to continuous angle.
+
+    Inverse function to angle2class for decoding predicted angle values.
+
+    Args:
+        angle_cls: Discrete angle class tensor to decode.
+        angle_res: Angle residual tensor to decode.
+        config: Training configuration containing num_dir_bins.
+        limit_period: Whether to limit angle to [-π, π] range.
+
+    Returns:
+        Decoded continuous angle tensor.
+    """
+    angle_per_class = 2 * np.pi / float(config.num_dir_bins)
+    angle_center = angle_cls.float() * angle_per_class
+    angle = angle_center + angle_res
+    if limit_period:
+        angle[angle > np.pi] -= 2 * np.pi
+        return angle

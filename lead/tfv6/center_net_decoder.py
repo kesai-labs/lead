@@ -6,20 +6,18 @@ from dataclasses import dataclass
 from functools import cached_property
 from math import sqrt
 
+import jaxtyping as jt
 import numpy as np
+import numpy.typing as npt
 import torch
 import torch.nn.functional as F
 from beartype import beartype
 from torch import nn
 
 import lead.common.common_utils as common_utils
-from lead.common.constants import (
-    SOURCE_DATASET_NAME_MAP,
-    SourceDataset,
-    TransfuserBoundingBoxIndex,
-)
+from lead.common.constants import SOURCE_DATASET_NAME_MAP, SourceDataset, TransfuserBoundingBoxIndex
 from lead.data_loader import carla_dataset_utils
-from lead.tfv6 import fn
+from lead.tfv6 import transfuser_utils as fn
 from lead.training.config_training import TrainingConfig
 
 
@@ -249,7 +247,8 @@ class CenterNetBoundingBoxPrediction:
     config: TrainingConfig
 
     @cached_property
-    def pred_bounding_box_image_system(self):
+    @beartype
+    def pred_bounding_box_image_system(self) -> jt.Float[npt.NDArray, "B K 9"]:
         """Numpy array of shape (bs, k, 9) with features (x, y, w, h, yaw, velocity, brake, class, score) in image system"""
         k = self.config.top_k_center_keypoints
         kernel = self.config.center_net_max_pooling_kernel
@@ -265,7 +264,7 @@ class CenterNetBoundingBoxPrediction:
 
         # convert class + res to yaw
         yaw_class = torch.argmax(yaw_class, -1)
-        yaw = common_utils.class2angle(yaw_class, yaw_res.squeeze(2), self.config)
+        yaw = fn.class2angle(yaw_class, yaw_res.squeeze(2), self.config)
 
         brake = torch.zeros_like(yaw)  # We don't predict brake but keep it for now to avoid refactoring
 
@@ -292,7 +291,8 @@ class CenterNetBoundingBoxPrediction:
         return batch_bboxes.detach().cpu().float().numpy()
 
     @cached_property
-    def pred_bounding_box_vehicle_system(self):
+    @beartype
+    def pred_bounding_box_vehicle_system(self) -> jt.Float[npt.NDArray, "B K 9"]:
         """Numpy array of shape (bs, k, 9) with features (x, y, w, h, yaw, velocity, brake, class, score) in vehicle system"""
         bboxes_image_system = self.pred_bounding_box_image_system
         # filter bbox based on the confidence of the prediction
@@ -312,7 +312,7 @@ class CenterNetBoundingBoxPrediction:
                     self.config.min_y_meter,
                 ).reshape(original_shape)
             )
-        return np.array(bounding_box_vehicle_system)
+        return np.array(bounding_box_vehicle_system).reshape(-1, len(bboxes_image_system), 9)
 
 
 @dataclass(frozen=True)
@@ -334,7 +334,16 @@ class PredictedBoundingBox:
     def norm(self):
         return math.sqrt(self.x**2 + self.y**2)
 
-    def update(self, x, y, orientation, x_target, y_target, orientation_target):
+    @beartype
+    def update(
+        self,
+        x: numbers.Real,
+        y: numbers.Real,
+        orientation: numbers.Real,
+        x_target: numbers.Real,
+        y_target: numbers.Real,
+        orientation_target: numbers.Real,
+    ) -> PredictedBoundingBox:
         pos_diff = np.array([x_target, y_target]) - np.array([x, y])
         rot_diff = common_utils.normalize_angle(orientation_target - orientation)
 
@@ -373,7 +382,8 @@ class PredictedBoundingBox:
             score=self.score,
         )
 
-    def scale(self, factor) -> PredictedBoundingBox:
+    @beartype
+    def scale(self, factor: numbers.Real) -> PredictedBoundingBox:
         factor = float(factor)
         return PredictedBoundingBox(
             x=self.x * factor,
@@ -685,4 +695,5 @@ def transpose_and_gather_feat(feat: torch.Tensor, ind: torch.Tensor) -> torch.Te
     feat = feat.permute(0, 2, 3, 1).contiguous()
     feat = feat.view(feat.size(0), -1, feat.size(3))
     feat = gather_feat(feat, ind)
+    return feat
     return feat
