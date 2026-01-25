@@ -18,21 +18,17 @@ vehicle stopped close enough to the leading vehicle
 
 import random
 
-import py_trees
-
 import carla
-
+import py_trees
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (ActorTransformSetter,
-                                                                      ActorDestroy,
-                                                                      KeepVelocity,
-                                                                      StopVehicle,
-                                                                      WaypointFollower)
-from srunner.scenariomanager.scenarioatomics.atomic_criteria import CollisionTest
-from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (InTriggerDistanceToVehicle,
-                                                                               InTriggerDistanceToNextIntersection,
-                                                                               DriveDistance,
-                                                                               StandStill)
+from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
+    ActorDestroy, ActorTransformSetter, KeepVelocity, StopVehicle,
+    WaypointFollower)
+from srunner.scenariomanager.scenarioatomics.atomic_criteria import \
+    CollisionTest
+from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (
+    DriveDistance, InTriggerDistanceToNextIntersection,
+    InTriggerDistanceToVehicle, StandStill)
 from srunner.scenariomanager.timer import TimeOut
 from srunner.scenarios.basic_scenario import BasicScenario
 from srunner.tools.scenario_helper import get_waypoint_in_distance
@@ -93,7 +89,8 @@ class FollowLeadingVehicle(BasicScenario):
         transform.location.z += 0.5
         first_vehicle = CarlaDataProvider.request_new_actor('vehicle.nissan.patrol', transform)
         self.other_actors.append(first_vehicle)
-        CarlaDataProvider.active_scenarios.append((type(self).__name__, [None, None, None, False, 1e9, 1e9, False], id(self))) # added
+        from srunner.scenariomanager.carla_data_provider import ActiveScenario
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
 
     def _create_behavior(self):
         """
@@ -236,7 +233,8 @@ class FollowLeadingVehicleWithObstacle(BasicScenario):
         self.other_actors.append(first_actor)
         self.other_actors.append(second_actor)
 
-        CarlaDataProvider.active_scenarios.append((type(self).__name__, [None, None, None, False, 1e9, 1e9, False], id(self))) # added
+        from srunner.scenariomanager.carla_data_provider import ActiveScenario
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
 
     def _create_behavior(self):
         """

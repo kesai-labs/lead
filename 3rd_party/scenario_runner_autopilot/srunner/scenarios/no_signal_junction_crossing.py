@@ -11,17 +11,15 @@ The hero vehicle is passing through a junction without traffic lights
 And encounters another vehicle passing across the junction.
 """
 
-import py_trees
 import carla
-
+import py_trees
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (ActorTransformSetter,
-                                                                      ActorDestroy,
-                                                                      SyncArrival,
-                                                                      KeepVelocity,
-                                                                      StopVehicle)
-from srunner.scenariomanager.scenarioatomics.atomic_criteria import CollisionTest
-from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import InTriggerRegion, DriveDistance, WaitEndIntersection
+from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
+    ActorDestroy, ActorTransformSetter, KeepVelocity, StopVehicle, SyncArrival)
+from srunner.scenariomanager.scenarioatomics.atomic_criteria import \
+    CollisionTest
+from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (
+    DriveDistance, InTriggerRegion, WaitEndIntersection)
 from srunner.scenarios.basic_scenario import BasicScenario
 
 
@@ -74,7 +72,8 @@ class NoSignalJunctionCrossing(BasicScenario):
         first_vehicle.set_simulate_physics(enabled=False)
         self.other_actors.append(first_vehicle)
 
-        CarlaDataProvider.active_scenarios.append((type(self).__name__, [None, None, None, False, 1e9, 1e9, False], id(self))) # added
+        from srunner.scenariomanager.carla_data_provider import ActiveScenario
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
 
     def _create_behavior(self):
         """

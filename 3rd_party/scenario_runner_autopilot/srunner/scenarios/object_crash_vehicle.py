@@ -11,24 +11,22 @@ moving along the road and encountering a cyclist ahead.
 from __future__ import print_function
 
 import math
-import py_trees
-import carla
 from math import floor
 
+import carla
+import py_trees
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (ActorDestroy,
-                                                                      KeepVelocity,
-                                                                      Idle,
-                                                                      ActorTransformSetter,
-                                                                      MovePedestrianWithEgo)
-from srunner.scenariomanager.scenarioatomics.atomic_criteria import CollisionTest
-from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (InTriggerDistanceToLocation,
-                                                                               InTimeToArrivalToLocation,
-                                                                               DriveDistance)
+from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
+    ActorDestroy, ActorTransformSetter, Idle, KeepVelocity,
+    MovePedestrianWithEgo)
+from srunner.scenariomanager.scenarioatomics.atomic_criteria import \
+    CollisionTest
+from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (
+    DriveDistance, InTimeToArrivalToLocation, InTriggerDistanceToLocation)
 from srunner.scenarios.basic_scenario import BasicScenario
+from srunner.tools.background_manager import (LeaveCrossingSpace,
+                                              LeaveSpaceInFront)
 from srunner.tools.scenario_helper import get_location_in_distance_from_wp
-
-from srunner.tools.background_manager import LeaveSpaceInFront, LeaveCrossingSpace
 
 
 def get_value_parameter(config, name, p_type, default):
@@ -92,7 +90,8 @@ class StationaryObjectCrossing(BasicScenario):
         static.set_simulate_physics(True)
         self.other_actors.append(static)
 
-        CarlaDataProvider.active_scenarios.append((type(self).__name__, [None, None, None, False, 1e9, 1e9, False], id(self))) # added
+        from srunner.scenariomanager.carla_data_provider import ActiveScenario
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
 
     def _create_behavior(self):
         """
@@ -295,7 +294,8 @@ class DynamicObjectCrossing(BasicScenario):
         self.other_actors.append(adversary)
         self.other_actors.append(blocker)
 
-        CarlaDataProvider.active_scenarios.append((type(self).__name__, [None, None, None, False, 1e9, 1e9, False], id(self))) # added
+        from srunner.scenariomanager.carla_data_provider import ActiveScenario
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
 
     def _create_behavior(self):
         """
@@ -508,7 +508,8 @@ class ParkingCrossingPedestrian(BasicScenario):
         self.other_actors.append(walker)
 
         self._collision_wp = walker_wp
-        CarlaDataProvider.active_scenarios.append((type(self).__name__, [None, None, None, False, 1e9, 1e9, False], id(self))) # added
+        from srunner.scenariomanager.carla_data_provider import ActiveScenario
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
 
     def _create_behavior(self):
         """

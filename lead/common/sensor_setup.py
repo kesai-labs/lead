@@ -1,4 +1,5 @@
 import copy
+import logging
 
 import numpy as np
 from beartype import beartype
@@ -7,6 +8,8 @@ from scipy.spatial.transform import Rotation as R
 from lead.common import config_base
 from lead.expert.config_expert import ExpertConfig
 from lead.training.config_training import TrainingConfig
+
+LOG = logging.getLogger(__name__)
 
 
 @beartype
@@ -33,7 +36,13 @@ def av_sensor_setup(
     Returns:
         List of sensor configurations
     """
-    result = camera_sensor_setup(config, perturbation_rotation, perturbation_translation, perturbate, sensor_agent)
+    result = camera_sensor_setup(
+        config,
+        perturbation_rotation,
+        perturbation_translation,
+        perturbate,
+        sensor_agent,
+    )
     if lidar:
         result.append(
             {
@@ -47,6 +56,9 @@ def av_sensor_setup(
                 "id": "lidar1",
             }
         )
+        LOG.info(
+            f"Added sensor: {result[-1]['id']} at position ({config.lidar_pos_1[0]}, {config.lidar_pos_1[1]}, {config.lidar_pos_1[2]})"  # noqa: E501
+        )
         if config.use_two_lidars:
             result.append(
                 {
@@ -59,6 +71,9 @@ def av_sensor_setup(
                     "yaw": config.lidar_rot_2[2],
                     "id": "lidar2",
                 }
+            )
+            LOG.info(
+                f"Added sensor: {result[-1]['id']} at position ({config.lidar_pos_2[0]}, {config.lidar_pos_2[1]}, {config.lidar_pos_2[2]})"  # noqa: E501
             )
     if radar:
         for sensor_index, sensor_cfg in config.radar_calibration.items():
@@ -75,6 +90,9 @@ def av_sensor_setup(
                     "vertical_fov": sensor_cfg["vert_fov"],
                     "id": f"radar{sensor_index}",
                 }
+            )
+            LOG.info(
+                f"Added sensor: {result[-1]['id']} at position ({sensor_cfg['pos'][0]}, {sensor_cfg['pos'][1]}, {sensor_cfg['pos'][2]})"  # noqa: E501
             )
         if perturbate:
             for sensor_index, sensor_cfg in config.radar_calibration.items():
@@ -96,6 +114,9 @@ def av_sensor_setup(
                         perturbation_rotation,
                     )
                 )
+                LOG.info(
+                    f"Added sensor: {result[-1]['id']} at position ({result[-1]['x']}, {result[-1]['y']}, {result[-1]['z']})"
+                )
 
     result.append(
         {
@@ -110,6 +131,7 @@ def av_sensor_setup(
             "id": "imu",
         }
     )
+    LOG.info(f"Added sensor: {result[-1]['id']}")
     result.append(
         {
             "type": "sensor.other.gnss",
@@ -123,7 +145,15 @@ def av_sensor_setup(
             "id": "gps",
         }
     )
-    result.append({"type": "sensor.speedometer", "reading_frequency": config.carla_fps, "id": "speed"})
+    LOG.info(f"Added sensor: {result[-1]['id']}")
+    result.append(
+        {
+            "type": "sensor.speedometer",
+            "reading_frequency": config.carla_fps,
+            "id": "speed",
+        }
+    )
+    LOG.info(f"Added sensor: {result[-1]['id']}")
     return result
 
 
@@ -176,6 +206,9 @@ def camera_sensor_setup(
                 "id": f"rgb{suffix}",
             }
         )
+        LOG.info(
+            f"Added sensor: {result[-1]['id']} at position ({cam_pos[0]}, {cam_pos[1]}, {cam_pos[2]}), size: {cam_width}x{cam_height}px"  # noqa: E501
+        )
 
         if not sensor_agent:
             # GT sensors
@@ -198,6 +231,9 @@ def camera_sensor_setup(
                         "fov": camera_fov,
                         "id": f"{base_id}{suffix}",
                     }
+                )
+                LOG.info(
+                    f"Added sensor: {result[-1]['id']} at position ({cam_pos[0]}, {cam_pos[1]}, {cam_pos[2]}), size: {cam_width}x{cam_height}px"  # noqa: E501
                 )
 
             # perturbated views
@@ -226,6 +262,9 @@ def camera_sensor_setup(
                             perturbation_translation,
                             perturbation_rotation,
                         )
+                    )
+                    LOG.info(
+                        f"Added perturbated sensor: {result[-1]['id']} at position ({result[-1]['x']}, {result[-1]['y']}, {result[-1]['z']}), size: {result[-1]['width']}x{result[-1]['height']}px"  # noqa: E501
                     )
 
     return result
@@ -258,11 +297,21 @@ def perturbated_sensor_cfg(
 
     # Original pose
     pos = np.array([sensor_cfg["x"], sensor_cfg["y"], sensor_cfg["z"]])
-    R0 = R.from_euler("xyz", [sensor_cfg["roll"], sensor_cfg["pitch"], sensor_cfg["yaw"]], degrees=True)
+    R0 = R.from_euler(
+        "xyz",
+        [sensor_cfg["roll"], sensor_cfg["pitch"], sensor_cfg["yaw"]],
+        degrees=True,
+    )
 
     # perturbation transform
-    R_aug = R.from_euler("xyz", [perturbation_roll, perturbation_pitch, perturbation_rotation], degrees=True)
-    t_aug = np.array([0, perturbation_translation, 0])  # translate along Y of perturbate frame
+    R_aug = R.from_euler(
+        "xyz",
+        [perturbation_roll, perturbation_pitch, perturbation_rotation],
+        degrees=True,
+    )
+    t_aug = np.array(
+        [0, perturbation_translation, 0]
+    )  # translate along Y of perturbate frame
 
     # Apply 3D rigid transform
     pos_new = R_aug.apply(pos) + t_aug
@@ -295,7 +344,15 @@ if __name__ == "__main__":
     sensor_agent = False
     radar = True
 
-    sensors = av_sensor_setup(config, perturbation_rotation, perturbation_translation, lidar, perturbate, sensor_agent, radar)
+    sensors = av_sensor_setup(
+        config,
+        perturbation_rotation,
+        perturbation_translation,
+        lidar,
+        perturbate,
+        sensor_agent,
+        radar,
+    )
     for sensor in sensors:
         if "radar" not in sensor["type"]:
             continue

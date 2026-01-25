@@ -67,8 +67,12 @@ class Logger:
                     settings=wandb.Settings(_service_wait=300),
                 )
                 self.step = max(self.step, wandb.run.step)
-                LOG.info(f"WandB logger will log scalar every {self.config.log_scalars_frequency} steps")
-                LOG.info(f"WandB logger will log images every {self.config.log_images_frequency} steps")
+                LOG.info(
+                    f"WandB logger will log scalar every {self.config.log_scalars_frequency} steps"
+                )
+                LOG.info(
+                    f"WandB logger will log images every {self.config.log_images_frequency} steps"
+                )
 
     def __del__(self):
         if self.config.rank == 0:
@@ -109,7 +113,10 @@ class Logger:
             and not self.config.is_on_slurm
             and self.config.visualize_training
             and self.config.carla_leaderboard_mode
-            and ((epoch_iteration + 1) % self.config.log_images_frequency == 0 or epoch_iteration <= 1)
+            and (
+                (epoch_iteration + 1) % self.config.log_images_frequency == 0
+                or epoch_iteration <= 1
+            )
         ):
             LOG.info(f"Visualizing training sample at step {step}.")
             visualize_sample(
@@ -125,7 +132,10 @@ class Logger:
         if self.config.rank == 0:
             if (
                 self.config.log_wandb
-                and ((epoch_iteration + 1) % self.config.log_images_frequency == 0 or epoch_iteration <= 1)
+                and (
+                    (epoch_iteration + 1) % self.config.log_images_frequency == 0
+                    or epoch_iteration <= 1
+                )
                 and self.config.carla_leaderboard_mode
             ):
                 LOG.info(f"Logging training sample to WandB at step {step}.")
@@ -148,7 +158,9 @@ class Logger:
                     message[f"debug/lr_{g}"] = self.optimizer.param_groups[g]["lr"]
                 message["debug/batch_size_per_gpu"] = data["source_dataset"].shape[0]
                 message["debug/num_gpu"] = torch.cuda.device_count()
-                message["debug/model_size"] = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+                message["debug/model_size"] = sum(
+                    p.numel() for p in self.model.parameters() if p.requires_grad
+                )
                 message["debug/dataset_size"] = len(self.dataset)
                 message["debug/num_gradient_steps"] = self.total_gradient_steps
                 message["debug/finished_percentage"] = step / self.total_gradient_steps
@@ -156,11 +168,21 @@ class Logger:
                 message["debug/dataloader_size"] = len(self.dataloader)
                 message["debug/allocated_cpus"] = self.config.assigned_cpu_cores
                 message["debug/gradient_steps_skipped"] = gradient_steps_skipped
-                message["debug/max_gpu_mem"] = torch.cuda.max_memory_allocated(self.config.device) / (1024**3)  # Convert to GB
-                message["debug/average_loading_time"] = data["loading_time"].cpu().numpy().mean()
-                message["debug/average_loading_meta_time"] = data["loading_meta_time"].cpu().numpy().mean()
-                message["debug/average_loading_sensor_time"] = data["loading_sensor_time"].cpu().numpy().mean()
-                message["debug/source_dataset"] = data["source_dataset"].cpu().numpy().mean()
+                message["debug/max_gpu_mem"] = torch.cuda.max_memory_allocated(
+                    self.config.device
+                ) / (1024**3)  # Convert to GB
+                message["debug/average_loading_time"] = (
+                    data["loading_time"].cpu().numpy().mean()
+                )
+                message["debug/average_loading_meta_time"] = (
+                    data["loading_meta_time"].cpu().numpy().mean()
+                )
+                message["debug/average_loading_sensor_time"] = (
+                    data["loading_sensor_time"].cpu().numpy().mean()
+                )
+                message["debug/source_dataset"] = (
+                    data["source_dataset"].cpu().numpy().mean()
+                )
                 if self.scaler is not None:
                     message["debug/grad_scale"] = self.scaler.get_scale()
 
@@ -181,7 +203,10 @@ class Logger:
 
                 # Convert bfloat16 to float for logging
                 for key, value in message.items():
-                    if isinstance(value, torch.Tensor) and value.dtype == torch.bfloat16:
+                    if (
+                        isinstance(value, torch.Tensor)
+                        and value.dtype == torch.bfloat16
+                    ):
                         message[key] = value.float().item()
 
                 if self.config.log_wandb:

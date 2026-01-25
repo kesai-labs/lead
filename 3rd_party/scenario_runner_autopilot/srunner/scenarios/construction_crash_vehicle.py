@@ -104,7 +104,8 @@ class ConstructionObstacle(BasicScenario):
         self.traffic_warning = traffic_warning
         self.last_cone = last_cone
         if add_scenario_type:
-            CarlaDataProvider.active_scenarios.append((type(self).__name__, [traffic_warning, last_cone, self._direction, False, 1e9, 1e9, False], id(self))) # added
+            from srunner.scenariomanager.carla_data_provider import ActiveScenario
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=traffic_warning, last_actor=last_cone, metadata=self._direction, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
             CarlaDataProvider.memory[type(self).__name__]["obstacles"] = self.other_actors
             CarlaDataProvider.memory[type(self).__name__].update(
                 {
@@ -356,7 +357,8 @@ class ConstructionObstacleTwoWays(ConstructionObstacle):
         """
         super()._initialize_actors(config,add_scenario_type=False)
         if add_scenario_type:
-            CarlaDataProvider.active_scenarios.append((type(self).__name__, [self.traffic_warning, self.last_cone, self._direction, False, 1e9, 1e9, False], id(self))) # added
+            from srunner.scenariomanager.carla_data_provider import ActiveScenario
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=self.traffic_warning, last_actor=self.last_cone, metadata=self._direction, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
             CarlaDataProvider.memory[type(self).__name__]["obstacles"] = self.other_actors
             CarlaDataProvider.memory[type(self).__name__].update(
                 {

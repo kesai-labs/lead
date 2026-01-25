@@ -9,19 +9,22 @@ Collection of traffic scenarios where the ego vehicle (hero)
 is making a left turn
 """
 
-import py_trees
-
 import carla
-
+import py_trees
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import TrafficLightFreezer, ScenarioTimeout
-from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import WaitEndIntersection, DriveDistance
-from srunner.scenariomanager.scenarioatomics.atomic_criteria import CollisionTest, ScenarioTimeoutTest
+from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
+    ScenarioTimeout, TrafficLightFreezer)
+from srunner.scenariomanager.scenarioatomics.atomic_criteria import (
+    CollisionTest, ScenarioTimeoutTest)
+from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (
+    DriveDistance, WaitEndIntersection)
 from srunner.scenarios.basic_scenario import BasicScenario
-from srunner.tools.scenario_helper import (get_closest_traffic_light)
+from srunner.tools.background_manager import (HandleJunctionScenario,
+                                              KeepFrontClear,
+                                              MakeRedLightLonger,
+                                              MakeTrafficLightRedOnce)
+from srunner.tools.scenario_helper import get_closest_traffic_light
 
-from srunner.tools.background_manager import HandleJunctionScenario, KeepFrontClear, MakeRedLightLonger, MakeTrafficLightRedOnce
-from srunner.tools.background_manager import HandleJunctionScenario
 
 def get_value_parameter(config, name, p_type, default):
     if name in config.other_parameters:
@@ -61,7 +64,9 @@ class RedLightWithoutLeadVehicle(BasicScenario):
         Override this method in child class to provide custom initialization.
         """
         if add_scenario_type:
-            CarlaDataProvider.active_scenarios.append((type(self).__name__, [None, None, None, False, 1e9, 1e9, False], id(self))) # added
+            from srunner.scenariomanager.carla_data_provider import \
+                ActiveScenario
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
 
     def _create_behavior(self):
         sequence = py_trees.composites.Sequence(name="RedLightWithoutLeadVehicle")
@@ -123,7 +128,9 @@ class T_Junction(BasicScenario):
         Override this method in child class to provide custom initialization.
         """
         if add_scenario_type:
-            CarlaDataProvider.active_scenarios.append((type(self).__name__, [None, None, None, False, 1e9, 1e9, False], id(self))) # added
+            from srunner.scenariomanager.carla_data_provider import \
+                ActiveScenario
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
 
     def _create_behavior(self):
         sequence = py_trees.composites.Sequence(name="T_Junction")

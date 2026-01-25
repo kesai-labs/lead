@@ -15,17 +15,15 @@ collision and follow the leading car in other lane. The scenario ends
 either via a timeout, or if the ego vehicle drives some distance.
 """
 
-import py_trees
-
 import carla
-
+import py_trees
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (ActorTransformSetter,
-                                                                      WaypointFollower,
-                                                                      ActorDestroy)
-from srunner.scenariomanager.scenarioatomics.atomic_criteria import CollisionTest
-from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (InTriggerDistanceToVehicle,
-                                                                               DriveDistance)
+from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
+    ActorDestroy, ActorTransformSetter, WaypointFollower)
+from srunner.scenariomanager.scenarioatomics.atomic_criteria import \
+    CollisionTest
+from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (
+    DriveDistance, InTriggerDistanceToVehicle)
 from srunner.scenarios.basic_scenario import BasicScenario
 from srunner.tools.scenario_helper import get_waypoint_in_distance
 
@@ -88,7 +86,8 @@ class OtherLeadingVehicle(BasicScenario):
         self._first_actor_transform = first_vehicle_transform
         self._second_actor_transform = second_vehicle_transform
 
-        CarlaDataProvider.active_scenarios.append((type(self).__name__, [None, None, None, False, 1e9, 1e9, False], id(self))) # added
+        from srunner.scenariomanager.carla_data_provider import ActiveScenario
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
 
 
     def _create_behavior(self):

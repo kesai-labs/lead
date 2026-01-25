@@ -8,22 +8,17 @@ Pedestrians crossing through the middle of the lane.
 
 from __future__ import print_function
 
-import py_trees
 import carla
-
+import py_trees
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (ActorDestroy,
-                                                                      KeepVelocity,
-                                                                      WaitForever,
-                                                                      Idle,
-                                                                      ActorTransformSetter,
-                                                                      MovePedestrianWithEgo)
-from srunner.scenariomanager.scenarioatomics.atomic_criteria import CollisionTest
-from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (InTriggerDistanceToLocation,
-                                                                               InTimeToArrivalToLocation,
-                                                                               DriveDistance)
+from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
+    ActorDestroy, ActorTransformSetter, Idle, KeepVelocity,
+    MovePedestrianWithEgo, WaitForever)
+from srunner.scenariomanager.scenarioatomics.atomic_criteria import \
+    CollisionTest
+from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (
+    DriveDistance, InTimeToArrivalToLocation, InTriggerDistanceToLocation)
 from srunner.scenarios.basic_scenario import BasicScenario
-
 from srunner.tools.background_manager import HandleJunctionScenario
 
 
@@ -146,7 +141,8 @@ class PedestrianCrossing(BasicScenario):
             walker_data['transform'] = spawn_transform
             walker_data['distance'] = move_dist
             walker_data['duration'] = move_dist / walker_data['speed']
-        CarlaDataProvider.active_scenarios.append((type(self).__name__, [None, None, None, False, 1e9, 1e9, False], id(self))) # added
+        from srunner.scenariomanager.carla_data_provider import ActiveScenario
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
 
     def _create_behavior(self):
         """

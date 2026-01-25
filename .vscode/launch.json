@@ -1,0 +1,147 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Eval Bench2Drive",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "lead.leaderboard_wrapper",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--checkpoint", "outputs/checkpoints/tfv6_resnet34",
+                "--routes", "data/benchmark_routes/bench2drive220routes/23687.xml",
+                "--bench2drive"
+            ],
+            "env": {
+                "PYTHONDONTWRITEBYTECODE": "1",
+            }
+        },
+        {
+            "name": "Eval Longest6",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "lead.leaderboard_wrapper",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--checkpoint", "outputs/checkpoints/regnety032",
+                "--routes", "data/routes/longest6/00.xml"
+            ],
+            "env": {
+                "PYTHONDONTWRITEBYTECODE": "1",
+            }
+        },
+        {
+            "name": "Eval Town13",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "lead.leaderboard_wrapper",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--checkpoint", "outputs/checkpoints/tfv6_resnet34",
+                "--routes", "data/benchmark_routes/Town13/0.xml",
+                "--timeout", "180"
+            ],
+            "env": {
+                "PYTHONDONTWRITEBYTECODE": "1",
+            }
+        },
+        {
+            "name": "Expert Gen Data",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "lead.leaderboard_wrapper",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--expert",
+                "--routes", "data/data_routes/lead/noScenarios/short_route.xml"
+            ],
+            "env": {
+                "PYTHONDONTWRITEBYTECODE": "1",
+            }
+        },
+        {
+            "name": "Evaluate Expert",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "lead.leaderboard_wrapper",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--expert",
+                "--routes", "data/benchmark_routes/Town13/1.xml"
+            ],
+            "env": {
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "LEAD_EXPERT_CONFIG": "eval_expert=true profile_expert=false",
+            }
+        },
+        {
+            "name": "Pretrain",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "lead/training/train.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "logdir=outputs/local_training/pretrain"
+            ],
+            "env": {
+                "PYTHONDONTWRITEBYTECODE": "1"
+            }
+        },
+        {
+            "name": "Posttrain",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "lead/training/train.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "logdir=outputs/local_training/posttrain",
+                "load_file=outputs/local_training/pretrain/model_0030.pth",
+                "use_planning_decoder=true"
+            ],
+            "env": {
+                "PYTHONDONTWRITEBYTECODE": "1"
+            }
+        },
+        {
+            "name": "Pretrain DDP",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "lead/training/train.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "LEAD_TRAINING_CONFIG": "logdir=outputs/local_training/pretrain",
+                "OMP_NUM_THREADS": "8",
+                "OPENBLAS_NUM_THREADS": "1",
+                "NCCL_P2P_DISABLE": "1",
+                "NCCL_P2P_LEVEL": "NVL",
+                "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+            }
+        },
+        {
+            "name": "Posttrain DDP",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "lead/training/train.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "LEAD_TRAINING_CONFIG": "logdir=outputs/local_training/posttrain load_file=outputs/local_training/pretrain/model_0030.pth use_planning_decoder=true",
+                "OMP_NUM_THREADS": "8",
+                "OPENBLAS_NUM_THREADS": "1",
+                "NCCL_P2P_DISABLE": "1",
+                "NCCL_P2P_LEVEL": "NVL",
+                "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+            }
+        }
+    ]
+}

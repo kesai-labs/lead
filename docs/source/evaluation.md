@@ -6,13 +6,17 @@ This guide covers local evaluation for getting started. For large-scale evaluati
 Dataset download is not required for CARLA evaluation—only a trained model checkpoint is needed.
 ```
 
+```{important}
+LEAD must be installed as a package in your Python environment. Ensure you're in the correct environment before running evaluations.
+```
+
 ## Overview
 
-The [Quick Start](https://github.com/autonomousvision/lead?tab=readme-ov-file#quick-start) tutorial demonstrates evaluating a trained policy on a single Bench2Drive route. We provide scripts for the three most popular benchmarks:
+The [Quick Start](https://github.com/autonomousvision/lead?tab=readme-ov-file#quick-start) tutorial demonstrates evaluating a trained policy on a single Bench2Drive route. We provide a unified Python-based evaluation interface (`lead.leaderboard_wrapper`) that simplifies debugging and configuration for the three most popular benchmarks:
 
-- **[Bench2Drive](https://github.com/autonomousvision/lead/blob/main/scripts/eval_bench2drive.sh)**: See [official repository](https://github.com/Thinklab-SJTU/Bench2Drive) for benchmark details
-- **[Longest6 v2](https://github.com/autonomousvision/lead/blob/main/scripts/eval_longest6.sh)**: See [carla_garage](https://github.com/autonomousvision/carla_garage?tab=readme-ov-file#longest6-v2) for benchmark details
-- **[Town13](https://github.com/autonomousvision/lead/blob/main/scripts/eval_town13.sh)**: See [CARLA Leaderboard 2.0 validation routes](https://github.com/autonomousvision/carla_garage?tab=readme-ov-file#carla-leaderboard-20-validation-routes)
+- **Bench2Drive**: See [official repository](https://github.com/Thinklab-SJTU/Bench2Drive) for benchmark details
+- **Longest6 v2**: See [carla_garage](https://github.com/autonomousvision/carla_garage?tab=readme-ov-file#longest6-v2) for benchmark details
+- **Town13**: See [CARLA Leaderboard 2.0 validation routes](https://github.com/autonomousvision/carla_garage?tab=readme-ov-file#carla-leaderboard-20-validation-routes)
 
 ```{warning}
 Do not evaluate Longest6 v2 or Town13 routes using Bench2Drive's evaluation repository—the metrics definitions differ.
@@ -20,27 +24,40 @@ Do not evaluate Longest6 v2 or Town13 routes using Bench2Drive's evaluation repo
 
 ## Running Evaluations
 
-### Start CARLA Server
+### Prerequisites
 
-Start the CARLA server before any evaluation:
+1. **Activate your Python environment** where LEAD is installed
+2. **Start CARLA server**:
 
 ```bash
 bash scripts/start_carla.sh
 ```
 
-### Configure Checkpoint and Route
+### Direct Python Invocation
 
-Each evaluation script contains configurable variables:
+The simplest way to run evaluations is directly with Python:
 
+**Model evaluation (Longest6/Town13):**
 ```bash
-export BENCHMARK_ROUTE_ID=23687  # Route ID to evaluate
-export CHECKPOINT_DIR=outputs/checkpoints/tfv6_resnet34/  # Path to model checkpoint
+python lead/leaderboard_wrapper.py \
+    --checkpoint outputs/checkpoints/tfv6_resnet34 \
+    --routes data/benchmark_routes/Town13/0.xml
 ```
 
-Route ID ranges:
-- **Bench2Drive**: 0-219 (220 routes)
-- **Longest6 v2**: 0-35 (36 routes)
-- **Town13**: 0-19 (20 routes)
+**Bench2Drive:**
+```bash
+python lead/leaderboard_wrapper.py \
+    --checkpoint outputs/checkpoints/tfv6_resnet34 \
+    --routes data/benchmark_routes/bench2drive220routes/23687.xml \
+    --bench2drive
+```
+
+**Expert mode (data generation):**
+```bash
+python lead/leaderboard_wrapper.py \
+    --expert \
+    --routes data/data_routes/lead/noScenarios/short_route.xml
+```
 
 ### Configuration Options
 
@@ -108,7 +125,13 @@ Bench2Drive evaluation tools are located at [3rd_party/Bench2Drive/tools/](https
 
 ## Best Practices
 
-### 1. Disable Visualization for Long Benchmarks
+### 1. Environment Setup
+
+Always run evaluations with:
+- LEAD installed as a package in your active Python environment
+- Optional: `LEAD_PROJECT_ROOT` environment variable set to your workspace root
+- CARLA server running on the expected port (default: 2000)
+
 
 With sufficient compute (16-32 GTX 1080 Ti GPUs):
 - **Longest6 v2**: ~1 day for 3 seeds (36 routes × 3 = 108 evaluations)
@@ -129,16 +152,15 @@ bash scripts/clean_carla.sh  # Kill CARLA processes
 bash scripts/start_carla.sh  # Start fresh instance
 ```
 
-### 3. Memory Management
 
 The pipeline loads all three checkpoint seeds as an ensemble by default. If GPU memory is limited, rename two checkpoint files temporarily so only one seed loads.
 
-### 4. Use Correct Evaluation Tools
+### 3. Use Correct Evaluation Tools
 
 - **Longest6 v2 and Town13**: Evaluate using standard leaderboard setup
 - **Bench2Drive**: Must evaluate using [Bench2Drive's code](https://github.com/autonomousvision/lead/tree/main/3rd_party/Bench2Drive)—otherwise results are invalid
 
-### 5. Account for Evaluation Variance
+### 4. Account for Evaluation Variance
 
 CARLA is highly stochastic despite fixed seeds. Results vary between runs due to traffic randomness and non-deterministic simulation factors.
 

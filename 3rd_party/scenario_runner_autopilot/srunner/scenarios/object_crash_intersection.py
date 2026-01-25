@@ -11,27 +11,22 @@ moving along the road and encounters a cyclist ahead after taking a right or lef
 
 from __future__ import print_function
 
-import py_trees
-
 import carla
-
+import py_trees
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (ActorDestroy,
-                                                                      HandBrakeVehicle,
-                                                                      KeepVelocity,
-                                                                      ActorTransformSetter,
-                                                                      MovePedestrianWithEgo)
-from srunner.scenariomanager.scenarioatomics.atomic_criteria import CollisionTest
-from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (InTriggerDistanceToLocation,
-                                                                               InTimeToArrivalToLocation,
-                                                                               DriveDistance)
+from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
+    ActorDestroy, ActorTransformSetter, HandBrakeVehicle, KeepVelocity,
+    MovePedestrianWithEgo)
+from srunner.scenariomanager.scenarioatomics.atomic_criteria import \
+    CollisionTest
+from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (
+    DriveDistance, InTimeToArrivalToLocation, InTriggerDistanceToLocation)
 from srunner.scenarios.basic_scenario import BasicScenario
+from srunner.tools.background_manager import LeaveCrossingSpace
 from srunner.tools.scenario_helper import (generate_target_waypoint,
                                            generate_target_waypoint_in_route,
-                                           get_same_dir_lanes,
-                                           get_opposite_dir_lanes)
-
-from srunner.tools.background_manager import LeaveCrossingSpace
+                                           get_opposite_dir_lanes,
+                                           get_same_dir_lanes)
 
 
 def get_sidewalk_transform(waypoint, offset):
@@ -238,7 +233,9 @@ class VehicleTurningRight(BaseVehicleTurning):
         """
         super()._initialize_actors(config)
         if add_scenario_type:
-            CarlaDataProvider.active_scenarios.append((type(self).__name__, [None, None, None, False, 1e9, 1e9, False], id(self))) # added
+            from srunner.scenariomanager.carla_data_provider import \
+                ActiveScenario
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
 
 
 class VehicleTurningLeft(BaseVehicleTurning):
@@ -263,7 +260,9 @@ class VehicleTurningLeft(BaseVehicleTurning):
         """
         super()._initialize_actors(config)
         if add_scenario_type:
-            CarlaDataProvider.active_scenarios.append((type(self).__name__, [None, None, None, False, 1e9, 1e9, False], id(self))) # added
+            from srunner.scenariomanager.carla_data_provider import \
+                ActiveScenario
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
 
 
 class VehicleTurningRoute(BaseVehicleTurning):
@@ -286,7 +285,8 @@ class VehicleTurningRoute(BaseVehicleTurning):
         Custom initialization
         """
         super()._initialize_actors(config)
-        CarlaDataProvider.active_scenarios.append((type(self).__name__, [None, None, None, False, 1e9, 1e9, False], id(self))) # added
+        from srunner.scenariomanager.carla_data_provider import ActiveScenario
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
 
 
     def _create_test_criteria(self):
@@ -394,7 +394,8 @@ class VehicleTurningRoutePedestrian(BasicScenario):
             self.parking_slots.append(parking_location)
 
         self.other_actors.append(adversary)
-        CarlaDataProvider.active_scenarios.append((type(self).__name__, [None, None, None, False, 1e9, 1e9, False], id(self))) # added
+        from srunner.scenariomanager.carla_data_provider import ActiveScenario
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
 
     def _create_behavior(self):
         """

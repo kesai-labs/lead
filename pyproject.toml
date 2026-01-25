@@ -21,7 +21,7 @@ exclude = ["data*", "outputs*", "notebooks*", "3rd_party*", "scripts*", "docs*",
 lead = ["**/*"]
 
 [tool.ruff]
-line-length = 128
+line-length = 88
 
 # Only check these directories
 include = ["lead/**/*.py", "tests/**/*.py"]
@@ -34,7 +34,7 @@ exclude = [
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
-ignore = ["E722", "F722"]
+ignore = ["E722", "F722", "E501"]
 
 [tool.ruff.format]
 quote-style = "double"

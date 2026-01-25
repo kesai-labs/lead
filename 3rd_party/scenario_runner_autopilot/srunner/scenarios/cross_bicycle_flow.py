@@ -11,17 +11,18 @@ Scenarios in which the ego has to cross a flow of bycicles
 
 from __future__ import print_function
 
-import py_trees
 import carla
-
-from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import BicycleFlow, TrafficLightFreezer, ScenarioTimeout
-from srunner.scenariomanager.scenarioatomics.atomic_criteria import CollisionTest, ScenarioTimeoutTest
-from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import WaitEndIntersection
-from srunner.scenarios.basic_scenario import BasicScenario
-
-from srunner.tools.background_manager import HandleJunctionScenario
+import py_trees
 from agents.navigation.local_planner import RoadOption
+from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
+from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
+    BicycleFlow, ScenarioTimeout, TrafficLightFreezer)
+from srunner.scenariomanager.scenarioatomics.atomic_criteria import (
+    CollisionTest, ScenarioTimeoutTest)
+from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import \
+    WaitEndIntersection
+from srunner.scenarios.basic_scenario import BasicScenario
+from srunner.tools.background_manager import HandleJunctionScenario
 
 
 def convert_dict_to_location(actor_dict):
@@ -137,7 +138,8 @@ class CrossingBicycleFlow(BasicScenario):
         else:
             self._signalized_junction = True
             self._get_traffic_lights(tls, ego_junction_dist)
-        CarlaDataProvider.active_scenarios.append((type(self).__name__, [None, None, None, False, 1e9, 1e9, False], id(self))) # added
+        from srunner.scenariomanager.carla_data_provider import ActiveScenario
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
 
     def _get_traffic_lights(self, tls, ego_dist):
         """Get the traffic light of the junction, mapping their states"""

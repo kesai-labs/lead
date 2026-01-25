@@ -18,17 +18,16 @@ The ego vehicle adjusts its velocity or changes the lane as well.
 """
 
 import random
-import py_trees
-import carla
 
+import carla
+import py_trees
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (ActorTransformSetter,
-                                                                      StopVehicle,
-                                                                      LaneChange,
-                                                                      WaypointFollower,
-                                                                      Idle)
-from srunner.scenariomanager.scenarioatomics.atomic_criteria import CollisionTest
-from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import InTriggerDistanceToVehicle, StandStill
+from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
+    ActorTransformSetter, Idle, LaneChange, StopVehicle, WaypointFollower)
+from srunner.scenariomanager.scenarioatomics.atomic_criteria import \
+    CollisionTest
+from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (
+    InTriggerDistanceToVehicle, StandStill)
 from srunner.scenarios.basic_scenario import BasicScenario
 from srunner.tools.scenario_helper import get_waypoint_in_distance
 
@@ -110,7 +109,8 @@ class ChangeLane(BasicScenario):
                            slow_car_waypoint.transform.location.z),
             slow_car_waypoint.transform.rotation)
 
-        CarlaDataProvider.active_scenarios.append((type(self).__name__, [None, None, None, False, 1e9, 1e9, False], id(self))) # added
+        from srunner.scenariomanager.carla_data_provider import ActiveScenario
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
 
     def _create_behavior(self):
 

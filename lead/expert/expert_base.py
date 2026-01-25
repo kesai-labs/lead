@@ -11,9 +11,8 @@ import jaxtyping as jt
 import numpy as np
 import numpy.typing as npt
 from agents.navigation.local_planner import RoadOption
-from autoagents import autonomous_agent_local
 from beartype import beartype
-from leaderboard.autoagents import autonomous_agent
+from leaderboard.autoagents import autonomous_agent, autonomous_agent_local
 from privileged_route_planner import PrivilegedRoutePlanner
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
 
@@ -21,7 +20,7 @@ import lead.common.common_utils as common_utils
 from lead.common.base_agent import BaseAgent
 from lead.common.constants import TransfuserSemanticSegmentationClass
 from lead.expert import expert_utils
-from lead.expert.expert_utils import step_cached_property
+from lead.expert.expert_utils import cached_property_by, step_cached_property
 
 LOG = logging.getLogger(__name__)
 
@@ -29,7 +28,10 @@ LOG = logging.getLogger(__name__)
 class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
     @beartype
     def expert_setup(
-        self, path_to_conf_file: str, route_index: str | None = None, traffic_manager: carla.TrafficManager | None = None
+        self,
+        path_to_conf_file: str,
+        route_index: str | None = None,
+        traffic_manager: carla.TrafficManager | None = None,
     ):
         LOG.info("Setup")
         self.initialized = False
@@ -40,8 +42,18 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
         self.save_path = None
         self.route_index = route_index
         self.scenario_name = pathlib.Path(path_to_conf_file).parent.name
-        self.list_traffic_lights: list[tuple[carla.TrafficLight, carla.Location, list[carla.Waypoint]]] = []
-        self.close_traffic_lights: list[tuple[carla.TrafficLight, carla.BoundingBox, carla.TrafficLightState, int, bool]] = []
+        self.list_traffic_lights: list[
+            tuple[carla.TrafficLight, carla.Location, list[carla.Waypoint]]
+        ] = []
+        self.close_traffic_lights: list[
+            tuple[
+                carla.TrafficLight,
+                carla.BoundingBox,
+                carla.TrafficLightState,
+                int,
+                bool,
+            ]
+        ] = []
         self.close_stop_signs = []
 
         self.track = autonomous_agent.Track.MAP
@@ -62,12 +74,16 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
         LOG.info("Init")
 
         # Check if the vehicle starts from a parking spot
-        distance_to_road = self.org_dense_route_world_coord[0][0].location.distance(self.ego_vehicle.get_location())
+        distance_to_road = self.org_dense_route_world_coord[0][0].location.distance(
+            self.ego_vehicle.get_location()
+        )
 
         # The first waypoint starts at the lane center, hence it's more than 2 m away from the center of the
         # ego vehicle at the beginning.
         starts_with_parking_exit = distance_to_road > 2
-        LOG.info(f"Vehicle starts {'with' if starts_with_parking_exit else 'without'} parking exit.")
+        LOG.info(
+            f"Vehicle starts {'with' if starts_with_parking_exit else 'without'} parking exit."
+        )
 
         # Set up the route planner and extrapolation
         self.privileged_route_planner = PrivilegedRoutePlanner(self.config_expert)
@@ -79,13 +95,17 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
             self.ego_vehicle.get_location(),
         )
         self.privileged_route_planner.save()
-        LOG.info(f"Route setup with {len(self.privileged_route_planner.route_waypoints)} waypoints.")
+        LOG.info(
+            f"Route setup with {len(self.privileged_route_planner.route_waypoints)} waypoints."
+        )
 
         # Preprocess traffic lights
         all_actors = self.carla_world.get_actors()
         for actor in all_actors:
             if "traffic_light" in actor.type_id:
-                center, waypoints = expert_utils.get_traffic_light_waypoints(actor, self.carla_world_map)
+                center, waypoints = expert_utils.get_traffic_light_waypoints(
+                    actor, self.carla_world_map
+                )
                 self.list_traffic_lights.append((actor, center, waypoints))
 
         # Remove bugged 2-wheelers
@@ -102,33 +122,45 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
 
     @step_cached_property
     def leading_vehicle_ids(self):
-        return self.privileged_route_planner.compute_leading_vehicles(self.vehicles_inside_bev, self.ego_vehicle.id)
+        return self.privileged_route_planner.compute_leading_vehicles(
+            self.vehicles_inside_bev, self.ego_vehicle.id
+        )
 
     @step_cached_property
     def trailing_vehicle_ids(self):
-        return self.privileged_route_planner.compute_trailing_vehicles(self.vehicles_inside_bev, self.ego_vehicle.id)
+        return self.privileged_route_planner.compute_trailing_vehicles(
+            self.vehicles_inside_bev, self.ego_vehicle.id
+        )
 
     @step_cached_property
     def distance_to_next_traffic_light(self):
-        return self.privileged_route_planner.distances_to_next_traffic_lights[self.privileged_route_planner.route_index]
+        return self.privileged_route_planner.distances_to_next_traffic_lights[
+            self.privileged_route_planner.route_index
+        ]
 
     @step_cached_property
     def next_traffic_light(self):
-        return self.privileged_route_planner.next_traffic_lights[self.privileged_route_planner.route_index]
+        return self.privileged_route_planner.next_traffic_lights[
+            self.privileged_route_planner.route_index
+        ]
 
     @step_cached_property
     def distance_to_next_stop_sign(self):
-        return self.privileged_route_planner.distances_to_next_stop_signs[self.privileged_route_planner.route_index]
+        return self.privileged_route_planner.distances_to_next_stop_signs[
+            self.privileged_route_planner.route_index
+        ]
 
     @step_cached_property
     def next_stop_sign(self):
-        return self.privileged_route_planner.next_stop_signs[self.privileged_route_planner.route_index]
+        return self.privileged_route_planner.next_stop_signs[
+            self.privileged_route_planner.route_index
+        ]
 
     @step_cached_property
     def remaining_route(self):
-        return self.route_waypoints_np[self.config_expert.tf_first_checkpoint_distance :][
-            :: self.config_expert.points_per_meter
-        ]
+        return self.route_waypoints_np[
+            self.config_expert.tf_first_checkpoint_distance :
+        ][:: self.config_expert.points_per_meter]
 
     @step_cached_property
     @beartype
@@ -142,16 +174,26 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
         # Determine the number of waypoints to look ahead based on the braking distance
         look_ahead_points = max(
             self.config_expert.minimum_lookahead_distance_to_compute_near_lane_change,
-            min(route_points.shape[0], self.config_expert.points_per_meter * int(braking_distance)),
+            min(
+                route_points.shape[0],
+                self.config_expert.points_per_meter * int(braking_distance),
+            ),
         )
         current_route_index = self.privileged_route_planner.route_index
         max_route_length = len(self.privileged_route_planner.commands)
 
-        from_index = max(0, current_route_index - self.config_expert.check_previous_distance_for_lane_change)
+        from_index = max(
+            0,
+            current_route_index
+            - self.config_expert.check_previous_distance_for_lane_change,
+        )
         to_index = min(max_route_length - 1, current_route_index + look_ahead_points)
         # Iterate over the points around the current position, checking for lane change commands
         for i in range(from_index, to_index, 1):
-            if self.privileged_route_planner.commands[i] in (RoadOption.CHANGELANELEFT, RoadOption.CHANGELANERIGHT):
+            if self.privileged_route_planner.commands[i] in (
+                RoadOption.CHANGELANELEFT,
+                RoadOption.CHANGELANERIGHT,
+            ):
                 return True
 
         return False
@@ -178,7 +220,9 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
         self.ego_vehicle = CarlaDataProvider.get_hero_actor()
         self.carla_world = self.ego_vehicle.get_world()
         # Check if the vehicle starts from a parking spot
-        distance_to_road = self.org_dense_route_world_coord[0][0].location.distance(self.ego_vehicle.get_location())
+        distance_to_road = self.org_dense_route_world_coord[0][0].location.distance(
+            self.ego_vehicle.get_location()
+        )
         # The first waypoint starts at the lane center, hence it's more than 2 m away from the center of the
         # ego vehicle at the beginning.
         starts_with_parking_exit = distance_to_road > 2
@@ -252,9 +296,9 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
             "NonSignalizedJunctionLeftTurnEnterFlow",
             "InterurbanActorFlow",
         ]:
-            intersection_index_ego = CarlaDataProvider.memory[self.current_active_scenario_type].get(
-                "intersection_index_ego", None
-            )
+            intersection_index_ego = CarlaDataProvider.memory[
+                self.current_active_scenario_type
+            ].get("intersection_index_ego", None)
             if intersection_index_ego is not None:
                 return (
                     intersection_index_ego - self.privileged_route_planner.route_index
@@ -286,37 +330,79 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
             - ignored adversarial actors IDs: we can ignore them completely
         """
         # Obstacle scenarios: compute source and target lane once
-        if self.current_active_scenario_type in ["Accident", "ConstructionObstacle", "ParkedObstacle"]:
+        if self.current_active_scenario_type in [
+            "Accident",
+            "ConstructionObstacle",
+            "ParkedObstacle",
+        ]:
             obstacle, direction = [
-                CarlaDataProvider.memory[self.current_active_scenario_type][key] for key in ["first_actor", "direction"]
+                CarlaDataProvider.memory[self.current_active_scenario_type][key]
+                for key in ["first_actor", "direction"]
             ]
             source_lane = self.carla_world_map.get_waypoint(
-                obstacle.get_location(), project_to_road=True, lane_type=carla.LaneType.Driving
+                obstacle.get_location(),
+                project_to_road=True,
+                lane_type=carla.LaneType.Driving,
             )
-            target_lane = source_lane.get_right_lane() if direction == "left" else source_lane.get_left_lane()
+            target_lane = (
+                source_lane.get_right_lane()
+                if direction == "left"
+                else source_lane.get_left_lane()
+            )
             if source_lane and target_lane:
-                CarlaDataProvider.memory[self.current_active_scenario_type]["source_lane"] = source_lane
-                CarlaDataProvider.memory[self.current_active_scenario_type]["target_lane"] = target_lane
+                CarlaDataProvider.memory[self.current_active_scenario_type][
+                    "source_lane"
+                ] = source_lane
+                CarlaDataProvider.memory[self.current_active_scenario_type][
+                    "target_lane"
+                ] = target_lane
 
         if self.current_active_scenario_type in ["HazardAtSideLane"]:
-            if CarlaDataProvider.memory[self.current_active_scenario_type]["bicycle_1"] is not None:
-                target_lane = CarlaDataProvider.memory[self.current_active_scenario_type]["target_lane"]
-                source_lane = CarlaDataProvider.memory[self.current_active_scenario_type]["source_lane"]
+            if (
+                CarlaDataProvider.memory[self.current_active_scenario_type]["bicycle_1"]
+                is not None
+            ):
+                target_lane = CarlaDataProvider.memory[
+                    self.current_active_scenario_type
+                ]["target_lane"]
+                source_lane = CarlaDataProvider.memory[
+                    self.current_active_scenario_type
+                ]["source_lane"]
                 if target_lane is None or source_lane is None:
-                    bicycle_1 = CarlaDataProvider.memory[self.current_active_scenario_type]["bicycle_1"]
+                    bicycle_1 = CarlaDataProvider.memory[
+                        self.current_active_scenario_type
+                    ]["bicycle_1"]
                     source_lane = self.carla_world_map.get_waypoint(
-                        bicycle_1.get_location(), project_to_road=True, lane_type=carla.LaneType.Driving
+                        bicycle_1.get_location(),
+                        project_to_road=True,
+                        lane_type=carla.LaneType.Driving,
                     )
                     target_lane = source_lane.get_left_lane()
-                    CarlaDataProvider.memory[self.current_active_scenario_type]["target_lane"] = target_lane
-                    CarlaDataProvider.memory[self.current_active_scenario_type]["soure_lane"] = source_lane
+                    CarlaDataProvider.memory[self.current_active_scenario_type][
+                        "target_lane"
+                    ] = target_lane
+                    CarlaDataProvider.memory[self.current_active_scenario_type][
+                        "soure_lane"
+                    ] = source_lane
 
         # One way obstacle scenarios: adversarial actors are those on the target lane
         if (
-            min([self.distance_to_accident_site, self.distance_to_construction_site, self.distance_to_parked_obstacle]) <= 40
+            min(
+                [
+                    self.distance_to_accident_site,
+                    self.distance_to_construction_site,
+                    self.distance_to_parked_obstacle,
+                ]
+            )
+            <= 40
             or self.current_active_scenario_type == "HazardAtSideLane"
         ):
-            for scenario in ["Accident", "ConstructionObstacle", "ParkedObstacle", "HazardAtSideLane"]:
+            for scenario in [
+                "Accident",
+                "ConstructionObstacle",
+                "ParkedObstacle",
+                "HazardAtSideLane",
+            ]:
                 dangerous_adversarial_actors_ids = []
                 safe_adversarial_actors_ids = []
                 ignored_adversarial_actors_ids = []
@@ -331,7 +417,9 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                         if actor.id == self.ego_vehicle.id:
                             continue
                         actor_lane = self.carla_world_map.get_waypoint(
-                            actor.get_location(), project_to_road=True, lane_type=carla.LaneType.Driving
+                            actor.get_location(),
+                            project_to_road=True,
+                            lane_type=carla.LaneType.Driving,
                         )
                         if actor_lane and actor_lane.lane_id == target_lane.lane_id:
                             rel_loc = common_utils.get_relative_transform(
@@ -345,23 +433,37 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                                     safe_adversarial_actors_ids.append(actor.id)
                                 else:  # Normal speed, be more careful
                                     dangerous_adversarial_actors_ids.append(actor.id)
-                CarlaDataProvider.memory[scenario]["dangerous_adversarial_actors_ids"] = dangerous_adversarial_actors_ids
-                CarlaDataProvider.memory[scenario]["safe_adversarial_actors_ids"] = safe_adversarial_actors_ids
-                CarlaDataProvider.memory[scenario]["ignored_adversarial_actors_ids"] = ignored_adversarial_actors_ids
+                CarlaDataProvider.memory[scenario][
+                    "dangerous_adversarial_actors_ids"
+                ] = dangerous_adversarial_actors_ids
+                CarlaDataProvider.memory[scenario]["safe_adversarial_actors_ids"] = (
+                    safe_adversarial_actors_ids
+                )
+                CarlaDataProvider.memory[scenario]["ignored_adversarial_actors_ids"] = (
+                    ignored_adversarial_actors_ids
+                )
 
         # High speed merging scenarios
-        for scenario in ["EnterActorFlow", "EnterActorFlowV2", "InterurbanAdvancedActorFlow"]:
+        for scenario in [
+            "EnterActorFlow",
+            "EnterActorFlowV2",
+            "InterurbanAdvancedActorFlow",
+        ]:
             if self.current_active_scenario_type != scenario:
                 continue
             safe_adversarial_actors_ids = []
             ignored_adversarial_actors_ids = []
             dangerous_adversarial_actors_ids = []
-            for adversarial_actor in CarlaDataProvider.memory[scenario]["adversarial_actors"]:
+            for adversarial_actor in CarlaDataProvider.memory[scenario][
+                "adversarial_actors"
+            ]:
                 try:
                     if not self.is_actor_inside_bev(adversarial_actor):
                         continue
                     adversarial_lane = self.carla_world_map.get_waypoint(
-                        adversarial_actor.get_location(), project_to_road=True, lane_type=carla.LaneType.Driving
+                        adversarial_actor.get_location(),
+                        project_to_road=True,
+                        lane_type=carla.LaneType.Driving,
                     )
                     if self.ego_lane_id != adversarial_lane.lane_id:
                         continue
@@ -369,25 +471,42 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                 except:
                     pass
 
-            CarlaDataProvider.memory[scenario]["dangerous_adversarial_actors_ids"] = dangerous_adversarial_actors_ids
-            CarlaDataProvider.memory[scenario]["safe_adversarial_actors_ids"] = safe_adversarial_actors_ids
-            CarlaDataProvider.memory[scenario]["ignored_adversarial_actors_ids"] = ignored_adversarial_actors_ids
+            CarlaDataProvider.memory[scenario]["dangerous_adversarial_actors_ids"] = (
+                dangerous_adversarial_actors_ids
+            )
+            CarlaDataProvider.memory[scenario]["safe_adversarial_actors_ids"] = (
+                safe_adversarial_actors_ids
+            )
+            CarlaDataProvider.memory[scenario]["ignored_adversarial_actors_ids"] = (
+                ignored_adversarial_actors_ids
+            )
 
         # Priority scenarios
-        for scenario in ["OppositeVehicleRunningRedLight", "OppositeVehicleTakingPriority"]:
+        for scenario in [
+            "OppositeVehicleRunningRedLight",
+            "OppositeVehicleTakingPriority",
+        ]:
             if self.current_active_scenario_type != scenario:
                 continue
             safe_adversarial_actors_ids = []
             ignored_adversarial_actors_ids = []
             dangerous_adversarial_actors_ids = []
-            for adversarial_actor in CarlaDataProvider.memory[scenario]["adversarial_actors"]:
+            for adversarial_actor in CarlaDataProvider.memory[scenario][
+                "adversarial_actors"
+            ]:
                 try:
                     if (
                         not self.is_actor_inside_bev(adversarial_actor)
                         or adversarial_actor.get_velocity().length() < 0.1
                         or (
-                            self.data_agent_id_to_bb_map[adversarial_actor.id]["visible_pixels"] < 10
-                            and self.data_agent_id_to_bb_map[adversarial_actor.id]["num_points"] < 10
+                            self.data_agent_id_to_bb_map[adversarial_actor.id][
+                                "visible_pixels"
+                            ]
+                            < 10
+                            and self.data_agent_id_to_bb_map[adversarial_actor.id][
+                                "num_points"
+                            ]
+                            < 10
                         )
                     ):
                         continue
@@ -395,9 +514,15 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                 except:
                     pass
 
-            CarlaDataProvider.memory[scenario]["dangerous_adversarial_actors_ids"] = dangerous_adversarial_actors_ids
-            CarlaDataProvider.memory[scenario]["safe_adversarial_actors_ids"] = safe_adversarial_actors_ids
-            CarlaDataProvider.memory[scenario]["ignored_adversarial_actors_ids"] = ignored_adversarial_actors_ids
+            CarlaDataProvider.memory[scenario]["dangerous_adversarial_actors_ids"] = (
+                dangerous_adversarial_actors_ids
+            )
+            CarlaDataProvider.memory[scenario]["safe_adversarial_actors_ids"] = (
+                safe_adversarial_actors_ids
+            )
+            CarlaDataProvider.memory[scenario]["ignored_adversarial_actors_ids"] = (
+                ignored_adversarial_actors_ids
+            )
 
         # Unprotected left and right turns scenarios
         for scenario in [
@@ -415,37 +540,60 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
             # Computer intersection point of ego route and adversarial route
             source_wp: carla.Waypoint = CarlaDataProvider.memory[scenario]["source_wp"]
             sink_wp: carla.Waypoint = CarlaDataProvider.memory[scenario]["sink_wp"]
-            opponent_traffic_route = CarlaDataProvider.memory[scenario]["opponent_traffic_route"]
+
+            # Skip if waypoints are None (invalid spawn locations)
+            if source_wp is None or sink_wp is None:
+                continue
+
+            opponent_traffic_route = CarlaDataProvider.memory[scenario][
+                "opponent_traffic_route"
+            ]
             if opponent_traffic_route is None:
                 opponent_traffic_route = expert_utils.compute_global_route(
                     world=self.carla_world,
                     source_location=source_wp.transform.location,
                     sink_location=sink_wp.transform.location,
                 )
-                CarlaDataProvider.memory[scenario]["opponent_traffic_route"] = opponent_traffic_route
+                CarlaDataProvider.memory[scenario]["opponent_traffic_route"] = (
+                    opponent_traffic_route
+                )
 
-            intersection_point = CarlaDataProvider.memory[scenario]["intersection_point"]
+            intersection_point = CarlaDataProvider.memory[scenario][
+                "intersection_point"
+            ]
             if opponent_traffic_route is not None and intersection_point is None:
-                intersection_point, intersection_index_ego = expert_utils.intersection_of_routes(
-                    points_a=self.route_waypoints_np[
-                        : self.config_expert.draw_future_route_till_distance
-                    ],  # Don't use full route otherwise too expensive
-                    points_b=opponent_traffic_route,
+                intersection_point, intersection_index_ego = (
+                    expert_utils.intersection_of_routes(
+                        points_a=self.route_waypoints_np[
+                            : self.config_expert.draw_future_route_till_distance
+                        ],  # Don't use full route otherwise too expensive
+                        points_b=opponent_traffic_route,
+                    )
                 )
                 if intersection_index_ego is not None:
                     intersection_index_ego += self.privileged_route_planner.route_index
-                CarlaDataProvider.memory[scenario]["intersection_index_ego"] = intersection_index_ego
-                CarlaDataProvider.memory[scenario]["intersection_point"] = intersection_point
+                CarlaDataProvider.memory[scenario]["intersection_index_ego"] = (
+                    intersection_index_ego
+                )
+                CarlaDataProvider.memory[scenario]["intersection_point"] = (
+                    intersection_point
+                )
 
             # Filter adversarial actors for unprotected left turns
-            intersection_point = CarlaDataProvider.memory[scenario]["intersection_point"]
+            intersection_point = CarlaDataProvider.memory[scenario][
+                "intersection_point"
+            ]
             if intersection_point is not None:
-                safe_adversarial_actors_ids = CarlaDataProvider.memory[scenario][
+                safe_adversarial_actors_ids = CarlaDataProvider.memory[
+                    scenario
+                ][
                     "safe_adversarial_actors_ids"
                 ]  # We keep track safe adversarial actors over time, once they are safe, they won't be dangerous anymore
                 ignored_adversarial_actors_ids = []
                 dangerous_adversarial_actors_ids = []
-                for adversarial_actor in CarlaDataProvider.memory[scenario]["adversarial_actors"]:
+                for adversarial_actor in CarlaDataProvider.memory[scenario][
+                    "adversarial_actors"
+                ]:
                     if adversarial_actor.id == self.ego_vehicle.id:
                         continue
                     if adversarial_actor.id in safe_adversarial_actors_ids:
@@ -459,17 +607,31 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                                 (
                                     self.distance_to_intersection_index_ego < 13
                                     and scenario
-                                    in ["SignalizedJunctionLeftTurnEnterFlow", "NonSignalizedJunctionLeftTurnEnterFlow"]
+                                    in [
+                                        "SignalizedJunctionLeftTurnEnterFlow",
+                                        "NonSignalizedJunctionLeftTurnEnterFlow",
+                                    ]
                                 )
                                 or (
                                     self.distance_to_intersection_index_ego < 13
-                                    and scenario in ["NonSignalizedJunctionLeftTurn", "InterurbanActorFlow"]
+                                    and scenario
+                                    in [
+                                        "NonSignalizedJunctionLeftTurn",
+                                        "InterurbanActorFlow",
+                                    ]
                                 )
                                 or (
                                     self.distance_to_intersection_index_ego < 18
-                                    and scenario in ["SignalizedJunctionRightTurn", "NonSignalizedJunctionRightTurn"]
+                                    and scenario
+                                    in [
+                                        "SignalizedJunctionRightTurn",
+                                        "NonSignalizedJunctionRightTurn",
+                                    ]
                                 )
-                                or (self.distance_to_intersection_index_ego < 23 and scenario in ["SignalizedJunctionLeftTurn"])
+                                or (
+                                    self.distance_to_intersection_index_ego < 23
+                                    and scenario in ["SignalizedJunctionLeftTurn"]
+                                )
                             )
                             and not self.stop_sign_hazard
                             and not self.traffic_light_hazard
@@ -482,53 +644,87 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                                 safe_threshold = (
                                     self.distance_to_intersection_index_ego * 1.1
                                 )  # Safe threshold, the lower, the earlier we ignore an adversarial actor
-                                if scenario in [
-                                    "SignalizedJunctionLeftTurn"
-                                ]:  # Urban scenarios, we need to treat them a bit differently
-                                    if self.distance_to_intersection_index_ego < 13:
-                                        safe_threshold = (
-                                            self.distance_to_intersection_index_ego * 1.2
-                                        )  # Urban, we need more time to reach intersection. Only empirical observations.
-                                    else:
-                                        safe_threshold = (
-                                            self.distance_to_intersection_index_ego * 1.6
-                                        )  # Urban, we need more time to reach intersection. Only empirical observations.
-                                safe_threshold = min(safe_threshold, 22)  # Don't go too far, otherwise we ignore all actors
                                 if (
-                                    adversarial_actor.get_location().distance(intersection_point) < safe_threshold
-                                ):  # If actor is/was near enough to the intersection point, we can safely ignore it
-                                    safe_adversarial_actors_ids.append(adversarial_actor.id)
-                                else:
-                                    dangerous_adversarial_actors_ids.append(adversarial_actor.id)
-                            elif scenario in ["SignalizedJunctionRightTurn", "NonSignalizedJunctionRightTurn"]:
-                                safe_threshold = self.distance_to_intersection_index_ego * 1.1
-                                if scenario in [
-                                    "SignalizedJunctionRightTurn"
-                                ]:  # Urban scenarios, we need to treat them a bit differently
+                                    scenario in ["SignalizedJunctionLeftTurn"]
+                                ):  # Urban scenarios, we need to treat them a bit differently
                                     if self.distance_to_intersection_index_ego < 13:
                                         safe_threshold = (
-                                            self.distance_to_intersection_index_ego * 1.2
+                                            self.distance_to_intersection_index_ego
+                                            * 1.2
                                         )  # Urban, we need more time to reach intersection. Only empirical observations.
                                     else:
                                         safe_threshold = (
-                                            self.distance_to_intersection_index_ego * 1.6
+                                            self.distance_to_intersection_index_ego
+                                            * 1.6
                                         )  # Urban, we need more time to reach intersection. Only empirical observations.
-                                safe_threshold = min(safe_threshold, 22)  # Don't go too far, otherwise we ignore all actors
+                                safe_threshold = min(
+                                    safe_threshold, 22
+                                )  # Don't go too far, otherwise we ignore all actors
+                                if (
+                                    adversarial_actor.get_location().distance(
+                                        intersection_point
+                                    )
+                                    < safe_threshold
+                                ):  # If actor is/was near enough to the intersection point, we can safely ignore it
+                                    safe_adversarial_actors_ids.append(
+                                        adversarial_actor.id
+                                    )
+                                else:
+                                    dangerous_adversarial_actors_ids.append(
+                                        adversarial_actor.id
+                                    )
+                            elif scenario in [
+                                "SignalizedJunctionRightTurn",
+                                "NonSignalizedJunctionRightTurn",
+                            ]:
+                                safe_threshold = (
+                                    self.distance_to_intersection_index_ego * 1.1
+                                )
+                                if (
+                                    scenario in ["SignalizedJunctionRightTurn"]
+                                ):  # Urban scenarios, we need to treat them a bit differently
+                                    if self.distance_to_intersection_index_ego < 13:
+                                        safe_threshold = (
+                                            self.distance_to_intersection_index_ego
+                                            * 1.2
+                                        )  # Urban, we need more time to reach intersection. Only empirical observations.
+                                    else:
+                                        safe_threshold = (
+                                            self.distance_to_intersection_index_ego
+                                            * 1.6
+                                        )  # Urban, we need more time to reach intersection. Only empirical observations.
+                                safe_threshold = min(
+                                    safe_threshold, 22
+                                )  # Don't go too far, otherwise we ignore all actors
                                 if self.distance_to_intersection_index_ego < 5:
                                     safe_adversarial_actors_ids.append(
                                         adversarial_actor.id
                                     )  # If we are very close to the intersection, we really want to commit
                                 elif (
-                                    adversarial_actor.get_location().distance(intersection_point) < safe_threshold
+                                    adversarial_actor.get_location().distance(
+                                        intersection_point
+                                    )
+                                    < safe_threshold
                                 ):  # If actor is/was near enough to the intersection point, we can safely ignore it
-                                    safe_adversarial_actors_ids.append(adversarial_actor.id)
+                                    safe_adversarial_actors_ids.append(
+                                        adversarial_actor.id
+                                    )
                                 else:
-                                    dangerous_adversarial_actors_ids.append(adversarial_actor.id)
-                            elif scenario in ["SignalizedJunctionLeftTurnEnterFlow", "NonSignalizedJunctionLeftTurnEnterFlow"]:
-                                adversarial_actor_location = adversarial_actor.get_location()
+                                    dangerous_adversarial_actors_ids.append(
+                                        adversarial_actor.id
+                                    )
+                            elif scenario in [
+                                "SignalizedJunctionLeftTurnEnterFlow",
+                                "NonSignalizedJunctionLeftTurnEnterFlow",
+                            ]:
+                                adversarial_actor_location = (
+                                    adversarial_actor.get_location()
+                                )
                                 if (
                                     expert_utils.distance_location_to_route(
-                                        route=CarlaDataProvider.memory[scenario]["opponent_traffic_route"],
+                                        route=CarlaDataProvider.memory[scenario][
+                                            "opponent_traffic_route"
+                                        ],
                                         location=np.array(
                                             [
                                                 adversarial_actor_location.x,
@@ -540,36 +736,56 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                                     > 1.0
                                 ):
                                     # If actor is further than the intersection point in the route, we can safely ignore it
-                                    safe_adversarial_actors_ids.append(adversarial_actor.id)
-                                    LOG.info("Adversarial actor went out of route. ignore")
+                                    safe_adversarial_actors_ids.append(
+                                        adversarial_actor.id
+                                    )
+                                    LOG.info(
+                                        "Adversarial actor went out of route. ignore"
+                                    )
                                 else:
-                                    dangerous_adversarial_actors_ids.append(adversarial_actor.id)
+                                    dangerous_adversarial_actors_ids.append(
+                                        adversarial_actor.id
+                                    )
                         else:
                             ignored_adversarial_actors_ids = [
                                 actor.id
-                                for actor in CarlaDataProvider.memory[self.current_active_scenario_type]["adversarial_actors"]
+                                for actor in CarlaDataProvider.memory[
+                                    self.current_active_scenario_type
+                                ]["adversarial_actors"]
                             ]
 
                     except RuntimeError as e:
                         if "trying to operate on a destroyed actor" in str(e):
-                            LOG.info(f"Error processing adversarial actor {adversarial_actor.id} in scenario {scenario}.")
                             ignored_adversarial_actors_ids.append(adversarial_actor.id)
                             continue
                         else:
                             raise e
 
-                CarlaDataProvider.memory[scenario]["dangerous_adversarial_actors_ids"] = dangerous_adversarial_actors_ids
-                CarlaDataProvider.memory[scenario]["safe_adversarial_actors_ids"] = safe_adversarial_actors_ids
-                CarlaDataProvider.memory[scenario]["ignored_adversarial_actors_ids"] = ignored_adversarial_actors_ids
+                CarlaDataProvider.memory[scenario][
+                    "dangerous_adversarial_actors_ids"
+                ] = dangerous_adversarial_actors_ids
+                CarlaDataProvider.memory[scenario]["safe_adversarial_actors_ids"] = (
+                    safe_adversarial_actors_ids
+                )
+                CarlaDataProvider.memory[scenario]["ignored_adversarial_actors_ids"] = (
+                    ignored_adversarial_actors_ids
+                )
 
         if (
             self.current_active_scenario_type in CarlaDataProvider.memory
-            and "dangerous_adversarial_actors_ids" in CarlaDataProvider.memory[self.current_active_scenario_type]
+            and "dangerous_adversarial_actors_ids"
+            in CarlaDataProvider.memory[self.current_active_scenario_type]
         ):
             return (
-                CarlaDataProvider.memory[self.current_active_scenario_type]["dangerous_adversarial_actors_ids"],
-                CarlaDataProvider.memory[self.current_active_scenario_type]["safe_adversarial_actors_ids"],
-                CarlaDataProvider.memory[self.current_active_scenario_type]["ignored_adversarial_actors_ids"],
+                CarlaDataProvider.memory[self.current_active_scenario_type][
+                    "dangerous_adversarial_actors_ids"
+                ],
+                CarlaDataProvider.memory[self.current_active_scenario_type][
+                    "safe_adversarial_actors_ids"
+                ],
+                CarlaDataProvider.memory[self.current_active_scenario_type][
+                    "ignored_adversarial_actors_ids"
+                ],
             )
         return [], [], []
 
@@ -588,13 +804,18 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
         ):
             min_distance = float("inf")
             rear_adversarial_vehicle = None
-            dangerous_adversarial_actors_ids, safe_adversarial_actors_ids, ignored_adversarial_actors_ids = (
-                self.adversarial_actors_ids
-            )
+            (
+                dangerous_adversarial_actors_ids,
+                safe_adversarial_actors_ids,
+                ignored_adversarial_actors_ids,
+            ) = self.adversarial_actors_ids
             for vehicle in self.vehicles_inside_bev:
                 if vehicle.id == self.ego_vehicle.id:
                     continue
-                if vehicle.id not in dangerous_adversarial_actors_ids and vehicle.id not in safe_adversarial_actors_ids:
+                if (
+                    vehicle.id not in dangerous_adversarial_actors_ids
+                    and vehicle.id not in safe_adversarial_actors_ids
+                ):
                     continue
                 rel_loc = common_utils.get_relative_transform(
                     self.ego_matrix,
@@ -605,12 +826,18 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                     if distance < min_distance:
                         min_distance = distance
                         rear_adversarial_vehicle = vehicle
-        elif self.current_active_scenario_type in ["EnterActorFlow", "EnterActorFlowV2", "InterurbanAdvancedActorFlow"]:
+        elif self.current_active_scenario_type in [
+            "EnterActorFlow",
+            "EnterActorFlowV2",
+            "InterurbanAdvancedActorFlow",
+        ]:
             min_distance = float("inf")
             rear_adversarial_vehicle = None
-            dangerous_adversarial_actors_ids, safe_adversarial_actors_ids, ignored_adversarial_actors_ids = (
-                self.adversarial_actors_ids
-            )
+            (
+                dangerous_adversarial_actors_ids,
+                safe_adversarial_actors_ids,
+                ignored_adversarial_actors_ids,
+            ) = self.adversarial_actors_ids
             for vehicle in self.vehicles_inside_bev:
                 if vehicle.id == self.ego_vehicle.id:
                     continue
@@ -625,12 +852,17 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                     if distance < min_distance:
                         min_distance = distance
                         rear_adversarial_vehicle = vehicle
-        elif self.current_active_scenario_type in ["OppositeVehicleRunningRedLight", "OppositeVehicleTakingPriority"]:
+        elif self.current_active_scenario_type in [
+            "OppositeVehicleRunningRedLight",
+            "OppositeVehicleTakingPriority",
+        ]:
             min_distance = float("inf")
             rear_adversarial_vehicle = None
-            dangerous_adversarial_actors_ids, safe_adversarial_actors_ids, ignored_adversarial_actors_ids = (
-                self.adversarial_actors_ids
-            )
+            (
+                dangerous_adversarial_actors_ids,
+                safe_adversarial_actors_ids,
+                ignored_adversarial_actors_ids,
+            ) = self.adversarial_actors_ids
             for vehicle in self.vehicles_inside_bev:
                 if vehicle.id == self.ego_vehicle.id:
                     continue
@@ -649,8 +881,15 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
 
     @step_cached_property
     def target_lane_width(self):
-        if self.current_active_scenario_type in ["Accident", "ConstructionObstacle", "ParkedObstacle", "HazardAtSideLane"]:
-            target_lane = CarlaDataProvider.memory[self.current_active_scenario_type]["target_lane"]
+        if self.current_active_scenario_type in [
+            "Accident",
+            "ConstructionObstacle",
+            "ParkedObstacle",
+            "HazardAtSideLane",
+        ]:
+            target_lane = CarlaDataProvider.memory[self.current_active_scenario_type][
+                "target_lane"
+            ]
             if target_lane is not None:
                 return target_lane.lane_width
 
@@ -663,7 +902,9 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
             "NonSignalizedJunctionLeftTurnEnterFlow",
             "InterurbanActorFlow",
         ]:
-            sink_wp = CarlaDataProvider.memory[self.current_active_scenario_type]["sink_wp"]
+            sink_wp = CarlaDataProvider.memory[self.current_active_scenario_type][
+                "sink_wp"
+            ]
             if sink_wp is not None:
                 return sink_wp.lane_width
 
@@ -685,12 +926,15 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
             y=self.config_expert.camera_3rd_person_calibration["y"],
             z=self.config_expert.camera_3rd_person_calibration["z"],
         )
-        world_camera_location = common_utils.get_world_coordinate_2d(self.ego_vehicle.get_transform(), ego_camera_location)
+        world_camera_location = common_utils.get_world_coordinate_2d(
+            self.ego_vehicle.get_transform(), ego_camera_location
+        )
         return carla.Transform(
             world_camera_location,
             carla.Rotation(
                 pitch=self.config_expert.camera_3rd_person_calibration["pitch"],
-                yaw=self.ego_vehicle.get_transform().rotation.yaw + self.config_expert.camera_3rd_person_calibration["yaw"],
+                yaw=self.ego_vehicle.get_transform().rotation.yaw
+                + self.config_expert.camera_3rd_person_calibration["yaw"],
             ),
         )
 
@@ -703,7 +947,9 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
         if not self.initialized:
             raise RuntimeError("Agent is not initialized. Call setup() first.")
         return self.carla_world_map.get_waypoint(
-            self.ego_vehicle.get_location(), project_to_road=True, lane_type=carla.LaneType.Driving
+            self.ego_vehicle.get_location(),
+            project_to_road=True,
+            lane_type=carla.LaneType.Driving,
         )
 
     @step_cached_property
@@ -741,18 +987,24 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
     def ego_orientation_rad(self) -> float | None:
         return self.compass
 
-    @property
+    @cached_property_by(lambda self: self.privileged_route_planner.route_index)
     @beartype
     def route_waypoints(self) -> list[carla.Waypoint]:
-        return self.privileged_route_planner.route_waypoints[self.privileged_route_planner.route_index :]
+        return self.privileged_route_planner.route_waypoints[
+            self.privileged_route_planner.route_index :
+        ]
 
-    @property
+    @cached_property_by(lambda self: self.privileged_route_planner.route_index)
     def route_waypoints_np(self) -> jt.Float[npt.NDArray, "N 3"]:
-        return self.privileged_route_planner.route_points[self.privileged_route_planner.route_index :]
+        return self.privileged_route_planner.route_points[
+            self.privileged_route_planner.route_index :
+        ]
 
-    @property
+    @cached_property_by(lambda self: self.privileged_route_planner.route_index)
     def original_route_waypoints_np(self) -> jt.Float[npt.NDArray, "N 3"]:
-        return self.privileged_route_planner.original_route_points[self.privileged_route_planner.route_index :]
+        return self.privileged_route_planner.original_route_points[
+            self.privileged_route_planner.route_index :
+        ]
 
     @step_cached_property
     def signed_dist_to_lane_change(self) -> float:
@@ -783,7 +1035,10 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
 
         min_dist = np.inf
         for i in range(from_index, to_index, 1):
-            if self.privileged_route_planner.commands[i] in (RoadOption.CHANGELANELEFT, RoadOption.CHANGELANERIGHT):
+            if self.privileged_route_planner.commands[i] in (
+                RoadOption.CHANGELANELEFT,
+                RoadOption.CHANGELANERIGHT,
+            ):
                 considered_dist = dist(current_index, i)
                 if abs(considered_dist) < abs(min_dist):
                     min_dist = considered_dist
@@ -806,7 +1061,7 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
     def current_active_scenario_type(self) -> str | None:
         if len(CarlaDataProvider.active_scenarios) == 0:
             return None
-        return CarlaDataProvider.active_scenarios[0][0]
+        return CarlaDataProvider.active_scenarios[0].name
 
     @property
     def previous_active_scenario_type(self) -> str | None:
@@ -817,7 +1072,10 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
         if self.current_active_scenario_type in [
             "ConstructionObstacle",
             "ConstructionObstacleTwoWays",
-        ] or self.previous_active_scenario_type in ["ConstructionObstacle", "ConstructionObstacleTwoWays"]:
+        ] or self.previous_active_scenario_type in [
+            "ConstructionObstacle",
+            "ConstructionObstacleTwoWays",
+        ]:
             num_cones = 0
             num_warning_traffic_signs = 0
             distances = []
@@ -847,14 +1105,20 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
 
     @step_cached_property
     def distance_to_accident_site(self) -> float:
-        if self.current_active_scenario_type in ["Accident", "AccidentTwoWays"] or self.previous_active_scenario_type in [
+        if self.current_active_scenario_type in [
+            "Accident",
+            "AccidentTwoWays",
+        ] or self.previous_active_scenario_type in [
             "Accident",
             "AccidentTwoWays",
         ]:
             distances = []
             num_scenario_cars = 0
             for actor in self.scenario_obstacles:
-                if "scenario" in actor.attributes["role_name"] and self._get_actor_forward_speed(actor) == 0.0:
+                if (
+                    "scenario" in actor.attributes["role_name"]
+                    and self._get_actor_forward_speed(actor) == 0.0
+                ):
                     num_scenario_cars += 1
                     distances.append(actor.get_location().distance(self.ego_location))
             if num_scenario_cars > 0:
@@ -866,11 +1130,17 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
         if self.current_active_scenario_type in [
             "ParkedObstacle",
             "ParkedObstacleTwoWays",
-        ] or self.previous_active_scenario_type in ["ParkedObstacle", "ParkedObstacleTwoWays"]:
+        ] or self.previous_active_scenario_type in [
+            "ParkedObstacle",
+            "ParkedObstacleTwoWays",
+        ]:
             distances = []
             num_scenario_cars = 0
             for actor in self.scenario_obstacles:
-                if "scenario" in actor.attributes["role_name"] and self._get_actor_forward_speed(actor) == 0.0:
+                if (
+                    "scenario" in actor.attributes["role_name"]
+                    and self._get_actor_forward_speed(actor) == 0.0
+                ):
                     num_scenario_cars += 1
                     distances.append(actor.get_location().distance(self.ego_location))
             if num_scenario_cars > 0:
@@ -879,13 +1149,16 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
 
     @step_cached_property
     def distance_to_vehicle_opens_door(self) -> float:
-        if self.current_active_scenario_type in ["VehicleOpensDoorTwoWays"] or self.previous_active_scenario_type in [
+        if self.current_active_scenario_type in [
             "VehicleOpensDoorTwoWays"
-        ]:
+        ] or self.previous_active_scenario_type in ["VehicleOpensDoorTwoWays"]:
             distances = []
             num_scenario_cars = 0
             for actor in self.scenario_obstacles:
-                if "scenario" in actor.attributes["role_name"] and self._get_actor_forward_speed(actor) == 0.0:
+                if (
+                    "scenario" in actor.attributes["role_name"]
+                    and self._get_actor_forward_speed(actor) == 0.0
+                ):
                     num_scenario_cars += 1
                     distances.append(actor.get_location().distance(self.ego_location))
             if num_scenario_cars > 0:
@@ -896,7 +1169,11 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
     def distance_to_cutin_vehicle(self) -> float:
         if not self.config_expert.datagen:
             return float("inf")
-        if self.current_active_scenario_type in ["ParkingCutIn", "StaticCutIn", "HighwayCutIn"]:
+        if self.current_active_scenario_type in [
+            "ParkingCutIn",
+            "StaticCutIn",
+            "HighwayCutIn",
+        ]:
             distances = []
             num_scenario_cars = 0
             for actor in self.cutin_actors:
@@ -923,7 +1200,9 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
         ego_location = self.ego_vehicle.get_location()
 
         # Find the closest pedestrian
-        closest_pedestrian = min(pedestrians, key=lambda p: ego_location.distance(p.get_location()))
+        closest_pedestrian = min(
+            pedestrians, key=lambda p: ego_location.distance(p.get_location())
+        )
         return ego_location.distance(closest_pedestrian.get_location())
 
     @step_cached_property
@@ -942,7 +1221,9 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
         ego_location = self.ego_vehicle.get_location()
 
         # Find the closest biker
-        closest_biker = min(bikers, key=lambda b: ego_location.distance(b.get_location()))
+        closest_biker = min(
+            bikers, key=lambda b: ego_location.distance(b.get_location())
+        )
         return ego_location.distance(closest_biker.get_location())
 
     @step_cached_property
@@ -962,7 +1243,14 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
     def route_curvature(self):
         route_points = self.route_waypoints_np
         total_curvature = 0.0
-        for i in range(1, min(len(route_points) - 1, self.config_expert.high_road_curvature_max_future_points) - 1):
+        for i in range(
+            1,
+            min(
+                len(route_points) - 1,
+                self.config_expert.high_road_curvature_max_future_points,
+            )
+            - 1,
+        ):
             loc_prev = route_points[i - 1]
             loc_current = route_points[i]
             loc_next = route_points[i + 1]
@@ -970,8 +1258,16 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                 (loc_current[0] - loc_prev[0]) * (loc_next[1] - loc_current[1])
                 - (loc_current[1] - loc_prev[1]) * (loc_next[0] - loc_current[0])
             ) / (
-                ((loc_current[0] - loc_prev[0]) ** 2 + (loc_current[1] - loc_prev[1]) ** 2) ** 0.5
-                * ((loc_next[0] - loc_current[0]) ** 2 + (loc_next[1] - loc_current[1]) ** 2) ** 0.5
+                (
+                    (loc_current[0] - loc_prev[0]) ** 2
+                    + (loc_current[1] - loc_prev[1]) ** 2
+                )
+                ** 0.5
+                * (
+                    (loc_next[0] - loc_current[0]) ** 2
+                    + (loc_next[1] - loc_current[1]) ** 2
+                )
+                ** 0.5
             )
             total_curvature += abs(curv)
         return total_curvature
@@ -980,7 +1276,9 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
     @beartype
     def vehicles_inside_bev(self) -> list[carla.Actor]:
         vehicles = self.carla_world.get_actors().filter("*vehicle*")
-        vehicles = [vehicle for vehicle in vehicles if self.is_actor_inside_bev(vehicle)]
+        vehicles = [
+            vehicle for vehicle in vehicles if self.is_actor_inside_bev(vehicle)
+        ]
         if (
             self.config_expert.datagen and self.config_expert.vehicle_occlusion_check
         ):  # Can only perform occlusion check if we have sensor data
@@ -1003,7 +1301,9 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
     def walkers_inside_bev(self) -> list[carla.Actor]:
         walkers = self.carla_world.get_actors().filter("*walker*")
         walkers = [walker for walker in walkers if self.is_actor_inside_bev(walker)]
-        if self.config_expert.datagen:  # Can only perform occlusion check if we have sensor data
+        if (
+            self.config_expert.datagen
+        ):  # Can only perform occlusion check if we have sensor data
             walkers = [
                 walker
                 for walker in walkers
@@ -1022,7 +1322,12 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
         bikers = [
             b
             for b in bikers
-            if b.type_id in ["vehicle.diamondback.century", "vehicle.gazelle.omafiets", "vehicle.bh.crossbike"]
+            if b.type_id
+            in [
+                "vehicle.diamondback.century",
+                "vehicle.gazelle.omafiets",
+                "vehicle.bh.crossbike",
+            ]
         ]
         bikers = [biker for biker in bikers if self.is_actor_inside_bev(biker)]
         if (
@@ -1049,14 +1354,18 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
             list: A list of static actors inside the BEV.
         """
         static_actors = self.carla_world.get_actors().filter("*static*")
-        static_actors = [actor for actor in static_actors if self.is_actor_inside_bev(actor)]
+        static_actors = [
+            actor for actor in static_actors if self.is_actor_inside_bev(actor)
+        ]
         return static_actors
 
     @step_cached_property
     @beartype
     def distance_to_next_junction(self) -> float:
         ego_wp = self.carla_world_map.get_waypoint(
-            self.ego_vehicle.get_location(), project_to_road=True, lane_type=carla.libcarla.LaneType.Any
+            self.ego_vehicle.get_location(),
+            project_to_road=True,
+            lane_type=carla.libcarla.LaneType.Any,
         )
         next_wps = expert_utils.wps_next_until_lane_end(ego_wp)
         try:
@@ -1069,7 +1378,9 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
             distance_to_junction_ego = 0.0
             # get distance to ego vehicle
         elif len(next_lane_wps_ego) > 0 and next_lane_wps_ego[0].is_junction:
-            distance_to_junction_ego = next_lane_wps_ego[0].transform.location.distance(ego_wp.transform.location)
+            distance_to_junction_ego = next_lane_wps_ego[0].transform.location.distance(
+                ego_wp.transform.location
+            )
         else:
             distance_to_junction_ego = np.inf
 
@@ -1079,7 +1390,9 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
     @beartype
     def scenario_actors(self) -> list[carla.Actor]:
         ret = []
-        for actor in self.vehicles_inside_bev + self.walkers_inside_bev + self.bikers_inside_bev:
+        for actor in (
+            self.vehicles_inside_bev + self.walkers_inside_bev + self.bikers_inside_bev
+        ):
             if "scenario" in actor.attributes["role_name"]:
                 ret.append(actor)
         return ret
@@ -1111,11 +1424,17 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
             "BlockedIntersection",
         ]
         if self.current_active_scenario_type in scenarios:
-            ret = CarlaDataProvider.memory[self.current_active_scenario_type]["obstacles"]
+            ret = CarlaDataProvider.memory[self.current_active_scenario_type][
+                "obstacles"
+            ]
         elif self.previous_active_scenario_type in scenarios:
-            obstacles = CarlaDataProvider.previous_memory[self.previous_active_scenario_type]["obstacles"]
+            obstacles = CarlaDataProvider.previous_memory[
+                self.previous_active_scenario_type
+            ]["obstacles"]
             try:
-                obstacles = [actor for actor in obstacles if self.is_actor_inside_bev(actor)]
+                obstacles = [
+                    actor for actor in obstacles if self.is_actor_inside_bev(actor)
+                ]
                 ret = obstacles
             except RuntimeError as e:
                 if "trying to operate on a destroyed actor" in str(e):
@@ -1190,11 +1509,17 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
         This is used to determine if the agent should react to a vehicle opening its door.
         """
         if self.current_active_scenario_type == "VehicleOpensDoorTwoWays":
-            return CarlaDataProvider.memory["VehicleOpensDoorTwoWays"]["vehicle_opened_door"]
+            return CarlaDataProvider.memory["VehicleOpensDoorTwoWays"][
+                "vehicle_opened_door"
+            ]
         elif self.previous_active_scenario_type == "VehicleOpensDoorTwoWays":
             try:
-                CarlaDataProvider.previous_memory["VehicleOpensDoorTwoWays"]["obstacles"][0].get_location()
-                return CarlaDataProvider.previous_memory["VehicleOpensDoorTwoWays"]["vehicle_opened_door"]
+                CarlaDataProvider.previous_memory["VehicleOpensDoorTwoWays"][
+                    "obstacles"
+                ][0].get_location()
+                return CarlaDataProvider.previous_memory["VehicleOpensDoorTwoWays"][
+                    "vehicle_opened_door"
+                ]
             except RuntimeError as e:
                 if "trying to operate on a destroyed actor" in str(e):
                     return False
@@ -1209,15 +1534,27 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
         This is used to determine if the agent should react to a vehicle opening its door.
         """
         if self.current_active_scenario_type == "VehicleOpensDoorTwoWays":
-            return CarlaDataProvider.memory["VehicleOpensDoorTwoWays"]["vehicle_door_side"]
+            return CarlaDataProvider.memory["VehicleOpensDoorTwoWays"][
+                "vehicle_door_side"
+            ]
         elif self.previous_active_scenario_type == "VehicleOpensDoorTwoWays":
-            return CarlaDataProvider.previous_memory["VehicleOpensDoorTwoWays"]["vehicle_door_side"]
+            return CarlaDataProvider.previous_memory["VehicleOpensDoorTwoWays"][
+                "vehicle_door_side"
+            ]
         return None
 
     @step_cached_property
     def cutin_actors(self):
-        if self.current_active_scenario_type in ["ParkingCutIn", "StaticCutIn", "HighwayCutIn"]:
-            return [CarlaDataProvider.memory[self.current_active_scenario_type]["cut_in_vehicle"]]
+        if self.current_active_scenario_type in [
+            "ParkingCutIn",
+            "StaticCutIn",
+            "HighwayCutIn",
+        ]:
+            return [
+                CarlaDataProvider.memory[self.current_active_scenario_type][
+                    "cut_in_vehicle"
+                ]
+            ]
         return []
 
     @step_cached_property
@@ -1281,7 +1618,11 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
         for bb in self.stored_bounding_boxes_of_this_step:
             if not (-8 <= bb["position"][0] <= 32 and abs(bb["position"][1]) <= 10):
                 continue
-            if bb["class"] == "static" and bb["transfuser_semantics_id"] == TransfuserSemanticSegmentationClass.VEHICLE:
+            if (
+                bb["class"] == "static"
+                and bb["transfuser_semantics_id"]
+                == TransfuserSemanticSegmentationClass.VEHICLE
+            ):
                 count += 1
             if bb["class"] == "static_prop_car":
                 count += 1

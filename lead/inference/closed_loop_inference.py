@@ -99,7 +99,10 @@ class ClosedLoopInference(OpenLoopInference):
         speed = float(speed[0].data.cpu().numpy())
         pred_target_speed = float(pred_target_speed[0].data.cpu().numpy())
 
-        brake = bool(pred_target_speed < 0.01 or (speed / pred_target_speed) > self.config_closed_loop.brake_ratio)
+        brake = bool(
+            pred_target_speed < 0.01
+            or (speed / pred_target_speed) > self.config_closed_loop.brake_ratio
+        )
         steer = self.lateral_route_controller.step(
             pred_checkpoints,
             speed,
@@ -107,13 +110,17 @@ class ClosedLoopInference(OpenLoopInference):
             ego_vehicle_rotation,
             sensor_agent_steer_correction=self.config_closed_loop.sensor_agent_steer_correction,
         )
-        throttle, brake = get_throttle(brake, pred_target_speed, speed, self.config_expert)
+        throttle, brake = get_throttle(
+            brake, pred_target_speed, speed, self.config_expert
+        )
 
         return steer, throttle, float(brake)
 
     @jt.jaxtyped(typechecker=beartype)
     def execute_waypoints(
-        self, waypoints: jt.Float[torch.Tensor, "1 num_waypoints 2"], velocity: jt.Float[torch.Tensor, "1 1"]
+        self,
+        waypoints: jt.Float[torch.Tensor, "1 num_waypoints 2"],
+        velocity: jt.Float[torch.Tensor, "1 1"],
     ) -> tuple[float, float, float]:
         """Predicts vehicle control with a PID controller. Use waypoint predictions.
 
@@ -128,11 +135,17 @@ class ClosedLoopInference(OpenLoopInference):
         waypoints = waypoints[0].data.cpu().numpy()
         speed = velocity[0].data.cpu().numpy()
 
-        one_second = int(self.config_training.carla_fps // self.config_training.data_save_freq)
+        one_second = int(
+            self.config_training.carla_fps // self.config_training.data_save_freq
+        )
         half_second = one_second // 2
 
-        desired_speed = np.linalg.norm(waypoints[half_second - 1] - waypoints[one_second - 1]) * 2.0
-        delta_speed = np.clip(desired_speed - speed, 0.0, self.config_closed_loop.wp_delta_clip)
+        desired_speed = (
+            np.linalg.norm(waypoints[half_second - 1] - waypoints[one_second - 1]) * 2.0
+        )
+        delta_speed = np.clip(
+            desired_speed - speed, 0.0, self.config_closed_loop.wp_delta_clip
+        )
 
         brake = (desired_speed < self.config_closed_loop.brake_speed) or (
             (speed / desired_speed) > self.config_closed_loop.brake_ratio
@@ -140,7 +153,9 @@ class ClosedLoopInference(OpenLoopInference):
         throttle = self.longitudinal_waypoint_controller.step(delta_speed)
         throttle = throttle if not brake else 0.0
 
-        if self.config_closed_loop.tuned_aim_distance:  # In LB2, we go faster, so we need to choose waypoints farther ahead
+        if (
+            self.config_closed_loop.tuned_aim_distance
+        ):  # In LB2, we go faster, so we need to choose waypoints farther ahead
             # range [2.4, 10.5] same as in the disentangled rep.
             aim_distance = np.clip(0.975532 * speed + 1.915288, 24, 105) / 10
         else:
@@ -171,7 +186,9 @@ class ClosedLoopInference(OpenLoopInference):
         return float(steer), float(throttle), float(brake)
 
     @beartype
-    def ensemble(self, data: dict[str, torch.Tensor], predictions: list[Prediction]) -> ClosedLoopPrediction:
+    def ensemble(
+        self, data: dict[str, torch.Tensor], predictions: list[Prediction]
+    ) -> ClosedLoopPrediction:
         """
         Args:
             data: Dictionary containing the input data
@@ -183,17 +200,23 @@ class ClosedLoopInference(OpenLoopInference):
         open_loop_prediction: OpenLoopPrediction = super().ensemble(data, predictions)
 
         # Convert high-level commands to vehicle controls
-        steer = throttle = brake = waypoint_steer = waypoint_throttle = waypoint_brake = route_steer = target_speed_throttle = (
-            target_speed_brake
-        ) = None
+        steer = throttle = brake = waypoint_steer = waypoint_throttle = (
+            waypoint_brake
+        ) = route_steer = target_speed_throttle = target_speed_brake = None
 
         if open_loop_prediction.pred_route is not None:
-            route_steer, target_speed_throttle, target_speed_brake = self.execute_route_and_target_speed(
-                open_loop_prediction.pred_route, open_loop_prediction.pred_target_speed_scalar, ego_speed
+            route_steer, target_speed_throttle, target_speed_brake = (
+                self.execute_route_and_target_speed(
+                    open_loop_prediction.pred_route,
+                    open_loop_prediction.pred_target_speed_scalar,
+                    ego_speed,
+                )
             )
         if open_loop_prediction.pred_future_waypoints is not None:
-            waypoints_steer, waypoints_throttle, waypoints_brake = self.execute_waypoints(
-                open_loop_prediction.pred_future_waypoints, ego_speed
+            waypoints_steer, waypoints_throttle, waypoints_brake = (
+                self.execute_waypoints(
+                    open_loop_prediction.pred_future_waypoints, ego_speed
+                )
             )
 
         # Select which high-level modality we want to use for each control
@@ -202,26 +225,34 @@ class ClosedLoopInference(OpenLoopInference):
         elif self.config_closed_loop.steer_modality == "waypoint":
             steer = waypoints_steer
         else:
-            raise ValueError(f"Invalid steer_modality: {self.config_closed_loop.steer_modality}")
+            raise ValueError(
+                f"Invalid steer_modality: {self.config_closed_loop.steer_modality}"
+            )
 
         if self.config_closed_loop.throttle_modality == "target_speed":
             throttle = target_speed_throttle
         elif self.config_closed_loop.throttle_modality == "waypoint":
             throttle = waypoints_throttle
         else:
-            raise ValueError(f"Invalid throttle_modality: {self.config_closed_loop.throttle_modality}")
+            raise ValueError(
+                f"Invalid throttle_modality: {self.config_closed_loop.throttle_modality}"
+            )
 
         if self.config_closed_loop.brake_modality == "target_speed":
             brake = target_speed_brake
         elif self.config_closed_loop.brake_modality == "waypoint":
             brake = waypoints_brake
         else:
-            raise ValueError(f"Invalid brake_modality: {self.config_closed_loop.brake_modality}")
+            raise ValueError(
+                f"Invalid brake_modality: {self.config_closed_loop.brake_modality}"
+            )
 
         # Turn off throttle if we brake
         if brake > 0.0:
             throttle = 0.0
-            if ego_speed < 0.01:  # When we don't move we don't want the angle error to accumulate in the integral
+            if (
+                ego_speed < 0.01
+            ):  # When we don't move we don't want the angle error to accumulate in the integral
                 steer = 0.0
 
         # Return all predictions

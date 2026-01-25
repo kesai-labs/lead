@@ -12,18 +12,19 @@ when a vehicle coming from the opposite lane invades the ego's lane, forcing the
 
 from __future__ import print_function
 
-import py_trees
 import carla
-
+import py_trees
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (InvadingActorFlow,
-                                                                      ScenarioTimeout,
-                                                                      ActorDestroy,
-                                                                      BatchActorTransformSetter)
-from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import WaitUntilInFrontPosition
-from srunner.scenariomanager.scenarioatomics.atomic_criteria import CollisionTest, ScenarioTimeoutTest
+from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
+    ActorDestroy, BatchActorTransformSetter, InvadingActorFlow,
+    ScenarioTimeout)
+from srunner.scenariomanager.scenarioatomics.atomic_criteria import (
+    CollisionTest, ScenarioTimeoutTest)
+from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import \
+    WaitUntilInFrontPosition
 from srunner.scenarios.basic_scenario import BasicScenario
-from srunner.tools.background_manager import RemoveRoadLane, ChangeOppositeBehavior, ReAddRoadLane
+from srunner.tools.background_manager import (ChangeOppositeBehavior,
+                                              ReAddRoadLane, RemoveRoadLane)
 
 
 def convert_dict_to_location(actor_dict):
@@ -112,7 +113,8 @@ class InvadingTurn(BasicScenario):
         # add actors, that are relevant for the Expert to the list active_scenarios
         first_cone = self.other_actors[-1]
         last_cone = self.other_actors[0]
-        CarlaDataProvider.active_scenarios.append((type(self).__name__, [first_cone, last_cone, self._true_offset], id(self))) # added
+        from srunner.scenariomanager.carla_data_provider import ActiveScenario
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=first_cone, last_actor=last_cone, metadata=self._true_offset, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
         CarlaDataProvider.memory[
             type(self).__name__
         ].update({

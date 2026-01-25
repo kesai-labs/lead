@@ -11,20 +11,18 @@ Scenario in which the ego has to yield its lane to emergency vehicle.
 
 from __future__ import print_function
 
-import py_trees
 import carla
-
+import py_trees
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (ActorTransformSetter,
-                                                                      ActorDestroy,
-                                                                      Idle,
-                                                                      AdaptiveConstantVelocityAgentBehavior)
-from srunner.scenariomanager.scenarioatomics.atomic_criteria import CollisionTest, YieldToEmergencyVehicleTest
-from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (InTriggerDistanceToVehicle,
-                                                                               WaitUntilInFront,
-                                                                               DriveDistance)
+from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
+    ActorDestroy, ActorTransformSetter, AdaptiveConstantVelocityAgentBehavior,
+    Idle)
+from srunner.scenariomanager.scenarioatomics.atomic_criteria import (
+    CollisionTest, YieldToEmergencyVehicleTest)
+from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (
+    DriveDistance, InTriggerDistanceToVehicle, WaitUntilInFront)
 from srunner.scenarios.basic_scenario import BasicScenario
-from srunner.tools.background_manager import RemoveRoadLane, ReAddRoadLane
+from srunner.tools.background_manager import ReAddRoadLane, RemoveRoadLane
 
 
 class YieldToEmergencyVehicle(BasicScenario):
@@ -109,7 +107,9 @@ class YieldToEmergencyVehicle(BasicScenario):
 
         # add actors that are relevant for the Expert to CarlaDataProvider.active_scenarios
         if add_scenario_type:
-            CarlaDataProvider.active_scenarios.append((type(self).__name__, [actor, None, False, 1e9, 1e9, False], id(self))) # added
+            from srunner.scenariomanager.carla_data_provider import \
+                ActiveScenario
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=actor, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
             CarlaDataProvider.memory[
                 type(self).__name__
             ].update({

@@ -10,7 +10,9 @@ class OpenLoopConfig(BaseConfig):
     def __init__(self, raise_error_on_missing_key: bool = True):
         super().__init__()
         self.load_from_environment(
-            loaded_config=None, env_key="LEAD_OPEN_LOOP_CONFIG", raise_error_on_missing_key=raise_error_on_missing_key
+            loaded_config=None,
+            env_key="LEAD_OPEN_LOOP_CONFIG",
+            raise_error_on_missing_key=raise_error_on_missing_key,
         )
 
     # --- Speed and Control Settings ---

@@ -14,18 +14,15 @@ from __future__ import print_function
 import carla
 import py_trees
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
-
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (ActorDestroy,
-                                                                      Idle,
-                                                                      ScenarioTimeout,
-                                                                      ActorTransformSetter,
-                                                                      HandBrakeVehicle)
-from srunner.scenariomanager.scenarioatomics.atomic_criteria import CollisionTest, ScenarioTimeoutTest
-from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import InTriggerDistanceToVehicle
-
+from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
+    ActorDestroy, ActorTransformSetter, HandBrakeVehicle, Idle,
+    ScenarioTimeout)
+from srunner.scenariomanager.scenarioatomics.atomic_criteria import (
+    CollisionTest, ScenarioTimeoutTest)
+from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import \
+    InTriggerDistanceToVehicle
 from srunner.scenarios.basic_scenario import BasicScenario
 from srunner.tools.background_manager import HandleJunctionScenario
-
 from srunner.tools.scenario_helper import generate_target_waypoint_in_route
 
 
@@ -100,7 +97,8 @@ class BlockedIntersection(BasicScenario):
         lights |= carla.VehicleLightState.Brake
         blocker.set_light_state(carla.VehicleLightState(lights))
 
-        CarlaDataProvider.active_scenarios.append((type(self).__name__, [None, None, None, False, 1e9, 1e9, False], id(self))) # added
+        from srunner.scenariomanager.carla_data_provider import ActiveScenario
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
         CarlaDataProvider.memory[type(self).__name__]["obstacles"] = [blocker]
 
     def _create_behavior(self):

@@ -17,7 +17,3 @@ A well-tuned controller (e.g., MPC) can significantly improve performance. Preli
 ## CARLA 0.9.16 Has Goal-Point Issues
 
 CARLA 0.9.16 currently has problems with the goal-point pipeline that degrade policy behavior. We don't recommend evaluating models on this version.
-
-## Expert Is Designed for Simplicity, Not Optimality
-
-The provided expert prioritizes simplicity and extensibility over optimal performance. We encourage future work to improve the expert or explore alternative designs within the LEAD framework.

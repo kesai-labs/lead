@@ -26,7 +26,9 @@ class KalmanFilter:
             config: Object containing the configuration parameters.
         """
         self.config = config
-        self.points = MerweScaledSigmaPoints(n=4, alpha=0.00001, beta=2, kappa=0, subtract=self._residual_state_x)
+        self.points = MerweScaledSigmaPoints(
+            n=4, alpha=0.00001, beta=2, kappa=0, subtract=self._residual_state_x
+        )
 
         self.ukf = UKF(
             dim_x=4,
@@ -64,7 +66,11 @@ class KalmanFilter:
 
     @beartype
     def step(
-        self, noisy_position: npt.NDArray, compass: float, speed: float, control: carla.VehicleControl
+        self,
+        noisy_position: npt.NDArray,
+        compass: float,
+        speed: float,
+        control: carla.VehicleControl,
     ) -> npt.NDArray[np.floating]:
         """Performs one iteration of predict and update of the UKF.
 
@@ -82,7 +88,12 @@ class KalmanFilter:
 
         # Create scale state
         z = np.array(
-            [noisy_position[0] - self.start_x, noisy_position[1] - self.start_y, common_utils.normalize_angle(compass), speed]
+            [
+                noisy_position[0] - self.start_x,
+                noisy_position[1] - self.start_y,
+                common_utils.normalize_angle(compass),
+                speed,
+            ]
         )
 
         if not self.filter_initialized:
@@ -93,7 +104,9 @@ class KalmanFilter:
             self.history_throttles.append(0.0)
             self.history_brakes.append(0.0)
 
-        self.ukf.predict(steer=control.steer, throttle=control.throttle, brake=control.brake)
+        self.ukf.predict(
+            steer=control.steer, throttle=control.throttle, brake=control.brake
+        )
         self.ukf.update(z)
 
         prediction = self.ukf.x.copy()
@@ -140,7 +153,12 @@ class KalmanFilter:
 
     @beartype
     def _bicycle_model_forward(
-        self, x: jt.Float[npt.NDArray, " 4"], dt: float, steer: float, throttle: float, brake: float
+        self,
+        x: jt.Float[npt.NDArray, " 4"],
+        dt: float,
+        steer: float,
+        throttle: float,
+        brake: float,
     ) -> jt.Float[npt.NDArray, " 4"]:
         """Leaderboard 1.0's kinematic bicycle model. Numbers are the tuned parameters from World on Rails.
 
@@ -185,7 +203,9 @@ class KalmanFilter:
         return next_state_x
 
     @beartype
-    def _measurement_function_hx(self, vehicle_state: jt.Float[npt.NDArray, " 4"]) -> jt.Float[npt.NDArray, " 4"]:
+    def _measurement_function_hx(
+        self, vehicle_state: jt.Float[npt.NDArray, " 4"]
+    ) -> jt.Float[npt.NDArray, " 4"]:
         """
         Identity measurement function.
 
@@ -198,7 +218,9 @@ class KalmanFilter:
         return vehicle_state
 
     @beartype
-    def _state_mean(self, state: jt.Float[npt.NDArray, "N 4"], wm: npt.ArrayLike) -> jt.Float[npt.NDArray, " 4"]:
+    def _state_mean(
+        self, state: jt.Float[npt.NDArray, "N 4"], wm: npt.ArrayLike
+    ) -> jt.Float[npt.NDArray, " 4"]:
         """Averaging function.
 
         Args:
@@ -219,7 +241,9 @@ class KalmanFilter:
         return x
 
     @beartype
-    def _measurement_mean(self, state: jt.Float[npt.NDArray, "N 4"], wm: npt.ArrayLike) -> jt.Float[npt.NDArray, " 4"]:
+    def _measurement_mean(
+        self, state: jt.Float[npt.NDArray, "N 4"], wm: npt.ArrayLike
+    ) -> jt.Float[npt.NDArray, " 4"]:
         """Averaging function.
 
         Args:
@@ -240,7 +264,9 @@ class KalmanFilter:
         return x
 
     @beartype
-    def _residual_state_x(self, a: npt.NDArray, b: npt.NDArray) -> npt.NDArray[np.floating]:
+    def _residual_state_x(
+        self, a: npt.NDArray, b: npt.NDArray
+    ) -> npt.NDArray[np.floating]:
         """Residual function
 
         Args:
@@ -255,7 +281,9 @@ class KalmanFilter:
         return y
 
     @beartype
-    def _residual_measurement_h(self, a: npt.NDArray, b: npt.NDArray) -> npt.NDArray[np.floating]:
+    def _residual_measurement_h(
+        self, a: npt.NDArray, b: npt.NDArray
+    ) -> npt.NDArray[np.floating]:
         """Residual function
 
         Args:

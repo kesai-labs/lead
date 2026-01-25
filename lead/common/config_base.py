@@ -16,7 +16,9 @@ class BaseConfig:
 
     @property
     def target_dataset(self):
-        raise NotImplementedError("Subclasses must implement the target_dataset property.")
+        raise NotImplementedError(
+            "Subclasses must implement the target_dataset property."
+        )
 
     @property
     def lead_project_root(self):
@@ -233,7 +235,9 @@ class BaseConfig:
                     constants.WAYMO_E2E_2025_CAMERA_SETTING["FRONT_RIGHT"]["extrinsic"],
                     constants.WAYMO_E2E_2025_CAMERA_SETTING["FRONT_RIGHT"]["width"],
                     constants.WAYMO_E2E_2025_CAMERA_SETTING["FRONT_RIGHT"]["height"],
-                    constants.WAYMO_E2E_2025_CAMERA_SETTING["FRONT_RIGHT"]["cropped_height"],
+                    constants.WAYMO_E2E_2025_CAMERA_SETTING["FRONT_RIGHT"][
+                        "cropped_height"
+                    ],
                 ),
                 2: waymo_e2e_camera_setting_to_carla(
                     WAYMO_E2E_INTRINSIC,
@@ -247,7 +251,9 @@ class BaseConfig:
                     constants.WAYMO_E2E_2025_CAMERA_SETTING["FRONT_LEFT"]["extrinsic"],
                     constants.WAYMO_E2E_2025_CAMERA_SETTING["FRONT_LEFT"]["width"],
                     constants.WAYMO_E2E_2025_CAMERA_SETTING["FRONT_LEFT"]["height"],
-                    constants.WAYMO_E2E_2025_CAMERA_SETTING["FRONT_LEFT"]["cropped_height"],
+                    constants.WAYMO_E2E_2025_CAMERA_SETTING["FRONT_LEFT"][
+                        "cropped_height"
+                    ],
                 ),
             }
         raise ValueError(f"Unsupported target dataset: {self.target_dataset}")
@@ -321,7 +327,7 @@ class BaseConfig:
 
     # --- Temporal Data ---
     # Number of temporal data points saved for ego vehicle
-    ego_num_temporal_data_points_saved = 200
+    ego_num_temporal_data_points_saved = 60
     # Number of temporal data points saved for other vehicles
     other_vehicles_num_temporal_data_points_saved = 40
 
@@ -422,7 +428,9 @@ class BaseConfig:
 
         self._loaded_config = loaded_config
 
-    def load_from_environment(self, loaded_config, env_key: str, raise_error_on_missing_key: bool):
+    def load_from_environment(
+        self, loaded_config, env_key: str, raise_error_on_missing_key: bool
+    ):
         # --- Parameters coming from environment variables, highest priority
         env_params = os.getenv(env_key, "").strip()
         if not env_params:

@@ -31,12 +31,13 @@ def route_failed(route_path: str) -> bool:
     infraction = True
     if results_route["scores"]["score_composed"] == 100.0:
         infraction = False
-    if results_route["scores"]["score_composed"] < 100.0 and results_route["num_infractions"] == len(
-        results_route["infractions"]["min_speed_infractions"]
-    ):
+    if results_route["scores"]["score_composed"] < 100.0 and results_route[
+        "num_infractions"
+    ] == len(results_route["infractions"]["min_speed_infractions"]):
         infraction = False
     if results_route["status"] == "Completed" and results_route["num_infractions"] == (
-        len(results_route["infractions"]["min_speed_infractions"]) + len(results_route["infractions"]["outside_route_lanes"])
+        len(results_route["infractions"]["min_speed_infractions"])
+        + len(results_route["infractions"]["outside_route_lanes"])
     ):  # We ignore minor out of lanes if we still complete the route
         infraction = False
     if results_route["status"] == "Perfect":
@@ -94,14 +95,18 @@ def route_completed_but_fail(route_path: str) -> bool:
     if (
         results_route["status"] == "Completed"
         and results_route["scores"]["score_composed"] < 100.0
-        and results_route["num_infractions"] == len(results_route["infractions"]["min_speed_infractions"])
+        and results_route["num_infractions"]
+        == len(results_route["infractions"]["min_speed_infractions"])
     ):
         LOG.info(f"\tSkipping route {route_path} due to only min speed infractions.")
         return False
     if results_route["status"] == "Completed" and results_route["num_infractions"] == (
-        len(results_route["infractions"]["min_speed_infractions"]) + len(results_route["infractions"]["outside_route_lanes"])
+        len(results_route["infractions"]["min_speed_infractions"])
+        + len(results_route["infractions"]["outside_route_lanes"])
     ):
-        LOG.info(f"\tSkipping route {route_path} due to only min speed and outside lane infractions.")
+        LOG.info(
+            f"\tSkipping route {route_path} due to only min speed and outside lane infractions."
+        )
         return False
 
     return True

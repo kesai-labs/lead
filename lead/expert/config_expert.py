@@ -5,7 +5,7 @@ import carla
 import numpy as np
 
 from lead.common import weathers
-from lead.common.config_base import BaseConfig
+from lead.common.config_base import BaseConfig, overridable_property
 from lead.common.constants import TargetDataset, WeatherVisibility
 
 # Temporal hack for points per meter conversion - needs to be fixed
@@ -24,7 +24,7 @@ class ExpertConfig(BaseConfig):
         super().__init__()
         self.load_from_environment(
             loaded_config=None,
-            env_key="EXPERT_CONFIG",
+            env_key="LEAD_EXPERT_CONFIG",
             raise_error_on_missing_key=True,
         )
 
@@ -33,6 +33,17 @@ class ExpertConfig(BaseConfig):
         """Set this to the target dataset for data collection. Will affect sensor setup."""
         return TargetDataset.CARLA_LEADERBOARD2_3CAMERAS
 
+    @overridable_property
+    def perturbate_sensors(self):
+        """If true enable camera perturbation during data collection"""
+        if self.eval_expert:
+            return False
+        return True
+
+    # If true, also run speed benchmarking during expert data collection
+    profile_expert = False
+    # How often we log in the main loop
+    log_info_freq = 10
     # --- Planning Area ---
     # Maximum planning area coordinate in x direction (meters)
     # How many pixels make up 1 meter in BEV grids.
@@ -43,7 +54,7 @@ class ExpertConfig(BaseConfig):
         """Back boundary of the planning area in meters."""
         return -32
 
-    @property
+    @overridable_property
     def max_x_meter(self):
         """Front boundary of the planning area in meters."""
         return 64
@@ -355,7 +366,9 @@ class ExpertConfig(BaseConfig):
     tf_first_checkpoint_distance = int(2.5 * points_per_meter)
     # Parameters to calculate how much the ego agent needs to cover a given distance. Values are taken from
     # the kinematic bicycle model
-    compute_min_time_to_cover_distance_params = np.array([0.00904221, 0.00733342, -0.03744807, 0.0235038])
+    compute_min_time_to_cover_distance_params = np.array(
+        [0.00904221, 0.00733342, -0.03744807, 0.0235038]
+    )
     # Distance to check for road_id/lane_id for RouteObstacle scenarios
     previous_road_lane_retrieve_distance = 100
     # Distance to check for road_id/lane_id for RouteObstacle scenarios
@@ -519,16 +532,19 @@ class ExpertConfig(BaseConfig):
             return False
         return True
 
-    # If true save instance segmentation images
     @property
     def save_instance_segmentation(self):
+        """If true save instance segmentation images."""
+        if self.eval_expert:
+            return False
         if self.is_on_slurm:
             return False
         return True
 
-    # If true run expert evaluation
-    @property
+    @overridable_property
     def eval_expert(self):
+        """If true run expert evaluation. This will minimize sensor production and other overheads to maximize
+        inference speed."""
         if self.is_on_slurm:
             return False
         return False
@@ -578,12 +594,12 @@ class ExpertConfig(BaseConfig):
                 "yaw": 0,
             },
             DemoCameraOptions.HIGH_BEV: {
-                "image_size_x": "1980",
+                "image_size_x": "786",
                 "image_size_y": "786",
                 "fov": "90",
-                "x": 18,
+                "x": 30,
                 "y": 0,
-                "z": 50,
+                "z": 75,
                 "pitch": -90,
                 "yaw": 0,
             },
@@ -607,7 +623,7 @@ class ExpertConfig(BaseConfig):
                 "pitch": -90,
                 "yaw": 0,
             },
-        }[DemoCameraOptions.PAPER_BEV]
+        }[DemoCameraOptions.HIGH_BEV]
 
     @property
     def visualize_source_lane(self):
@@ -764,9 +780,11 @@ class ExpertConfig(BaseConfig):
     # --- Data Storage Configuration ---
     save_sensors = True
 
-    @property
+    @overridable_property
     def save_3rd_person_camera(self):
         """If true 3rd person camera images should be saved."""
+        if self.eval_expert:
+            return True
         if self.is_on_slurm:
             return False
         # If true save the 3rd person camera images
@@ -775,6 +793,8 @@ class ExpertConfig(BaseConfig):
     @property
     def save_depth(self):
         """If true depth images should be saved."""
+        if self.eval_expert:
+            return False
         if self.is_on_slurm:
             return True
         return True
@@ -786,7 +806,7 @@ class ExpertConfig(BaseConfig):
     replace_semantics_segmentation_with_instance_segmentation = True
 
     # JPEG quality for 3rd person camera images
-    jpg_quality_3rd_person = 100
+    jpg_quality_3rd_person = 40
 
     # --- Weather Configuration ---
     # JPEG compression quality settings for different weather conditions
@@ -810,7 +830,9 @@ class ExpertConfig(BaseConfig):
         LOW_COMPRESSION = normalize({80: 0.25, 85: 0.5, 90: 0.25})
         MILD_COMPRESSION = normalize({70: 0.1, 75: 0.25, 80: 0.4, 90: 0.2})
         MEDIUM_COMPRESSION = normalize({70: 0.2, 75: 0.2, 80: 0.15, 90: 0.2})
-        HIGH_COMPRESION = normalize({60: 0.05, 65: 0.1, 70: 0.1, 75: 0.2, 80: 0.1, 90: 0.2})
+        HIGH_COMPRESION = normalize(
+            {60: 0.05, 65: 0.1, 70: 0.1, 75: 0.2, 80: 0.1, 90: 0.2}
+        )
         VERY_HIGH_COMPRESION = normalize({55: 0.15, 65: 0.4, 75: 0.15, 90: 0.2})
         EXTREME_COMPRESSION = normalize({30: 0.2, 40: 0.35, 50: 0.15, 90: 0.2})
 
@@ -818,7 +840,9 @@ class ExpertConfig(BaseConfig):
             LOW_COMPRESSION = normalize({80: 0.30, 85: 0.5, 90: 0.2})
             MILD_COMPRESSION = normalize({70: 0.15, 75: 0.25, 80: 0.4, 90: 0.15})
             MEDIUM_COMPRESSION = normalize({70: 0.25, 75: 0.2, 80: 0.15, 90: 0.15})
-            HIGH_COMPRESION = normalize({60: 0.10, 65: 0.1, 70: 0.1, 75: 0.2, 80: 0.1, 90: 0.15})
+            HIGH_COMPRESION = normalize(
+                {60: 0.10, 65: 0.1, 70: 0.1, 75: 0.2, 80: 0.1, 90: 0.15}
+            )
             VERY_HIGH_COMPRESION = normalize({55: 0.20, 65: 0.4, 75: 0.15, 90: 0.15})
             EXTREME_COMPRESSION = normalize({30: 0.25, 40: 0.35, 50: 0.15, 90: 0.15})
 
@@ -895,7 +919,11 @@ class ExpertConfig(BaseConfig):
         ret = weathers.WEATHER_SETTINGS
         if self.target_dataset == TargetDataset.NAVSIM_4CAMERAS:
             # Keep only clear weather
-            return {k: v for k, v in ret.items() if weathers.WEATHER_VISIBILITY_MAPPING[k] == WeatherVisibility.CLEAR}
+            return {
+                k: v
+                for k, v in ret.items()
+                if weathers.WEATHER_VISIBILITY_MAPPING[k] == WeatherVisibility.CLEAR
+            }
         elif self.target_dataset == TargetDataset.WAYMO_E2E_2025_3CAMERAS:
             # Remove foggy weather
             return {k: v for k, v in ret.items() if v["fog_density"] < 20.0}

@@ -94,7 +94,9 @@ def setup_logging(level: str = None, format_string: str = None):
 
     # Default format with timestamp, level, file path, line number, and message
     if format_string is None:
-        format_string = "%(asctime)s [%(levelname)s] [%(pathname)s:%(lineno)d] %(message)s"
+        format_string = (
+            "%(asctime)s [%(levelname)s] [%(pathname)s:%(lineno)d] %(message)s"
+        )
 
     # Configure root logger with basic config first
     logging.basicConfig(
@@ -121,8 +123,7 @@ def setup_logging(level: str = None, format_string: str = None):
         logger.addHandler(handler)
 
     # Suppress third-party loggers - only show warnings and errors
-    # This makes only your 'lead.*' code logs visible at INFO level
-    third_party_loggers = [
+    for logger_name in [
         "matplotlib",
         "PIL",
         "urllib3",
@@ -131,16 +132,15 @@ def setup_logging(level: str = None, format_string: str = None):
         "leaderboard",
         "agents",
         "carla",
-    ]
-
-    for logger_name in third_party_loggers:
+    ]:
         logging.getLogger(logger_name).setLevel(logging.WARNING)
 
     # Set root logger to WARNING by default, so only lead.* modules show INFO
-    # This prevents unknown third-party modules from cluttering output
-    logging.getLogger().setLevel(logging.WARNING)
+    logging.getLogger().setLevel(logging.INFO)
 
     # Enable your lead modules at the specified level
     logging.getLogger("lead").setLevel(level)
 
-    logger.info("Logging configured: level=%s for 'lead' modules", logging.getLevelName(level))
+    logger.info(
+        "Logging configured: level=%s for 'lead' modules", logging.getLevelName(level)
+    )

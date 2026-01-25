@@ -191,7 +191,7 @@ class ClearScenarioType(AtomicBehavior):
 
     def update(self):
         if len(CarlaDataProvider.active_scenarios) > 0:
-            _, _, scenario_instance_id = CarlaDataProvider.active_scenarios[0]
+            scenario_instance_id = CarlaDataProvider.active_scenarios[0].scenario_id
             if scenario_instance_id == self.scenario_instance_id:
                 print("[ClearScenarioType] Cleaning active scenario: {} automatically after ending.".format(self.scenario_instance_id))
                 CarlaDataProvider.clean_current_active_scenario()

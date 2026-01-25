@@ -102,14 +102,12 @@ outputs/                     # Training and evaluation outputs
 └── visualization/           # General visualizations
 
 scripts/                     # Utility scripts
+├── generate_data.py            # Data generation script
 ├── build_buckets_pretrain.py   # Pre-training data buckets
 ├── build_buckets_posttrain.py  # Post-training data buckets
 ├── build_cache.py              # Data cache generation
 ├── setup_carla.sh              # CARLA installation
 ├── start_carla.sh              # CARLA startup
-├── eval_bench2drive.sh         # Bench2Drive evaluation
-├── eval_longest6.sh            # Longest6 evaluation
-├── eval_town13.sh              # Town13 evaluation
 └── ...                         # More utility scripts
 
 slurm/                       # SLURM job scripts

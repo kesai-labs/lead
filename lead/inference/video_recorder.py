@@ -99,7 +99,9 @@ class VideoRecorder:
         self._last_input_image = None
 
         # Initialize demo cameras if needed
-        if self.config.save_path is not None and (self.config.produce_demo_video or self.config.produce_demo_image):
+        if self.config.save_path is not None and (
+            self.config.produce_demo_video or self.config.produce_demo_image
+        ):
             self._setup_demo_cameras()
 
     @beartype
@@ -119,12 +121,15 @@ class VideoRecorder:
                 y=camera_config["y"],
                 z=camera_config["z"],
             )
-            world_camera_location = common_utils.get_world_coordinate_2d(self.vehicle.get_transform(), demo_camera_location)
+            world_camera_location = common_utils.get_world_coordinate_2d(
+                self.vehicle.get_transform(), demo_camera_location
+            )
             demo_camera_transform = carla.Transform(
                 world_camera_location,
                 carla.Rotation(
                     pitch=camera_config["pitch"],
-                    yaw=self.vehicle.get_transform().rotation.yaw + camera_config["yaw"],
+                    yaw=self.vehicle.get_transform().rotation.yaw
+                    + camera_config["yaw"],
                 ),
             )
 
@@ -163,7 +168,9 @@ class VideoRecorder:
     @beartype
     def move_demo_cameras_with_ego(self) -> None:
         """Update demo camera transforms to follow ego vehicle position and orientation."""
-        if self.config.save_path is None or not (self.config.produce_demo_video or self.config.produce_demo_image):
+        if self.config.save_path is None or not (
+            self.config.produce_demo_video or self.config.produce_demo_image
+        ):
             return
 
         for demo_cam_info in self._demo_cameras:
@@ -174,12 +181,15 @@ class VideoRecorder:
                     y=camera_config["y"],
                     z=camera_config["z"],
                 )
-                world_camera_location = common_utils.get_world_coordinate_2d(self.vehicle.get_transform(), demo_camera_location)
+                world_camera_location = common_utils.get_world_coordinate_2d(
+                    self.vehicle.get_transform(), demo_camera_location
+                )
                 demo_camera_transform = carla.Transform(
                     world_camera_location,
                     carla.Rotation(
                         pitch=camera_config["pitch"],
-                        yaw=self.vehicle.get_transform().rotation.yaw + camera_config["yaw"],
+                        yaw=self.vehicle.get_transform().rotation.yaw
+                        + camera_config["yaw"],
                     ),
                 )
                 demo_cam_info["camera"].set_transform(demo_camera_transform)
@@ -196,7 +206,9 @@ class VideoRecorder:
             pred_waypoints: Waypoints in vehicle coords, shape (n_waypoints, 2) with (x, y) in meters.
             target_points: Route targets {'previous': (x,y), 'current': (x,y), 'next': (x,y)}.
         """
-        if self.config.save_path is None or not (self.config.produce_demo_video or self.config.produce_demo_image):
+        if self.config.save_path is None or not (
+            self.config.produce_demo_video or self.config.produce_demo_image
+        ):
             return
 
         processed_images = []
@@ -211,9 +223,17 @@ class VideoRecorder:
 
             # Add visualizations if enabled
             if draw_planning and pred_waypoints is not None:
-                processed_image = self.draw_waypoints(processed_image, pred_waypoints, camera_config)
-            if draw_target_points and target_points is not None and camera_name == "bev_camera":
-                processed_image = self.draw_target_points(processed_image, target_points, camera_config, is_bev=True)
+                processed_image = self.draw_waypoints(
+                    processed_image, pred_waypoints, camera_config
+                )
+            if (
+                draw_target_points
+                and target_points is not None
+                and camera_name == "bev_camera"
+            ):
+                processed_image = self.draw_target_points(
+                    processed_image, target_points, camera_config, is_bev=True
+                )
 
             processed_images.append(processed_image)
 
@@ -235,7 +255,10 @@ class VideoRecorder:
             )
 
         # Add to demo video if enabled
-        if self.config.produce_demo_video and self.step % self.config.produce_frame_frequency == 0:
+        if (
+            self.config.produce_demo_video
+            and self.step % self.config.produce_frame_frequency == 0
+        ):
             if self.demo_video_writer is None:
                 os.makedirs(os.path.dirname(self.config.demo_video_path), exist_ok=True)
                 self.demo_video_writer = cv2.VideoWriter(
@@ -270,13 +293,22 @@ class VideoRecorder:
         # Extract camera parameters from config
         camera_fov = float(camera_config["fov"])
         camera_pos = [camera_config["x"], camera_config["y"], camera_config["z"]]
-        camera_rot = [camera_config.get("roll", 0.0), camera_config["pitch"], camera_config["yaw"]]  # roll, pitch, yaw
+        camera_rot = [
+            camera_config.get("roll", 0.0),
+            camera_config["pitch"],
+            camera_config["yaw"],
+        ]  # roll, pitch, yaw
 
         # Draw route in blue
         if pred_waypoints is not None and len(pred_waypoints) > 0:
             route_points = pred_waypoints.detach().cpu().float().numpy()
             projected_route, points_inside_image = common_utils.project_points_to_image(
-                camera_rot, camera_pos, camera_fov, camera_width, camera_height, route_points
+                camera_rot,
+                camera_pos,
+                camera_fov,
+                camera_width,
+                camera_height,
+                route_points,
             )
 
             # Draw circles for waypoints
@@ -332,7 +364,11 @@ class VideoRecorder:
         # Extract camera parameters from config
         camera_fov = float(camera_config["fov"])
         camera_pos = [camera_config["x"], camera_config["y"], camera_config["z"]]
-        camera_rot = [camera_config.get("roll", 0.0), camera_config["pitch"], camera_config["yaw"]]
+        camera_rot = [
+            camera_config.get("roll", 0.0),
+            camera_config["pitch"],
+            camera_config["yaw"],
+        ]
 
         # Define colors and sizes for each target point (BGR format)
         targets_config = [
@@ -344,11 +380,18 @@ class VideoRecorder:
         for key, color in targets_config:
             if key in target_points and target_points[key] is not None:
                 # Get target point in vehicle coordinates
-                target_point = np.array([[target_points[key][0], target_points[key][1]]])
+                target_point = np.array(
+                    [[target_points[key][0], target_points[key][1]]]
+                )
 
                 # Project center point to image
                 projected, points_inside_image = common_utils.project_points_to_image(
-                    camera_rot, camera_pos, camera_fov, camera_width, camera_height, target_point
+                    camera_rot,
+                    camera_pos,
+                    camera_fov,
+                    camera_width,
+                    camera_height,
+                    target_point,
                 )
 
                 if len(projected) > 0:
@@ -364,16 +407,24 @@ class VideoRecorder:
                             sphere_radius_meters = 0.05
 
                             # Calculate 3D distance from camera to target point
-                            target_3d = np.array([target_points[key][0], target_points[key][1], 0.0])
+                            target_3d = np.array(
+                                [target_points[key][0], target_points[key][1], 0.0]
+                            )
                             camera_3d = np.array(camera_pos)
                             distance = np.linalg.norm(target_3d - camera_3d)
 
                             # Calculate pixel radius using perspective projection
                             # pixel_size = (object_size * focal_length) / distance
                             # focal_length ≈ (image_width / 2) / tan(fov/2)
-                            focal_length = (camera_width / 2.0) / np.tan(np.radians(camera_fov / 2.0))
-                            pixel_radius = int((sphere_radius_meters * focal_length) / distance)
-                            pixel_radius = max(1, min(pixel_radius, 50))  # Clamp between 1 and 50 pixels
+                            focal_length = (camera_width / 2.0) / np.tan(
+                                np.radians(camera_fov / 2.0)
+                            )
+                            pixel_radius = int(
+                                (sphere_radius_meters * focal_length) / distance
+                            )
+                            pixel_radius = max(
+                                1, min(pixel_radius, 50)
+                            )  # Clamp between 1 and 50 pixels
 
                         if pixel_radius > 0:
                             # Draw white border
@@ -521,7 +572,10 @@ class VideoRecorder:
         """
         if (
             self.config.save_path is None
-            or (not self.config.produce_grid_image and not self.config.produce_grid_video)
+            or (
+                not self.config.produce_grid_image
+                and not self.config.produce_grid_video
+            )
             or self.step % self.config.produce_frame_frequency != 0
         ):
             return
@@ -538,23 +592,36 @@ class VideoRecorder:
 
         # Draw waypoints and target points on input image if provided
         input_with_viz = input_image.copy()
-        if (pred_waypoints is not None or target_points is not None) and self.training_config is not None:
+        if (
+            pred_waypoints is not None or target_points is not None
+        ) and self.training_config is not None:
             # The input image is stitched from multiple cameras horizontally
             # We need to draw on each camera section separately with correct calibration
             input_height, input_width = input_image.shape[:2]
             num_cameras = self.training_config.num_cameras
             camera_width = input_width // num_cameras
 
-            assert self.training_config.carla_leaderboard_mode, "Grid video is currently supported for CARLA leaderboard mode."
+            assert self.training_config.carla_leaderboard_mode, (
+                "Grid video is currently supported for CARLA leaderboard mode."
+            )
             # Mapping from image section index to calibration index
             # Image order: [LEFT_FRONT, CENTER_FRONT, RIGHT_FRONT, RIGHT_REAR, CENTER_REAR, LEFT_REAR]
             # Calib order: [RIGHT_FRONT, CENTER_FRONT, LEFT_FRONT, LEFT_REAR, CENTER_REAR, RIGHT_REAR]
             if num_cameras == 6:
-                section_to_calib = [3, 2, 1, 6, 5, 4]  # Map section index to calibration index
+                section_to_calib = [
+                    3,
+                    2,
+                    1,
+                    6,
+                    5,
+                    4,
+                ]  # Map section index to calibration index
             elif num_cameras == 3:
                 section_to_calib = [3, 2, 1]  # [LEFT_FRONT, CENTER_FRONT, RIGHT_FRONT]
             else:
-                section_to_calib = list(range(1, num_cameras + 1))  # Fallback: assume they match
+                section_to_calib = list(
+                    range(1, num_cameras + 1)
+                )  # Fallback: assume they match
 
             for section_idx in range(num_cameras):
                 # Get calibration index for this image section
@@ -579,9 +646,13 @@ class VideoRecorder:
 
                 # Draw visualizations on this camera section
                 if pred_waypoints is not None:
-                    camera_section = self.draw_waypoints(camera_section, pred_waypoints, camera_config)
+                    camera_section = self.draw_waypoints(
+                        camera_section, pred_waypoints, camera_config
+                    )
                 if target_points is not None:
-                    camera_section = self.draw_target_points(camera_section, target_points, camera_config, is_bev=False)
+                    camera_section = self.draw_target_points(
+                        camera_section, target_points, camera_config, is_bev=False
+                    )
 
                 # Put the modified section back into the stitched image
                 input_with_viz[:, x_start:x_end, :] = camera_section
@@ -636,7 +707,9 @@ class VideoRecorder:
             self.grid_video_writer.write(grid_image)
 
     @beartype
-    def compress_video(self, temp_path: str, final_path: str, crf: int, preset: str) -> None:
+    def compress_video(
+        self, temp_path: str, final_path: str, crf: int, preset: str
+    ) -> None:
         """Compress a video using ffmpeg.
 
         Args:

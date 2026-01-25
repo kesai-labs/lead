@@ -20,7 +20,9 @@ class Town13HeldOutPretrainBucketCollection(AbstractBucketCollection):
 
     def _build_buckets(self):
         """Build bucket collection from scratch"""
-        print(f"[Town13HeldOutPretrainBucketCollection] Building buckets from data at: {self.root}")
+        print(
+            f"[Town13HeldOutPretrainBucketCollection] Building buckets from data at: {self.root}"
+        )
         for route_path in self.iter_root():
             if route_filtering.route_not_finished(route_path):
                 print(f"Skipping unfinished route {route_path}")
@@ -38,8 +40,14 @@ class Town13HeldOutPretrainBucketCollection(AbstractBucketCollection):
 
     def cache_file_path(self):
         """Return path for cache file"""
-        return os.path.join(self.config.bucket_collection_path, "town13_heldout_pretrain_buckets.gz")
+        return os.path.join(
+            self.config.bucket_collection_path, "town13_heldout_pretrain_buckets.gz"
+        )
 
     def buckets_mixture_per_epoch(self, _):
         total_samples = sum(len(bucket) for bucket in self.buckets)
-        return {Buckets.TOWN13: 0.0, Buckets.OTHER_TOWNS: total_samples / max(1, len(self.buckets[Buckets.OTHER_TOWNS]))}
+        return {
+            Buckets.TOWN13: 0.0,
+            Buckets.OTHER_TOWNS: total_samples
+            / max(1, len(self.buckets[Buckets.OTHER_TOWNS])),
+        }

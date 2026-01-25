@@ -61,17 +61,29 @@ class CARLAData(Dataset):
         self.rank = config.rank
 
         self.training_session_cache = training_session_cache
-        self.persistent_cache = PersistentCache(self.config) if self.config.use_persistent_cache else None
+        self.persistent_cache = (
+            PersistentCache(self.config) if self.config.use_persistent_cache else None
+        )
         self.memory_cache = {}
-        self.semantic_converter = np.uint8(list(constants.SEMANTIC_SEGMENTATION_CONVERTER.values()))
-        self.hdmap_converter = np.uint8(list(constants.CHAFFEURNET_TO_TRANSFUSER_BEV_SEMANTIC_CONVERTER.values()))
+        self.semantic_converter = np.uint8(
+            list(constants.SEMANTIC_SEGMENTATION_CONVERTER.values())
+        )
+        self.hdmap_converter = np.uint8(
+            list(constants.CHAFFEURNET_TO_TRANSFUSER_BEV_SEMANTIC_CONVERTER.values())
+        )
         self.image_augmenter_func = image_augmenter(config, config.use_color_aug_prob)
         self.random = random
         self.build_cache = build_cache
         self.build_buckets = build_buckets
-        self.sim2real_semantic_converter = np.uint8(list(constants.SIM2REAL_SEMANTIC_SEGMENTATION_CONVERTER.values()))
-        self.sim2real_bev_semantic_converter = np.uint8(list(constants.SIM2REAL_BEV_SEMANTIC_SEGMENTATION_CONVERTER.values()))
-        self.sim2real_bev_occupancy_converter = np.uint8(list(constants.SIM2REAL_BEV_OCCUPANCY_CLASS_CONVERTER.values()))
+        self.sim2real_semantic_converter = np.uint8(
+            list(constants.SIM2REAL_SEMANTIC_SEGMENTATION_CONVERTER.values())
+        )
+        self.sim2real_bev_semantic_converter = np.uint8(
+            list(constants.SIM2REAL_BEV_SEMANTIC_SEGMENTATION_CONVERTER.values())
+        )
+        self.sim2real_bev_occupancy_converter = np.uint8(
+            list(constants.SIM2REAL_BEV_OCCUPANCY_CLASS_CONVERTER.values())
+        )
 
         self.bucket_collection = self.config.carla_bucket_collection(root, config)
         self.shuffle(0)
@@ -93,11 +105,15 @@ class CARLAData(Dataset):
 
         future_waypoint_indices = [self.config.waypoints_spacing]
         for _ in range(self.config.num_way_points_prediction - 1):
-            future_waypoint_indices.append(future_waypoint_indices[-1] + self.config.waypoints_spacing)
+            future_waypoint_indices.append(
+                future_waypoint_indices[-1] + self.config.waypoints_spacing
+            )
 
         past_waypoint_indices = [self.config.waypoints_spacing]
         for _ in range(self.config.num_way_points_prediction - 1):
-            past_waypoint_indices.append(past_waypoint_indices[-1] + self.config.waypoints_spacing)
+            past_waypoint_indices.append(
+                past_waypoint_indices[-1] + self.config.waypoints_spacing
+            )
 
         # Determine files of index
         global_index = self.global_indices[index]  # Index in dataset
@@ -144,7 +160,9 @@ class CARLAData(Dataset):
 
         # Meta-data needed for cache or bucket building
         if self.build_buckets or self.build_cache:
-            if (not self.config.mixed_data_training and not self.build_cache) or (self.build_buckets):
+            if (not self.config.mixed_data_training and not self.build_cache) or (
+                self.build_buckets
+            ):
                 data.update(meta)
 
                 # Those data has variable length which is hard for collation.
@@ -164,7 +182,12 @@ class CARLAData(Dataset):
             if self.build_buckets:
                 data["boxes"] = common_utils.read_pickle(box_path)
 
-            data.update({"route_dir": "/".join(box_path.split("/")[:-2]), "seq": int(box_path.split("/")[-1].split(".")[0])})
+            data.update(
+                {
+                    "route_dir": "/".join(box_path.split("/")[:-2]),
+                    "seq": int(box_path.split("/")[-1].split(".")[0]),
+                }
+            )
 
         # Meta-data needed for visualization
         if self.config.visualize_dataset:
@@ -183,13 +206,16 @@ class CARLAData(Dataset):
                 vehicle_future_waypoints = box.get("future_positions")
                 if vehicle_future_waypoints is not None:
                     vehicle_future_waypoints = np.array(vehicle_future_waypoints)
-                    augmented_vehicle_future_waypoints = carla_dataset_utils.perturbate_waypoints(
-                        vehicle_future_waypoints,
-                        y_perturbation=perturbation_translation,
-                        yaw_perturbation=perturbation_rotation,
+                    augmented_vehicle_future_waypoints = (
+                        carla_dataset_utils.perturbate_waypoints(
+                            vehicle_future_waypoints,
+                            y_perturbation=perturbation_translation,
+                            yaw_perturbation=perturbation_rotation,
+                        )
                     )
                     augmented_vehicle_future_yaws = carla_dataset_utils.perturbate_yaws(
-                        np.array(box.get("future_yaws")), yaw_perturbation=perturbation_rotation
+                        np.array(box.get("future_yaws")),
+                        yaw_perturbation=perturbation_rotation,
                     )
                     augmented_vehicle_future_waypoints = np.array(
                         [
@@ -205,7 +231,9 @@ class CARLAData(Dataset):
                             if i < len(augmented_vehicle_future_yaws)
                         ]
                     )
-                    data["vehicles_future_waypoints"].append(augmented_vehicle_future_waypoints)
+                    data["vehicles_future_waypoints"].append(
+                        augmented_vehicle_future_waypoints
+                    )
                     data["vehicles_future_yaws"].append(augmented_vehicle_future_yaws)
 
         # Non-numeric meta-data
@@ -313,16 +341,23 @@ class CARLAData(Dataset):
             "previous_active_scenario_type",
         ]:
             if (
-                attr in ["previous_active_scenario_type", "current_active_scenario_type"]
+                attr
+                in ["previous_active_scenario_type", "current_active_scenario_type"]
                 and attr in meta
                 and meta[attr] is None
             ):
                 data[attr] = "NA"
             else:
                 data[attr] = meta[attr]  # Some scenarios do not have these attributes
-        if data["current_active_scenario_type"] is not None and data["current_active_scenario_type"] != "NA":
+        if (
+            data["current_active_scenario_type"] is not None
+            and data["current_active_scenario_type"] != "NA"
+        ):
             data["scenario_type"] = data["current_active_scenario_type"]
-        elif data["previous_active_scenario_type"] is not None and data["previous_active_scenario_type"] != "NA":
+        elif (
+            data["previous_active_scenario_type"] is not None
+            and data["previous_active_scenario_type"] != "NA"
+        ):
             data["scenario_type"] = data["previous_active_scenario_type"]
         else:
             data["scenario_type"] = "NA"
@@ -333,9 +368,19 @@ class CARLAData(Dataset):
             future_positions = meta.get("future_positions")
             future_yaws = meta.get("future_yaws")
             future_waypoints = np.array(
-                [future_positions[i][:2] for i in future_waypoint_indices if i < len(future_positions)]
+                [
+                    future_positions[i][:2]
+                    for i in future_waypoint_indices
+                    if i < len(future_positions)
+                ]
             ).reshape(-1, 2)
-            future_yaws = np.array([future_yaws[i] for i in future_waypoint_indices if i < len(future_yaws)]).reshape(-1)
+            future_yaws = np.array(
+                [
+                    future_yaws[i]
+                    for i in future_waypoint_indices
+                    if i < len(future_yaws)
+                ]
+            ).reshape(-1)
 
             if future_waypoints.shape[0] > 0:
                 data["future_waypoints"] = carla_dataset_utils.perturbate_waypoints(
@@ -349,21 +394,31 @@ class CARLAData(Dataset):
                 )
 
         # Route and target speed features
-        if self.config.use_planning_decoder or self.config.visualize_dataset or self.build_buckets:
+        if (
+            self.config.use_planning_decoder
+            or self.config.visualize_dataset
+            or self.build_buckets
+        ):
             # Normal route
             route = meta["route"]
             route = np.array(route[: self.config.num_route_points_smoothing])
             route = carla_dataset_utils.perturbate_route(
-                route, y_perturbation=perturbation_translation, yaw_perturbation=perturbation_rotation
+                route,
+                y_perturbation=perturbation_translation,
+                yaw_perturbation=perturbation_rotation,
             )
             if self.config.smooth_route:
-                route = carla_dataset_utils.smooth_path(self.config, route, target_first_distance=2.5)
+                route = carla_dataset_utils.smooth_path(
+                    self.config, route, target_first_distance=2.5
+                )
 
             # Meta data for route
             data["brake"] = meta["brake"]
             data["throttle"] = meta["throttle"]
             data["route"] = route[: self.config.num_route_points_prediction]
-            data["route_labels_curvature"] = common_utils.waypoints_curvature(torch.from_numpy(data["route"]))
+            data["route_labels_curvature"] = common_utils.waypoints_curvature(
+                torch.from_numpy(data["route"])
+            )
 
         # Velocity
         if self.config.use_velocity:
@@ -379,21 +434,33 @@ class CARLAData(Dataset):
                 ego_position = np.array(meta["noisy_pos_global"][:2])
 
         def transform_and_augment(point: list[float]) -> jt.Float[npt.NDArray, " 2"]:
-            ego_point = common_utils.inverse_conversion_2d(np.array(point), ego_position, ego_yaw)
+            ego_point = common_utils.inverse_conversion_2d(
+                np.array(point), ego_position, ego_yaw
+            )
             return carla_dataset_utils.perturbate_target_point(
-                ego_point, y_perturbation=perturbation_translation, yaw_perturbation=perturbation_rotation
+                ego_point,
+                y_perturbation=perturbation_translation,
+                yaw_perturbation=perturbation_rotation,
             )
 
         noisy_version = ""
         if self.config.use_noisy_tp:
             noisy_version = "_gps"
-        next_tp_list = meta[f"next{noisy_version}_target_points_{self.config.tp_pop_distance}"]
-        next_command_list = meta[f"next{noisy_version}_commands_{self.config.tp_pop_distance}"]
+        next_tp_list = meta[
+            f"next{noisy_version}_target_points_{self.config.tp_pop_distance}"
+        ]
+        next_command_list = meta[
+            f"next{noisy_version}_commands_{self.config.tp_pop_distance}"
+        ]
         # Merge duplicates target point
         filtered_tp_list = []
         filtered_command_list = []
         for pt, cmd in zip(next_tp_list, next_command_list, strict=False):
-            if len(next_tp_list) == 2 or not filtered_tp_list or not np.allclose(pt[:2], filtered_tp_list[-1][:2]):
+            if (
+                len(next_tp_list) == 2
+                or not filtered_tp_list
+                or not np.allclose(pt[:2], filtered_tp_list[-1][:2])
+            ):
                 filtered_tp_list.append(pt)
                 filtered_command_list.append(cmd)
         next_tp_list = filtered_tp_list
@@ -411,9 +478,15 @@ class CARLAData(Dataset):
             data["target_point_previous"] = transform_and_augment(next_tp_list[0][:2])
 
         if self.config.use_discrete_command or self.config.visualize_dataset:
-            data["command"] = carla_dataset_utils.command_to_one_hot(next_command_list[0])
-            data["next_command"] = carla_dataset_utils.command_to_one_hot(next_command_list[1])
-            data["previous_command"] = carla_dataset_utils.command_to_one_hot(next_command_list[0])
+            data["command"] = carla_dataset_utils.command_to_one_hot(
+                next_command_list[0]
+            )
+            data["next_command"] = carla_dataset_utils.command_to_one_hot(
+                next_command_list[1]
+            )
+            data["previous_command"] = carla_dataset_utils.command_to_one_hot(
+                next_command_list[0]
+            )
 
         loading_meta_time = time.time() - start_loading_time
         data["loading_meta_time"] = loading_meta_time
@@ -434,18 +507,25 @@ class CARLAData(Dataset):
         # LiDAR BEV
         if not self.config.LTF:
             data["rasterized_lidar"] = (
-                np.array(sensor_data.rasterized_lidar).squeeze()[None] if sensor_data.rasterized_lidar is not None else None
+                np.array(sensor_data.rasterized_lidar).squeeze()[None]
+                if sensor_data.rasterized_lidar is not None
+                else None
             )
         # RGB
         if self.config.use_color_aug:
             processed_image = self.image_augmenter_func(image=sensor_data.image)
         else:
             processed_image = sensor_data.image
-        data["rgb"] = np.transpose(processed_image, (2, 0, 1)) if processed_image is not None else None
+        data["rgb"] = (
+            np.transpose(processed_image, (2, 0, 1))
+            if processed_image is not None
+            else None
+        )
         # Radars
         if self.config.use_radars:
             radar_list = carla_dataset_utils.preprocess_radar_input(
-                self.config, {f"radar{i + 1}": arr for i, arr in enumerate(sensor_data.radars)}
+                self.config,
+                {f"radar{i + 1}": arr for i, arr in enumerate(sensor_data.radars)},
             )
             for i, arr in enumerate(radar_list):
                 data[f"radar{i + 1}"] = arr
@@ -461,7 +541,9 @@ class CARLAData(Dataset):
 
         # Depth
         if self.config.use_depth and sensor_data.depth is not None:
-            loaded_depth = sensor_data.depth.astype(np.float32)  # Use only current frame
+            loaded_depth = sensor_data.depth.astype(
+                np.float32
+            )  # Use only current frame
             if self.config.save_depth_lower_resolution:
                 loaded_depth = cv2.resize(
                     loaded_depth,
@@ -475,8 +557,10 @@ class CARLAData(Dataset):
                 loaded_depth = cv2.resize(
                     loaded_depth,
                     dsize=(
-                        loaded_depth.shape[1] // self.config.perspective_downsample_factor,
-                        loaded_depth.shape[0] // self.config.perspective_downsample_factor,
+                        loaded_depth.shape[1]
+                        // self.config.perspective_downsample_factor,
+                        loaded_depth.shape[0]
+                        // self.config.perspective_downsample_factor,
                     ),
                     interpolation=cv2.INTER_LINEAR,
                 )
@@ -490,11 +574,13 @@ class CARLAData(Dataset):
             hdmap_center = sensor_data.hdmap.shape[0] / 2
             hdmap_x_cut = (
                 hdmap_center
-                + np.array([self.config.min_x_meter, self.config.max_x_meter]) * self.config.pixels_per_meter_collection
+                + np.array([self.config.min_x_meter, self.config.max_x_meter])
+                * self.config.pixels_per_meter_collection
             ).astype(int)  # Cut the BEV around vehicle
             hdmap_y_cut = (
                 hdmap_center
-                + np.array([self.config.min_y_meter, self.config.max_y_meter]) * self.config.pixels_per_meter_collection
+                + np.array([self.config.min_y_meter, self.config.max_y_meter])
+                * self.config.pixels_per_meter_collection
             ).astype(int)  # Cut the BEV around vehicle
             loaded_hdmap = (
                 sensor_data.hdmap[
@@ -508,13 +594,17 @@ class CARLAData(Dataset):
 
         # Occupancy
         if self.config.use_bev_semantic:
-            assert sensor_data.bev_occupancy.shape[0] == sensor_data.bev_occupancy.shape[1]
+            assert (
+                sensor_data.bev_occupancy.shape[0] == sensor_data.bev_occupancy.shape[1]
+            )
             bev_occupancy_center = sensor_data.bev_occupancy.shape[0] / 2
             bev_occupancy_i_x_cut = (
-                bev_occupancy_center + np.array([self.config.min_x_meter, self.config.max_x_meter]) * 4
+                bev_occupancy_center
+                + np.array([self.config.min_x_meter, self.config.max_x_meter]) * 4
             ).astype(int)  # Cut the BEV around vehicle
             bev_occupancy_i_y_cut = (
-                bev_occupancy_center + np.array([self.config.min_y_meter, self.config.max_y_meter]) * 4
+                bev_occupancy_center
+                + np.array([self.config.min_y_meter, self.config.max_y_meter]) * 4
             ).astype(int)  # Cut the BEV around vehicle
             loaded_bev_occupancy = sensor_data.bev_occupancy[
                 bev_occupancy_i_y_cut[0] : bev_occupancy_i_y_cut[1],
@@ -522,7 +612,9 @@ class CARLAData(Dataset):
             ]  # Zoom in around ego and upscale
 
             if not self.config.carla_leaderboard_mode:
-                loaded_bev_occupancy = self.sim2real_bev_occupancy_converter[loaded_bev_occupancy]
+                loaded_bev_occupancy = self.sim2real_bev_occupancy_converter[
+                    loaded_bev_occupancy
+                ]
 
             mask = loaded_bev_occupancy != TransfuserBEVOccupancyClass.UNLABELED
             loaded_hdmap[mask] = loaded_bev_occupancy[mask] + (
@@ -530,11 +622,17 @@ class CARLAData(Dataset):
             )  # Add offset to BEV occupancy classes
             data["bev_semantic"] = loaded_hdmap
             if not self.config.carla_leaderboard_mode:
-                data["bev_semantic"] = self.sim2real_bev_semantic_converter[data["bev_semantic"]]
+                data["bev_semantic"] = self.sim2real_bev_semantic_converter[
+                    data["bev_semantic"]
+                ]
 
         # 2D bounding boxes
         if self.config.detect_boxes:
-            data.update(get_centernet_labels(sensor_data.boxes, self.config, self.config.num_bb_classes))
+            data.update(
+                get_centernet_labels(
+                    sensor_data.boxes, self.config, self.config.num_bb_classes
+                )
+            )
 
         # Finish loading. Measure time
         data["loading_time"] = time.time() - start_loading_time
@@ -576,7 +674,9 @@ class CARLAData(Dataset):
                 if data.get("semantic") is not None:
                     data["semantic"] = data["semantic"][self.config.crop_height :]
             else:
-                raise ValueError(f"Unknown carla_crop_height_type: {self.config.carla_crop_height_type}")
+                raise ValueError(
+                    f"Unknown carla_crop_height_type: {self.config.carla_crop_height_type}"
+                )
 
         # Transform the semantic segmentation to only contain the classes we care about in NavSim
         if data.get("semantic") is not None and not self.config.carla_leaderboard_mode:
@@ -590,23 +690,31 @@ class CARLAData(Dataset):
                 _, h, w = data["rgb"].shape
                 data["rgb"] = data["rgb"][:, :, crop_pixels:-crop_pixels]
                 data["rgb"] = np.transpose(data["rgb"], (1, 2, 0))  # -> (H, W_crop, C)
-                data["rgb"] = cv2.resize(data["rgb"], (w, h), interpolation=cv2.INTER_LINEAR)
+                data["rgb"] = cv2.resize(
+                    data["rgb"], (w, h), interpolation=cv2.INTER_LINEAR
+                )
                 data["rgb"] = np.transpose(data["rgb"], (2, 0, 1))  # -> (C, H, W)
             # Depth: (H, W)
             if data.get("depth") is not None:
                 h, w = data["depth"].shape
                 data["depth"] = data["depth"][:, crop_pixels:-crop_pixels]
-                data["depth"] = cv2.resize(data["depth"], (w, h), interpolation=cv2.INTER_LINEAR)
+                data["depth"] = cv2.resize(
+                    data["depth"], (w, h), interpolation=cv2.INTER_LINEAR
+                )
             # Semantic: (H, W)
             if data.get("semantic") is not None:
                 h, w = data["semantic"].shape
                 data["semantic"] = data["semantic"][:, crop_pixels:-crop_pixels]
-                data["semantic"] = cv2.resize(data["semantic"], (w, h), interpolation=cv2.INTER_NEAREST)
+                data["semantic"] = cv2.resize(
+                    data["semantic"], (w, h), interpolation=cv2.INTER_NEAREST
+                )
 
         return data
 
     @beartype
-    def _load_sensor_data(self, data: dict, meta: dict, index: int, perturbate_sensor: bool) -> SensorData:
+    def _load_sensor_data(
+        self, data: dict, meta: dict, index: int, perturbate_sensor: bool
+    ) -> SensorData:
         """
         Load sensor data for the given index and current meta.
 
@@ -623,8 +731,20 @@ class CARLAData(Dataset):
         route = image_path_str.split("/")[-3]
         scenario = image_path_str.split("/")[-4]
         frame = image_path_str.split("/")[-1].split(".")[0]
-        cache_key_perturbated = CacheKey(scenario=scenario, route=route, frame=frame, perturbated=True, config=self.config)
-        cache_key_normal = CacheKey(scenario=scenario, route=route, frame=frame, perturbated=False, config=self.config)
+        cache_key_perturbated = CacheKey(
+            scenario=scenario,
+            route=route,
+            frame=frame,
+            perturbated=True,
+            config=self.config,
+        )
+        cache_key_normal = CacheKey(
+            scenario=scenario,
+            route=route,
+            frame=frame,
+            perturbated=False,
+            config=self.config,
+        )
 
         if perturbate_sensor:
             used_cache_key = cache_key_perturbated
@@ -633,29 +753,49 @@ class CARLAData(Dataset):
 
         # Data in cache. Load them from cache
         if (
-            (self.training_session_cache is not None and used_cache_key in self.training_session_cache)
-            or (self.persistent_cache is not None and used_cache_key in self.persistent_cache)
+            (
+                self.training_session_cache is not None
+                and used_cache_key in self.training_session_cache
+            )
+            or (
+                self.persistent_cache is not None
+                and used_cache_key in self.persistent_cache
+            )
         ) and not self.config.force_rebuild_data_cache:
             # Search cache, from fast to slow.
             try:
                 cache = None
-                if self.training_session_cache is not None and used_cache_key in self.training_session_cache:
+                if (
+                    self.training_session_cache is not None
+                    and used_cache_key in self.training_session_cache
+                ):
                     cache = self.training_session_cache
-                elif self.persistent_cache is not None and used_cache_key in self.persistent_cache:
+                elif (
+                    self.persistent_cache is not None
+                    and used_cache_key in self.persistent_cache
+                ):
                     cache = self.persistent_cache
 
                 # Access cache - now stores CompressedSensorData directly
                 cached_compressed_data = cache[used_cache_key]
 
-                if self.training_session_cache is not None and used_cache_key not in self.training_session_cache:
+                if (
+                    self.training_session_cache is not None
+                    and used_cache_key not in self.training_session_cache
+                ):
                     self.training_session_cache[used_cache_key] = cached_compressed_data
 
-                if self.persistent_cache is not None and used_cache_key not in self.persistent_cache:
+                if (
+                    self.persistent_cache is not None
+                    and used_cache_key not in self.persistent_cache
+                ):
                     self.persistent_cache[used_cache_key] = cached_compressed_data
 
                 return cached_compressed_data.decompress()
             except EOFError:
-                LOG.warning(f"EOFError when reading cache for key {used_cache_key}. Rebuilding cache for this key.")
+                LOG.warning(
+                    f"EOFError when reading cache for key {used_cache_key}. Rebuilding cache for this key."
+                )
 
         # Data not in cache, load from disk. Do this for all 3 views, since we might need them later.
         sensor_data_normal = self._load_sensor_data_and_build_cache(
@@ -748,20 +888,26 @@ class CARLAData(Dataset):
         lidar_path = self.lidars[index]  # LiDAR is always the same
         boxes_path = self.bboxes[index]  # Boxes are always the same
 
-        bev_3rd_person_images = image = raw_image_bytes = rasterized_lidar = semantic = hdmap = depth = boxes = (
-            bev_occupancy
-        ) = radars = None
+        bev_3rd_person_images = image = raw_image_bytes = rasterized_lidar = (
+            semantic
+        ) = hdmap = depth = boxes = bev_occupancy = radars = None
 
         if self.config.load_bev_3rd_person_images:
             try:
-                bev_3rd_person_images = cv2.imread(str(bev_3rd_person_image_path, encoding="utf-8"), cv2.IMREAD_COLOR)
-                bev_3rd_person_images = cv2.cvtColor(bev_3rd_person_images, cv2.COLOR_BGR2RGB)
+                bev_3rd_person_images = cv2.imread(
+                    str(bev_3rd_person_image_path, encoding="utf-8"), cv2.IMREAD_COLOR
+                )
+                bev_3rd_person_images = cv2.cvtColor(
+                    bev_3rd_person_images, cv2.COLOR_BGR2RGB
+                )
             except Exception:
                 bev_3rd_person_images = np.zeros((800, 600, 3), dtype=np.uint8)
         # Read raw bytes of the JPEG image to avoid re-encoding it later aka. double JPEG artifacts.
         with open(str(image_path, encoding="utf-8"), "rb") as f:
             raw_image_bytes = f.read()
-        image = cv2.imdecode(np.frombuffer(raw_image_bytes, np.uint8), cv2.IMREAD_UNCHANGED)
+        image = cv2.imdecode(
+            np.frombuffer(raw_image_bytes, np.uint8), cv2.IMREAD_UNCHANGED
+        )
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         if self.config.use_radars:
@@ -780,31 +926,48 @@ class CARLAData(Dataset):
         rasterized_lidar = rasterize_lidar(
             config=self.config,
             lidar=common_utils.align_lidar(
-                lidar_pc_i, np.array([0, perturbation_translation, 0]), np.deg2rad(perturbation_rotation)
+                lidar_pc_i,
+                np.array([0, perturbation_translation, 0]),
+                np.deg2rad(perturbation_rotation),
             ),
         )
 
         # Load semantic
         if self.config.use_semantic:
-            semantic = cv2.imread(str(semantic_path, encoding="utf-8"), cv2.IMREAD_UNCHANGED)
+            semantic = cv2.imread(
+                str(semantic_path, encoding="utf-8"), cv2.IMREAD_UNCHANGED
+            )
             if not self.config.save_grouped_semantic:
-                semantic = self.semantic_converter[semantic]  # Convert to TransFuser labeling
+                semantic = self.semantic_converter[
+                    semantic
+                ]  # Convert to TransFuser labeling
 
         # Load BEV semantic
         if self.config.use_bev_semantic:
-            hdmap = cv2.imread(str(bev_semantic_path, encoding="utf-8"), cv2.IMREAD_UNCHANGED)  # (256, 256)
+            hdmap = cv2.imread(
+                str(bev_semantic_path, encoding="utf-8"), cv2.IMREAD_UNCHANGED
+            )  # (256, 256)
             hdmap = self.hdmap_converter[hdmap]  # Convert to TransFuser labeling
 
         # Load depth
         if self.config.use_depth:
             depth = cv2.imread(str(depth_path, encoding="utf-8"), cv2.IMREAD_UNCHANGED)
-            depth = common_utils.decode_depth(depth)  # Decode 8-bit depth to metric float
+            depth = common_utils.decode_depth(
+                depth
+            )  # Decode 8-bit depth to metric float
 
         # Load bounding boxes
         if self.config.detect_boxes:
             json_boxes = common_utils.read_pickle(str(boxes_path, encoding="utf-8"))
-            boxes, boxes_waypoints, boxes_num_waypoints = carla_dataset_utils.get_bbox_labels(
-                data, self.config, json_boxes, meta, perturbation_translation, perturbation_rotation
+            boxes, boxes_waypoints, boxes_num_waypoints = (
+                carla_dataset_utils.get_bbox_labels(
+                    data,
+                    self.config,
+                    json_boxes,
+                    meta,
+                    perturbation_translation,
+                    perturbation_rotation,
+                )
             )
 
         # Draw BEV occupancy
@@ -836,13 +999,17 @@ class CARLAData(Dataset):
         )
         # Compute radar detection labels if radars are enabled
         if self.config.use_radars and radars is not None:
-            radar_detections = carla_dataset_utils.parse_radar_detection_labels(self.config, sensor_data)
+            radar_detections = carla_dataset_utils.parse_radar_detection_labels(
+                self.config, sensor_data
+            )
             sensor_data.radar_detections = radar_detections
 
         # Store cache if cache directory is available
         if self.training_session_cache is not None or self.persistent_cache is not None:
             # Use our new compression API for cleaner code
-            compressed_sensor_data = sensor_data.compress(raw_image_bytes, self.config, meta)
+            compressed_sensor_data = sensor_data.compress(
+                raw_image_bytes, self.config, meta
+            )
 
             # Store CompressedSensorData object directly in cache
             if self.training_session_cache is not None:
@@ -887,19 +1054,29 @@ class CARLAData(Dataset):
                 if samples_needed > 0:
                     if self.random:
                         if samples_needed > len(bucket):
-                            indices = rng.choice(len(bucket), size=samples_needed, replace=True)
+                            indices = rng.choice(
+                                len(bucket), size=samples_needed, replace=True
+                            )
                         else:
-                            indices = rng.choice(len(bucket.images), size=samples_needed, replace=False)
+                            indices = rng.choice(
+                                len(bucket.images), size=samples_needed, replace=False
+                            )
                     else:
                         indices = np.arange(samples_needed)
 
-                    self.bev_3rd_person_images.extend(bucket.bev_3rd_person_images[indices])
+                    self.bev_3rd_person_images.extend(
+                        bucket.bev_3rd_person_images[indices]
+                    )
                     self.images.extend(bucket.images[indices])
                     self.images_perturbated.extend(bucket.images_perturbated[indices])
                     self.semantics.extend(bucket.semantics[indices])
-                    self.semantics_perturbated.extend(bucket.semantics_perturbated[indices])
+                    self.semantics_perturbated.extend(
+                        bucket.semantics_perturbated[indices]
+                    )
                     self.bev_semantics.extend(bucket.hdmap[indices])
-                    self.bev_semantics_perturbated.extend(bucket.hdmap_perturbated[indices])
+                    self.bev_semantics_perturbated.extend(
+                        bucket.hdmap_perturbated[indices]
+                    )
                     self.depth.extend(bucket.depth[indices])
                     self.depth_perturbated.extend(bucket.depth_perturbated[indices])
                     self.lidars.extend(bucket.lidars[indices])
@@ -914,10 +1091,14 @@ class CARLAData(Dataset):
                     self.global_indices.extend(bucket.global_indices[indices])
 
         if self.rank == 0:
-            LOG.info(f"Loaded {len(self.images)} images from {len(self.bucket_collection.buckets)} buckets.")
+            LOG.info(
+                f"Loaded {len(self.images)} images from {len(self.bucket_collection.buckets)} buckets."
+            )
 
         # Convert to numpy arrays and shuffle if needed
-        self.bev_3rd_person_images = np.array(self.bev_3rd_person_images).astype(np.string_)
+        self.bev_3rd_person_images = np.array(self.bev_3rd_person_images).astype(
+            np.string_
+        )
         self.images = np.array(self.images)
         self.images_perturbated = np.array(self.images_perturbated)
         self.semantics = np.array(self.semantics)
@@ -947,7 +1128,9 @@ class CARLAData(Dataset):
                 else:
                     num_repeat = self.config.carla_num_samples // len(indices)
                     remainder = self.config.carla_num_samples % len(indices)
-                    indices = np.concatenate([indices] * num_repeat + [indices[:remainder]])
+                    indices = np.concatenate(
+                        [indices] * num_repeat + [indices[:remainder]]
+                    )
 
             self.bev_3rd_person_images = self.bev_3rd_person_images[indices]
             self.images = self.images[indices]

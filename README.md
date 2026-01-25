@@ -35,26 +35,14 @@ https://github.com/user-attachments/assets/9f316ad2-e629-4bb4-bffb-9bb55e225738
   - [1. Environment initialization](#1-environment-initialization)
   - [2. Install dependencies](#2-install-dependencies)
   - [3. Download checkpoints](#3-download-checkpoints)
-  - [4. Evaluate model](#4-evaluate-model)
-  - [5. Verify autopilot](#5-verify-autopilot)
-- [Training for CARLA Leaderboard](#training-for-carla-leaderboard)
-  - [1. Download training data](#1-download-training-data)
-  - [2. Build data cache](#2-build-data-cache)
-  - [3. Train model](#3-train-model)
-  - [4. Post-train model](#4-post-train-model)
-  - [5. Large-scale training on SLURM](#5-large-scale-training-on-slurm)
+  - [4. Setup VSCode/PyCharm](#4-setup-vscodepycharm)
+  - [5. Evaluate model](#5-evaluate-model)
+  - [6. Verify autopilot](#6-verify-autopilot)
+- [Training](#training)
 - [Data Collection](#data-collection)
-  - [1. Start CARLA](#1-start-carla)
-  - [2. Start expert](#2-start-expert)
-  - [3. Data structure](#3-data-structure)
-- [Evaluation on CARLA Leaderboard](#evaluation-on-carla-leaderboard)
-  - [1. Start CARLA](#1-start-carla-1)
-  - [2. Evaluate on Bench2Drive](#2-evaluate-on-bench2drive)
-  - [3. Evaluate on Longest6](#3-evaluate-on-longest6)
-  - [4. Evaluate on Town13](#4-evaluate-on-town13)
-  - [5. Clean CARLA](#5-clean-carla)
-  - [6. Large-scale evaluation on SLURM](#6-large-scale-evaluation-on-slurm)
+- [Benchmarking](#benchmarking)
 - [Project Structure](#project-structure)
+- [Common Issues](#common-issues)
 - [Beyond CARLA: Cross-Benchmark Deployment](#beyond-carla-cross-benchmark-deployment)
 - [Further Documentation](#further-documentation)
 - [Acknowledgements](#acknowledgements)
@@ -87,17 +75,14 @@ Clone the repository and map the project root to your environment
 ```bash
 git clone https://github.com/autonomousvision/lead.git
 cd lead
-```
 
-Set up environment variables
-
-```bash
+# Setup environment, important!
 echo -e "export LEAD_PROJECT_ROOT=$(pwd)" >> ~/.bashrc  # Set project root variable
 echo "source $(pwd)/scripts/main.sh" >> ~/.bashrc       # Persist more environment variables
 source ~/.bashrc                                        # Reload config
 ```
 
-Please verify that ~/.bashrc reflects these paths correctly.
+Please verify that `~/.bashrc` reflects these paths correctly.
 
 ### 2. Install dependencies
 
@@ -106,12 +91,16 @@ We utilize [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/i
 ```bash
 # Install conda-lock and create conda environment
 pip install conda-lock && conda-lock install -n lead conda-lock.yml
+
 # Activate conda environment
 conda activate lead
+
 # Install dependencies and setup git hooks
 pip install uv && uv pip install -r requirements.txt && uv pip install -e .
+
 # Install other tools needed for development
 conda install -c conda-forge ffmpeg parallel tree gcc zip unzip
+
 # Optional: Activate git hooks
 pre-commit install
 ```
@@ -138,34 +127,45 @@ Pre-trained checkpoints are hosted on [HuggingFace](https://huggingface.co/ln269
 | Vision only driving                   |    91.6     |     43      |   TBD    |  [Link](https://huggingface.co/ln2697/tfv6/tree/main/visiononly_resnet34)   |
 | Removed Town13 from training set      |    93.1     |     52      |   3.52   | [Link](https://huggingface.co/ln2697/tfv6/tree/main/town13heldout_resnet34) |
 
-**Table 1:** Performance of pre-trained checkpoints. We report Driving Score, for which higher is better.
-
 </div>
 <br>
 
-To download one single checkpoint for test purpose:
+To download checkpoints:
 
 ```bash
+# Either download one for test purpose
 bash scripts/download_one_checkpoint.sh
-```
 
-Or download all checkpoints at once with <a href="https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage">git lfs</a>
-
-```bash
+# Or clone them all (>10GB)
 git clone https://huggingface.co/ln2697/tfv6 outputs/checkpoints
 cd outputs/checkpoints
 git lfs pull
 ```
 
-### 4. Evaluate model
+### 4. Setup VSCode/PyCharm
+
+For VSCode, install recommended extensions when prompted. We support debugging of data collection, training and evaluation out of the box.
+
+![](docs/assets/vscode.png)
+
+For PyCharm, you need to add CARLA Python API `3rd_party/CARLA_0915/PythonAPI/carla` to your Python path `Settings... → Python → Interpreter → Show All... → Show Interpreter Paths`.
+
+![](docs/assets/pycharm.png)
+
+
+### 5. Evaluate model
 
 To initiate closed-loop evaluation and verify the setup, execute the following:
 
 ```bash
 # Start driving environment
 bash scripts/start_carla.sh
+
 # Start policy on one route
-bash scripts/eval_bench2drive.sh
+python lead/leaderboard_wrapper.py \
+--checkpoint outputs/checkpoints/tfv6_resnet34 \
+--routes data/benchmark_routes/bench2drive220routes/23687.xml \
+--bench2drive
 ```
 
 Driving logs will be saved to <code>outputs/local_evaluation</code> with the following structure:
@@ -184,7 +184,7 @@ outputs/local_evaluation/1_town15_construction
 ├── metric_info.json
 └── qualitative_results.mp4
 ```
-Launch the interactive infraction dashboard to analyze driving failures:
+Launch the interactive infraction dashboard to analyze driving failures more conveniently:
 
 ```bash
 python lead/infraction_webapp/app.py
@@ -198,8 +198,6 @@ Navigate to [http://localhost:5000](http://localhost:5000) to access the dashboa
 
 https://github.com/user-attachments/assets/81954b7c-4153-45d1-90a8-80cb426ccb70
 
-  **Video 2:** Interactive infraction analysis tool for model evaluation.
-
 </div>
 <br>
 
@@ -208,15 +206,18 @@ https://github.com/user-attachments/assets/81954b7c-4153-45d1-90a8-80cb426ccb70
 > 2. If memory is limited, modify the file prefixes to load only the first checkpoint seed. By default, the pipeline loads all three seeds as an ensemble.
 > 3. To save time, decrease video FPS in [config_closed_loop](lead/inference/config_closed_loop.py) by increasing `produce_frame_frequency`.
 
-### 5. Verify autopilot
+### 6. Verify autopilot
 
 Verify the expert policy and data acquisition pipeline by executing a test run on a sample route:
 
 ```bash
 # Start CARLA if not done already
 bash scripts/start_carla.sh
+
 # Run expert on one route
-bash scripts/run_expert.sh
+python lead/leaderboard_wrapper.py \
+--expert \
+--routes data/benchmark_routes/Town13/1.xml
 ```
 
 Data collected will be stored at <code>data/expert_debug</code> and should have following structure:
@@ -248,67 +249,43 @@ data/expert_debug/
     └── 1_town15_construction_result.json
 ```
 
-## Training for CARLA Leaderboard
+## Training
 
-For a more detailed documentation, take a look at the [documentation page](https://ln2697.github.io/lead/docs/carla_training.html).
-
-### 1. Download training data
-
-Download the CARLA dataset from [HuggingFace](https://huggingface.co/datasets/ln2697/lead_carla) using git lfs:
+For a more detailed documentation, take a look at the [documentation page](https://ln2697.github.io/lead/docs/carla_training.html). First, download the CARLA dataset from [HuggingFace](https://huggingface.co/datasets/ln2697/lead_carla) using git lfs:
 
 ```bash
+# Download all routes
 git clone https://huggingface.co/datasets/ln2697/lead_carla data/carla_leaderboard2/zip
 cd data/carla_leaderboard2/zip
 git lfs pull
-```
 
-Or download a single route for testing:
-
-```bash
+# Or download a single route for testing
 bash scripts/download_one_route.sh
-```
 
-Unzip the downloaded routes:
-
-```bash
+# Upzip the routes
 bash scripts/unzip_routes.sh
-```
 
-### 2. Build data cache
-
-Build persistent cache for faster data loading during training:
-
-```bash
+# Build data cache
 python scripts/build_cache.py
 ```
-
-### 3. Train model
 
 Start pretraining:
 
 ```bash
+# Train on a single GPU
 bash scripts/pretrain.sh
-```
 
-For multi-GPU training with Distributed Data Parallel:
-
-```bash
+# Or Torch DDP
 bash scripts/pretrain_ddp.sh
 ```
 
-Training logs and checkpoints will be saved to `outputs/local_training/pretrain`.
-
-### 4. Post-train model
-
-Fine-tune the pretrained model with planning decoder enabled:
+Training logs and checkpoints will be saved to `outputs/local_training/pretrain`. To fine-tune the pretrained model with planning decoder enabled:
 
 ```bash
+# Single GPU
 bash scripts/posttrain.sh
-```
 
-For multi-GPU training:
-
-```bash
+# Distributed Torch DDP
 bash scripts/posttrain_ddp.sh
 ```
 
@@ -320,12 +297,8 @@ Post-training checkpoints will be saved to `outputs/local_training/posttrain`. W
     <img src="docs/assets/eval_wandb.png" />
   </picture>
 
-  **Figure 3:** WandB logging with debug plot.
-
 </div>
 <br>
-
-### 5. Large-scale training on SLURM
 
 For distributed training on SLURM, see this [documentation page](https://ln2697.github.io/lead/docs/slurm_training.html). For a complete SLURM workflow of pre-training, post-training, evaluation, see this [example](slurm/experiments/001_example).
 
@@ -333,20 +306,15 @@ For distributed training on SLURM, see this [documentation page](https://ln2697.
 
 To collect your own dataset, you can run the rule-based expert driver. To setup own camera/lidar/radar calibration, see [config_base.py](lead/common/config_base.py) and [config_expert.py](lead/expert/config_expert.py).
 
-### 1. Start CARLA
-
 ```bash
+# Start CARLA
 bash scripts/start_carla.sh
+
+# Collect data
+python lead/leaderboard_wrapper.py \
+--expert \
+--routes data/data_routes/lead/noScenarios/short_route.xml
 ```
-
-### 2. Start expert
-
-```bash
-bash scripts/run_expert.sh
-```
-
-### 3. Data structure
-
 Collected data will be saved to `data/expert_debug/` with the following sensor outputs:
 
 
@@ -380,71 +348,39 @@ The [Jupyter notebooks](notebooks) provide some example scripts to visualize the
     <img src="docs/assets/point_cloud_visualization.webp" width="49%" />
   </picture>
 
-  **Figure 2:** Plotting with visualization notebooks.
-
 </div>
 <br>
 
-## Evaluation on CARLA Leaderboard
+## Benchmarking
 
 For a more detailed documentation, take a look at the [evaluation documentation](https://ln2697.github.io/lead/docs/evaluation.html).
-
-### 1. Start CARLA
 
 Start the CARLA simulator before running evaluation:
 
 ```bash
 bash scripts/start_carla.sh
-```
 
-### 2. Evaluate on Bench2Drive
+# Bench2Drive
+python lead/leaderboard_wrapper.py \
+--checkpoint outputs/checkpoints/tfv6_resnet34 \
+--routes data/benchmark_routes/bench2drive220routes/23687.xml \
+--bench2drive
 
-Run closed-loop evaluation on the Bench2Drive benchmark:
+# Longest6 v2
+python lead/leaderboard_wrapper.py \
+--checkpoint outputs/checkpoints/tfv6_resnet34 \
+--routes data/benchmark_routes/longest6/00.xml
 
-```bash
-bash scripts/eval_bench2drive.sh
-```
+# Town13
+python lead/leaderboard_wrapper.py \
+--checkpoint outputs/checkpoints/tfv6_resnet34 \
+--routes data/benchmark_routes/Town13/0.xml
 
-### 3. Evaluate on Longest6
-
-Run closed-loop evaluation on the Longest6 v2 benchmark:
-
-```bash
-bash scripts/eval_longest6.sh
-```
-
-### 4. Evaluate on Town13
-
-Run closed-loop evaluation on the Town13 benchmark:
-
-```bash
-bash scripts/eval_town13.sh
-```
-
-Results will be saved to `outputs/local_evaluation/` with videos, infractions, and metrics.
-
-### 5. Clean CARLA
-
-If CARLA becomes unresponsive, clean up zombie processes:
-
-```bash
+# Clean CARLA
 bash scripts/clean_carla.sh
 ```
 
-### 6. Large-scale evaluation on SLURM
-
-For distributed evaluation across multiple routes and benchmarks, see the [SLURM evaluation documentation](https://ln2697.github.io/lead/docs/slurm_evaluation.html). For large-scale evaluation we also provide a WandB logger.
-
-<br>
-<div align="center">
-  <picture>
-    <img src="docs/assets/logging_wandb.png" />
-  </picture>
-
-  **Figure 4:** Example online WandB logging during evaluation.
-
-</div>
-<br>
+Results will be saved to `outputs/local_evaluation/` with videos, infractions, and metrics. For distributed evaluation across multiple routes and benchmarks, see the [SLURM evaluation documentation](https://ln2697.github.io/lead/docs/slurm_evaluation.html). For large-scale evaluation we also provide a WandB logger.
 
 ## Project Structure
 
@@ -459,6 +395,15 @@ The project is organized into several key directories:
 - **`slurm`** - SLURM job scripts for large-scale experiments
 
 For a detailed breakdown of the codebase organization, see the [project structure documentation](https://ln2697.github.io/lead/docs/project_structure.html).
+
+## Common Issues
+
+Most issues can be solved by:
+- Delete and rebuild training cache / buckets.
+- Redownload data.
+- Restart CARLA.
+
+When debugging policy / expert, the script `scripts/reset_carla_world.py` can be handy to reset the map without restart the simulator, which can take some time.
 
 ## Beyond CARLA: Cross-Benchmark Deployment
 

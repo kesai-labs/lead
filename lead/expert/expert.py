@@ -1,12 +1,17 @@
 """Driving logic for expert autonomous agent. Meta information is also handled here."""
 
+import cProfile
+import io
 import logging
 import numbers
+import pstats
+import time
 import typing
 
 import carla
 import matplotlib
 import numpy as np
+import torch
 from agents.tools.misc import compute_distance, is_within_distance
 from beartype import beartype
 from shapely.geometry import Polygon
@@ -15,9 +20,7 @@ from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
 import lead.common.common_utils as common_utils
 import lead.expert.expert_utils as expert_utils
 from lead.common import constants, weathers
-from lead.common.constants import (
-    WeatherVisibility,
-)
+from lead.common.constants import WeatherVisibility
 from lead.common.logging_config import setup_logging
 from lead.common.pid_controller import ExpertLateralPIDController
 from lead.expert.expert_data import ExpertData
@@ -42,7 +45,10 @@ class Expert(ExpertData):
 
     @beartype
     def setup(
-        self, path_to_conf_file: str, route_index: str | None = None, traffic_manager: carla.TrafficManager | None = None
+        self,
+        path_to_conf_file: str,
+        route_index: str | None = None,
+        traffic_manager: carla.TrafficManager | None = None,
     ):
         super().setup()
         LOG.info("Setup")
@@ -51,13 +57,85 @@ class Expert(ExpertData):
         self._turn_controller = ExpertLateralPIDController(self.config_expert)
         self.cleared_stop_sign = False
 
+        if self.config_expert.profile_expert:
+            self.profiler = cProfile.Profile()
+            self.profiler.enable()
+
+    def destroy(self, results=None):
+        if self.config_expert.profile_expert:
+            self.profiler.disable()
+
+            # Save to file for visualization
+            try:
+                self.profiler.dump_stats("expert_profile.prof")
+                LOG.info(
+                    "Profile stats saved to 'expert_profile.prof'. Run 'pip install snakeviz && snakeviz expert_profile.prof' to view."
+                )
+            except Exception as e:
+                LOG.error(f"Failed to dump profile stats: {e}")
+
+            s = io.StringIO()
+            ps = pstats.Stats(self.profiler, stream=s).sort_stats("cumulative")
+            ps.print_stats("lead/lead/")
+            print(s.getvalue())
+        super().destroy(results)
+
     @beartype
     def _init(self, hd_map) -> None:
         LOG.info("Init")
         self.expert_init(hd_map)
 
+    def sort_active_scenarios(self):
+        """Sort active scenarios based on their distance along the route to the ego vehicle. Remove scenarios that have ended.
+        This function should be called every step to keep the active scenarios list updated."""
+
+        distances = []
+        for scenario in CarlaDataProvider.active_scenarios:
+            # Try to get distance from first_actor location if available
+            if scenario.first_actor is not None and scenario.first_actor.is_alive:
+                try:
+                    actor_location = scenario.first_actor.get_location()
+                    distance = self.ego_location.distance(actor_location)
+                except:
+                    # Fallback to trigger location if actor location fails
+                    if scenario.trigger_location is not None:
+                        distance = self.ego_location.distance(scenario.trigger_location)
+                    else:
+                        distance = float("inf")  # Put at end if no location available
+            # Fallback to trigger_location for scenarios without first_actor (like EnterActorFlow)
+            elif scenario.trigger_location is not None:
+                distance = self.ego_location.distance(scenario.trigger_location)
+            else:
+                # No location available, put at end
+                distance = float("inf")
+
+            distances.append(distance)
+
+        # Sort the scenarios based on the calculated distances
+        indices = np.argsort(distances)
+        CarlaDataProvider.active_scenarios = [
+            CarlaDataProvider.active_scenarios[i] for i in indices
+        ]
+
+        # Remove scenarios that ended with a scenario timeout
+        active_scenarios = CarlaDataProvider.active_scenarios.copy()
+        for i, scenario in enumerate(active_scenarios):
+            first_actor = scenario.first_actor
+            last_actor = scenario.last_actor
+            # Only check actor liveness if actors exist
+            should_remove = False
+            if first_actor is not None and not first_actor.is_alive:
+                should_remove = True
+            elif last_actor is not None and not last_actor.is_alive:
+                should_remove = True
+
+            if should_remove:
+                CarlaDataProvider.active_scenarios.remove(active_scenarios[i])
+
     @beartype
-    def run_step(self, input_data: dict, _: float, __: list[list[str | typing.Any]] | None) -> carla.VehicleControl:
+    def run_step(
+        self, input_data: dict, _: float, __: list[list[str | typing.Any]] | None
+    ) -> carla.VehicleControl:
         """
         Entry main function!
         Run a single step of the agent's control loop.
@@ -71,14 +149,32 @@ class Expert(ExpertData):
         Raises:
             RuntimeError: If the agent is not initialized before calling this method.
         """
+        start_time = time.time()
+        torch.cuda.empty_cache()
+
         # Initialize the agent if not done yet
         if not self.initialized:
             self._init(None)
 
         self.step += 1
+        self.sort_active_scenarios()
 
-        if self.config_expert.datagen:
-            self.perturbate_camera()
+        # Track scenario changes
+        current_scenario = self.current_active_scenario_type
+        if not hasattr(self, "_last_scenario_type"):
+            self._last_scenario_type = None
+        if current_scenario != self._last_scenario_type:
+            if current_scenario is not None:
+                LOG.info(f"[Scenario Change] Entering new scenario: {current_scenario}")
+            if self._last_scenario_type is not None:
+                LOG.info(
+                    f"[Scenario Change] Exiting scenario: {self._last_scenario_type}"
+                )
+            self._last_scenario_type = current_scenario
+
+        if not self.config_expert.eval_expert:
+            if self.config_expert.datagen:
+                self.perturbate_camera()
 
         self.update_3rd_person_camera()
 
@@ -87,22 +183,29 @@ class Expert(ExpertData):
         # Get the control commands and driving data for the current step
         target_speed, control, speed_reduced_by_obj = self._get_control()
 
-        if input_data is not None and "bounding_boxes" in input_data:
-            self.bounding_boxes.append(
-                (self.step, self.step // self.config_expert.data_save_freq, input_data["bounding_boxes"])
+        if not self.config_expert.eval_expert:
+            if input_data is not None and "bounding_boxes" in input_data:
+                self.bounding_boxes.append(
+                    (
+                        self.step,
+                        self.step // self.config_expert.data_save_freq,
+                        input_data["bounding_boxes"],
+                    )
+                )
+
+            self.save_meta(
+                control,
+                target_speed,
+                input_data,
+                speed_reduced_by_obj,
             )
 
         if self.step % self.config_expert.data_save_freq == 0:
             if self.save_path is not None and self.config_expert.datagen:
                 self.save_sensors(input_data)
-
-        self.save_meta(
-            control,
-            target_speed,
-            input_data,
-            speed_reduced_by_obj,
-        )
-
+        if self.step % self.config_expert.log_info_freq == 0:
+            elapsed_time = time.time() - start_time
+            LOG.info(f"Step: {self.step}, Time per step: {elapsed_time * 1000:.2f} ms")
         return control
 
     @beartype
@@ -112,19 +215,26 @@ class Expert(ExpertData):
             # We are still rendering the map for the current frame, so we need to use the translation from the last frame.
             last_translation = self.perturbation_translation
             last_rotation = self.perturbation_rotation
-            bb_copy = carla.BoundingBox(self.ego_vehicle.bounding_box.location, self.ego_vehicle.bounding_box.extent)
+            bb_copy = carla.BoundingBox(
+                self.ego_vehicle.bounding_box.location,
+                self.ego_vehicle.bounding_box.extent,
+            )
             transform_copy = carla.Transform(
                 self.ego_vehicle.get_transform().location,
                 self.ego_vehicle.get_transform().rotation,
             )
-            perturbated_loc = transform_copy.transform(carla.Location(0.0, last_translation, 0.0))
+            perturbated_loc = transform_copy.transform(
+                carla.Location(0.0, last_translation, 0.0)
+            )
             transform_copy.location = perturbated_loc
             transform_copy.rotation.yaw = transform_copy.rotation.yaw + last_rotation
             self.perturbated_vehicle_dummy.bounding_box = bb_copy
             self.perturbated_vehicle_dummy.transform = transform_copy
 
     @beartype
-    def _solve_vulnerable_vehicles_scenarios(self, target_speed: float) -> tuple[float, bool, bool, list | None]:
+    def _solve_vulnerable_vehicles_scenarios(
+        self, target_speed: float
+    ) -> tuple[float, bool, bool, list | None]:
         """
         Check for vulnerable vehicles (pedestrians, cyclists). If there are any vulnerable vehicles close enough,
         and we are inside certain scenarios, we brake and set the target speed to 0.
@@ -149,7 +259,9 @@ class Expert(ExpertData):
         ]:
             for actor in self.walkers_inside_bev + self.bikers_inside_bev:
                 num_visible_pixel = (
-                    self.data_agent_id_to_bb_map[actor.id]["visible_pixels"] if self.config_expert.datagen else -1
+                    self.data_agent_id_to_bb_map[actor.id]["visible_pixels"]
+                    if self.config_expert.datagen
+                    else -1
                 )
                 actor_height = actor.bounding_box.extent.z
                 threshold = (
@@ -163,11 +275,17 @@ class Expert(ExpertData):
                 actor_velocity = actor.get_velocity().length()
                 if (
                     actor_velocity < 0.25
-                    and not CarlaDataProvider.memory[self.current_active_scenario_type]["pedestrian_moved"][actor.id]
+                    and not CarlaDataProvider.memory[self.current_active_scenario_type][
+                        "pedestrian_moved"
+                    ][actor.id]
                 ):
                     continue  # Actor did not move yet and is not moving, we come nearer to trigger the scenario
-                elif actor_velocity >= 0.25:  # Actor is moving, we mark it as moving and continue with the scenario
-                    CarlaDataProvider.memory[self.current_active_scenario_type]["pedestrian_moved"][actor.id] = True
+                elif (
+                    actor_velocity >= 0.25
+                ):  # Actor is moving, we mark it as moving and continue with the scenario
+                    CarlaDataProvider.memory[self.current_active_scenario_type][
+                        "pedestrian_moved"
+                    ][actor.id] = True
 
                 bb_location = np.array(actor.get_transform().get_matrix())[:3, 3]
                 rel_vector = bb_location - ego_location
@@ -180,7 +298,9 @@ class Expert(ExpertData):
                 if x < 0:
                     continue  # Behind ego vehicle
 
-                LOG.info(f"Found vulnerable vehicle in front: {angle}°, {distance}m, emergency braking.")
+                LOG.info(
+                    f"Found vulnerable vehicle in front: {angle}°, {distance}m, emergency braking."
+                )
                 return 0.0, True, True, [0, actor.type_id, actor.id, distance]
 
         return target_speed, False, False, None
@@ -210,13 +330,23 @@ class Expert(ExpertData):
 
         # --- Target speed limit, the highest we can go depending on weather, surrounding, etc ---
         self.target_speed_limit = self.speed_limit
-        self.target_speed_limit = max(self.target_speed_limit, self.second_highest_speed_limit)  # We don't to drive too slow
-        if self.second_highest_speed > 30.0 / 3.6:  # We don't want to drive too fast either
-            self.target_speed_limit = min(self.target_speed_limit, self.second_highest_speed / 0.9)
+        self.target_speed_limit = max(
+            self.target_speed_limit, self.second_highest_speed_limit
+        )  # We don't to drive too slow
+        if (
+            self.second_highest_speed > 30.0 / 3.6
+        ):  # We don't want to drive too fast either
+            self.target_speed_limit = min(
+                self.target_speed_limit, self.second_highest_speed / 0.9
+            )
 
         # --- Drive slower with bad weather, night time, junction and clutterness in city ---
-        self.weather_setting = expert_utils.get_weather_name(self.carla_world.get_weather(), self.config_expert)
-        self.visual_visibility = int(weathers.WEATHER_VISIBILITY_MAPPING[self.weather_setting])
+        self.weather_setting = expert_utils.get_weather_name(
+            self.carla_world.get_weather(), self.config_expert
+        )
+        self.visual_visibility = int(
+            weathers.WEATHER_VISIBILITY_MAPPING[self.weather_setting]
+        )
         self.slower_bad_visibility = False
         self.slower_clutterness = False
         self.slower_occluded_junction = False
@@ -237,7 +367,8 @@ class Expert(ExpertData):
                 "InterurbanActorFlow",
                 "InterurbanAdvancedActorFlow",
             ]
-            and min(self.target_speed_limit, self.speed_limit) < 60 / 3.6  # Assume urban = 60kmh
+            and min(self.target_speed_limit, self.speed_limit)
+            < 60 / 3.6  # Assume urban = 60kmh
         ):
             if self.distance_to_next_junction > 0:
                 if self.visual_visibility == WeatherVisibility.VERY_LIMITED:
@@ -248,29 +379,49 @@ class Expert(ExpertData):
                     self.slower_clutterness = True
                 if (
                     self.distance_to_next_junction < 20
-                    and min([self.visibility_range_camera_1, self.visibility_range_camera_2, self.visibility_range_camera_3])
+                    and min(
+                        [
+                            self.visibility_range_camera_1,
+                            self.visibility_range_camera_2,
+                            self.visibility_range_camera_3,
+                        ]
+                    )
                     < 0.2
                 ):
                     self.slower_occluded_junction = True
                     self.target_speed_limit -= 4.0
 
             # Reduce target speed if there is a junction ahead
-            for i in range(min(self.config_expert.max_lookahead_to_check_for_junction, len(self.route_waypoints))):
+            for i in range(
+                min(
+                    self.config_expert.max_lookahead_to_check_for_junction,
+                    len(self.route_waypoints),
+                )
+            ):
                 if self.route_waypoints[i].is_junction:
                     if self.speed_limit < 40 / 3.6:
-                        self.target_speed_limit = min(self.target_speed_limit, self.config_expert.max_speed_in_junction_urban)
+                        self.target_speed_limit = min(
+                            self.target_speed_limit,
+                            self.config_expert.max_speed_in_junction_urban,
+                        )
 
         else:
-            self.target_speed_limit = max(self.target_speed_limit, 40.0 / 3.6)  # We don't want to drive too slow
+            self.target_speed_limit = max(
+                self.target_speed_limit, 40.0 / 3.6
+            )  # We don't want to drive too slow
 
-        self.target_speed_limit = max(self.target_speed_limit, self.config_expert.min_target_speed_limit)
+        self.target_speed_limit = max(
+            self.target_speed_limit, self.config_expert.min_target_speed_limit
+        )
         self.target_speed_limit = min(self.target_speed_limit, 20.0)
 
         # --- Target speed, begins with target speed limit, reduces further depending on scenarios ---
         target_speed = self.target_speed_limit
 
         # Manage route obstacle scenarios and adjust target speed
-        target_speed_route_obstacle, obstacle_override, speed_reduced_by_obj = self._solve_obstacle_scenarios(target_speed)
+        target_speed_route_obstacle, obstacle_override, speed_reduced_by_obj = (
+            self._solve_obstacle_scenarios(target_speed)
+        )
 
         # Manage distance to pedestrians and bikers
         (
@@ -281,15 +432,26 @@ class Expert(ExpertData):
         ) = self._solve_vulnerable_vehicles_scenarios(target_speed)
         self.does_emergency_brake_for_pedestrians = vulnerable_vehicle_override
 
-        assert int(obstacle_override) + int(vulnerable_vehicle_override) <= 1, "Only one override can be active at a time."
+        assert int(obstacle_override) + int(vulnerable_vehicle_override) <= 1, (
+            "Only one override can be active at a time."
+        )
 
         # Specific cases
         if obstacle_override:
             # In obstacle override, we force the vehicle to drive no matter what.
+            LOG.info(
+                f"[Control Override] Obstacle override active, forcing drive with speed {target_speed_route_obstacle * 3.6:.1f} km/h"
+            )
             brake, target_speed = False, target_speed_route_obstacle
             speed_reduced_by_obj = speed_reduced_by_obj
         elif vulnerable_vehicle_override:
-            brake, target_speed = brake_vulnerable_vehicle, min(target_speed, target_speed_vulnerable_vehicles)
+            LOG.info(
+                f"[Control Override] Vulnerable vehicle override active, adjusting speed to {min(target_speed, target_speed_vulnerable_vehicles) * 3.6:.1f} km/h, brake={brake_vulnerable_vehicle}"
+            )
+            brake, target_speed = (
+                brake_vulnerable_vehicle,
+                min(target_speed, target_speed_vulnerable_vehicles),
+            )
             speed_reduced_by_obj = speed_reduced_by_obj_vulnerable_vehicles
         else:  # Generate cases
             brake, target_speed, speed_reduced_by_obj = self._solve_general_scenarios(
@@ -300,9 +462,14 @@ class Expert(ExpertData):
         target_speed = min(target_speed, target_speed_route_obstacle)
 
         self.emergency_brake_for_special_vehicle = False
-        if self.current_active_scenario_type in ["OppositeVehicleTakingPriority", "OppositeVehicleRunningRedLight"]:
+        if self.current_active_scenario_type in [
+            "OppositeVehicleTakingPriority",
+            "OppositeVehicleRunningRedLight",
+        ]:
             if len(self.adversarial_actors_ids[0]) > 0:
-                LOG.info("Reducing target speed, waiting for dangerous adversarial vehicle to pass.")
+                LOG.info(
+                    f"[Control] {self.current_active_scenario_type}: Reducing target speed to 0, waiting for dangerous adversarial vehicle to pass."
+                )
                 target_speed = 0.0
                 brake = True
         elif self.current_active_scenario_type in [
@@ -311,31 +478,47 @@ class Expert(ExpertData):
         ]:
             if self.speed_limit > 25:
                 if 25 < self.distance_to_scenario_obstacle < 50:
-                    LOG.info("Reducing target speed, driving against visible obstacle.")
+                    LOG.info(
+                        f"[Control] {self.current_active_scenario_type}: Reducing target speed to 10.0 m/s, approaching visible obstacle at {self.distance_to_scenario_obstacle:.1f}m"
+                    )
                     target_speed = min(target_speed, 10.0)
             elif self.speed_limit > 20:
                 if 25 < self.distance_to_scenario_obstacle < 45:
-                    LOG.info("Reducing target speed, driving against visible obstacle.")
+                    LOG.info(
+                        f"[Control] {self.current_active_scenario_type}: Reducing target speed to 7.5 m/s, approaching visible obstacle at {self.distance_to_scenario_obstacle:.1f}m"
+                    )
                     target_speed = min(target_speed, 7.5)
             else:
                 if 25 < self.distance_to_scenario_obstacle < 40:
-                    LOG.info("Reducing target speed, driving against visible obstacle.")
-                    target_speed = min(target_speed, self.config_expert.min_target_speed_limit)
+                    LOG.info(
+                        f"[Control] {self.current_active_scenario_type}: Reducing target speed to {self.config_expert.min_target_speed_limit} m/s, approaching visible obstacle at {self.distance_to_scenario_obstacle:.1f}m"
+                    )
+                    target_speed = min(
+                        target_speed, self.config_expert.min_target_speed_limit
+                    )
         elif self.current_active_scenario_type in [
             "ParkedObstacle",
         ]:
             if self.speed_limit > 25:
                 if 25 < self.distance_to_scenario_obstacle < 45:
-                    LOG.info("Reducing target speed, driving against visible obstacle.")
+                    LOG.info(
+                        f"[Control] ParkedObstacle: Reducing target speed to 10.0 m/s, approaching parked obstacle at {self.distance_to_scenario_obstacle:.1f}m"
+                    )
                     target_speed = min(target_speed, 10.0)
             elif self.speed_limit > 20:
                 if 25 < self.distance_to_scenario_obstacle < 45:
-                    LOG.info("Reducing target speed, driving against visible obstacle.")
+                    LOG.info(
+                        f"[Control] ParkedObstacle: Reducing target speed to 7.5 m/s, approaching parked obstacle at {self.distance_to_scenario_obstacle:.1f}m"
+                    )
                     target_speed = min(target_speed, 7.5)
             else:
                 if 25 < self.distance_to_scenario_obstacle < 35:
-                    LOG.info("Reducing target speed, driving against visible obstacle.")
-                    target_speed = min(target_speed, self.config_expert.min_target_speed_limit)
+                    LOG.info(
+                        f"[Control] ParkedObstacle: Reducing target speed to {self.config_expert.min_target_speed_limit} m/s, approaching parked obstacle at {self.distance_to_scenario_obstacle:.1f}m"
+                    )
+                    target_speed = min(
+                        target_speed, self.config_expert.min_target_speed_limit
+                    )
 
         # Attempt to try to avoid collision in some cases
         self.rear_danger_8 = self.rear_danger_16 = False
@@ -354,14 +537,28 @@ class Expert(ExpertData):
             rear_adversarial_actor = self.rear_adversarial_actor
             if rear_adversarial_actor:
                 vehicle_behind_speed = rear_adversarial_actor.get_velocity().length()
-                vehicle_behind_distance = self.ego_location.distance(rear_adversarial_actor.get_location())
-                if vehicle_behind_distance < 8 and vehicle_behind_speed > 5 and self.ego_speed > 5:
-                    LOG.info("Vehicle behind speed:", vehicle_behind_speed, "Target speed:", target_speed)
+                vehicle_behind_distance = self.ego_location.distance(
+                    rear_adversarial_actor.get_location()
+                )
+                if (
+                    vehicle_behind_distance < 8
+                    and vehicle_behind_speed > 5
+                    and self.ego_speed > 5
+                ):
+                    LOG.info(
+                        f"[Control] {self.current_active_scenario_type}: Rear danger (8m): Accelerating to avoid rear collision, vehicle behind speed: {vehicle_behind_speed * 3.6:.1f} km/h, adjusting target speed to {(vehicle_behind_speed + 5) * 3.6:.1f} km/h"
+                    )
                     target_speed = max(target_speed, vehicle_behind_speed + 5)
                     self.rear_danger_8 = True
                     brake = False
-                elif vehicle_behind_distance < 16 and vehicle_behind_speed > 5 and self.ego_speed > 5:
-                    LOG.info("Vehicle behind speed:", vehicle_behind_speed, "Target speed:", target_speed)
+                elif (
+                    vehicle_behind_distance < 16
+                    and vehicle_behind_speed > 5
+                    and self.ego_speed > 5
+                ):
+                    LOG.info(
+                        f"[Control] {self.current_active_scenario_type}: Rear danger (16m): Matching rear vehicle speed: {vehicle_behind_speed * 3.6:.1f} km/h"
+                    )
                     target_speed = max(target_speed, vehicle_behind_speed)
                     self.rear_danger_16 = True
                     brake = False
@@ -373,34 +570,60 @@ class Expert(ExpertData):
             cut_in_vehicle = self.cutin_actors[0]
             if (
                 1 < cut_in_vehicle.get_velocity().length() < 4.25
-                and not CarlaDataProvider.memory[self.current_active_scenario_type]["stopped"]
+                and not CarlaDataProvider.memory[self.current_active_scenario_type][
+                    "stopped"
+                ]
             ):
+                LOG.info(
+                    f"[Control] ParkingCutIn: Emergency braking for cut-in vehicle (speed={cut_in_vehicle.get_velocity().length() * 3.6:.1f} km/h)"
+                )
                 self.brake_cutin = True
                 brake = True
                 target_speed = 0.0
             elif (
-                not CarlaDataProvider.memory[self.current_active_scenario_type]["stopped"]
+                not CarlaDataProvider.memory[self.current_active_scenario_type][
+                    "stopped"
+                ]
                 and cut_in_vehicle.get_velocity().length() >= 5
             ):
-                CarlaDataProvider.memory[self.current_active_scenario_type]["stopped"] = True
+                LOG.info(
+                    f"[Control] ParkingCutIn: Cut-in vehicle cleared (speed={cut_in_vehicle.get_velocity().length() * 3.6:.1f} km/h)"
+                )
+                CarlaDataProvider.memory[self.current_active_scenario_type][
+                    "stopped"
+                ] = True
         elif self.current_active_scenario_type in ["StaticCutIn"]:
             assert len(self.cutin_actors) == 1
             cut_in_vehicle = self.cutin_actors[0]
             if (
                 2.1 < cut_in_vehicle.get_velocity().length() < 4.25
-                and not CarlaDataProvider.memory[self.current_active_scenario_type]["stopped"]
+                and not CarlaDataProvider.memory[self.current_active_scenario_type][
+                    "stopped"
+                ]
             ):
+                LOG.info(
+                    f"[Control] StaticCutIn: Emergency braking for cut-in vehicle (speed={cut_in_vehicle.get_velocity().length() * 3.6:.1f} km/h)"
+                )
                 self.brake_cutin = True
                 brake = True
                 target_speed = 0.0
             elif (
-                not CarlaDataProvider.memory[self.current_active_scenario_type]["stopped"]
+                not CarlaDataProvider.memory[self.current_active_scenario_type][
+                    "stopped"
+                ]
                 and cut_in_vehicle.get_velocity().length() >= 5
             ):
-                CarlaDataProvider.memory[self.current_active_scenario_type]["stopped"] = True
+                LOG.info(
+                    f"[Control] StaticCutIn: Cut-in vehicle cleared (speed={cut_in_vehicle.get_velocity().length() * 3.6:.1f} km/h)"
+                )
+                CarlaDataProvider.memory[self.current_active_scenario_type][
+                    "stopped"
+                ] = True
 
         # Compute throttle and brake control
-        throttle, control_brake = self._longitudinal_controller.get_throttle_and_brake(brake, target_speed, self.ego_speed)
+        throttle, control_brake = self._longitudinal_controller.get_throttle_and_brake(
+            brake, target_speed, self.ego_speed
+        )
 
         # Compute steering control
         steer = expert_utils.get_steer(
@@ -419,7 +642,11 @@ class Expert(ExpertData):
         self.control.brake = float(brake or control_brake)
 
         # Apply brake if the vehicle is stopped to prevent rolling back
-        if self.control.throttle == 0 and self.ego_speed < self.config_expert.minimum_speed_to_prevent_rolling_back:
+        if (
+            self.control.throttle == 0
+            and self.ego_speed
+            < self.config_expert.minimum_speed_to_prevent_rolling_back
+        ):
             self.control.brake = 1
 
         # Apply throttle if the vehicle is blocked for too long
@@ -467,7 +694,9 @@ class Expert(ExpertData):
         to_location = carla.Location(to_location[0], to_location[1], to_location[2])
 
         from_location = self.privileged_route_planner.route_points[from_index]
-        from_location = carla.Location(from_location[0], from_location[1], from_location[2])
+        from_location = carla.Location(
+            from_location[0], from_location[1], from_location[2]
+        )
 
         # Compute the distance and time needed for the ego vehicle to overtake
         ego_distance = (
@@ -476,7 +705,10 @@ class Expert(ExpertData):
             + self.config_expert.check_path_free_safety_distance
         )
         ego_time = expert_utils.compute_min_time_for_distance(
-            self.config_expert, ego_distance, min(min_speed, target_speed), self.ego_speed
+            self.config_expert,
+            ego_distance,
+            min(min_speed, target_speed),
+            self.ego_speed,
         )
 
         path_clear = True
@@ -491,7 +723,11 @@ class Expert(ExpertData):
                 vehicle_waypoint = self.carla_world_map.get_waypoint(vehicle_location)
 
                 diff_vector = vehicle_location - self.ego_location
-                dot_product = self.ego_vehicle.get_transform().get_forward_vector().dot(diff_vector)
+                dot_product = (
+                    self.ego_vehicle.get_transform()
+                    .get_forward_vector()
+                    .dot(diff_vector)
+                )
                 # Draw dot_product above vehicle
                 self.carla_world.debug.draw_string(
                     vehicle_location + carla.Location(x=1, y=0, z=2.5),
@@ -502,7 +738,9 @@ class Expert(ExpertData):
 
                 # The overtaking path is blocked by vehicle
                 diff_vector_2 = to_location - vehicle_location
-                dot_product_2 = vehicle.get_transform().get_forward_vector().dot(diff_vector_2)
+                dot_product_2 = (
+                    vehicle.get_transform().get_forward_vector().dot(diff_vector_2)
+                )
                 self.carla_world.debug.draw_string(
                     vehicle_location + carla.Location(x=2, y=0, z=3.5),
                     f"dot2={dot_product_2:.1f}",
@@ -523,9 +761,16 @@ class Expert(ExpertData):
             vehicle_waypoint = self.carla_world_map.get_waypoint(vehicle_location)
 
             # Check if the vehicle is on the previous lane IDs
-            if (vehicle_waypoint.road_id, vehicle_waypoint.lane_id) in previous_lane_ids:
+            if (
+                vehicle_waypoint.road_id,
+                vehicle_waypoint.lane_id,
+            ) in previous_lane_ids:
                 diff_vector = vehicle_location - self.ego_location
-                dot_product = self.ego_vehicle.get_transform().get_forward_vector().dot(diff_vector)
+                dot_product = (
+                    self.ego_vehicle.get_transform()
+                    .get_forward_vector()
+                    .dot(diff_vector)
+                )
 
                 # One TwoWay scenarios we can skip this vehicle since it's not on the overtaking path and behind
                 # the ego vehicle. Otherwise in other scenarios it's coming from behind and is relevant
@@ -542,7 +787,9 @@ class Expert(ExpertData):
                 # We only want predictable earlier acceleration from scratch that is why we have the ego_speed < 1.0 constraint.
                 # Ignore vehicle that are close to the ego vehicle and is already almost out of the way
                 if self.ego_speed < 1.0 and vehicle.get_velocity().length() > 3.0:
-                    if self.current_active_scenario_type in ["ConstructionObstacleTwoWays"]:
+                    if self.current_active_scenario_type in [
+                        "ConstructionObstacleTwoWays"
+                    ]:
                         threshold = 8
                         if self.ego_lane_width <= 2.76:
                             threshold = 8
@@ -572,7 +819,9 @@ class Expert(ExpertData):
                             threshold = 9
                         if dot_product < threshold:
                             continue
-                    elif self.current_active_scenario_type in ["VehicleOpensDoorTwoWays"]:
+                    elif self.current_active_scenario_type in [
+                        "VehicleOpensDoorTwoWays"
+                    ]:
                         threshold = 8
                         if self.ego_lane_width <= 2.76:
                             threshold = 8
@@ -582,7 +831,9 @@ class Expert(ExpertData):
                             threshold = 10
                         if dot_product < threshold:
                             continue
-                    elif self.current_active_scenario_type in ["HazardAtSideLaneTwoWays"]:
+                    elif self.current_active_scenario_type in [
+                        "HazardAtSideLaneTwoWays"
+                    ]:
                         threshold = 8
                         if self.ego_lane_width <= 2.76:
                             threshold = 8
@@ -595,18 +846,28 @@ class Expert(ExpertData):
 
                 # The overtaking path is blocked by vehicle
                 diff_vector_2 = to_location - vehicle_location
-                dot_product_2 = vehicle.get_transform().get_forward_vector().dot(diff_vector_2)
+                dot_product_2 = (
+                    vehicle.get_transform().get_forward_vector().dot(diff_vector_2)
+                )
 
                 if dot_product_2 < 0:
                     path_clear = False
                     break
 
-                other_vehicle_distance = to_location.distance(vehicle_location) - vehicle.bounding_box.extent.x
-                other_vehicle_time = other_vehicle_distance / max(1.0, vehicle.get_velocity().length())
+                other_vehicle_distance = (
+                    to_location.distance(vehicle_location)
+                    - vehicle.bounding_box.extent.x
+                )
+                other_vehicle_time = other_vehicle_distance / max(
+                    1.0, vehicle.get_velocity().length()
+                )
 
                 # Add 200 ms safety margin
                 # Vehicle needs less time to arrive at to_location than the ego vehicle
-                if other_vehicle_time < ego_time + self.config_expert.check_path_free_safety_time:
+                if (
+                    other_vehicle_time
+                    < ego_time + self.config_expert.check_path_free_safety_time
+                ):
                     path_clear = False
                     break
 
@@ -631,8 +892,12 @@ class Expert(ExpertData):
         target_speed = initial_target_speed
 
         # Calculate the global bounding box of the ego vehicle
-        center_ego_bb_global = self.ego_transform.transform(self.ego_vehicle.bounding_box.location)
-        ego_bb_global = carla.BoundingBox(center_ego_bb_global, self.ego_vehicle.bounding_box.extent)
+        center_ego_bb_global = self.ego_transform.transform(
+            self.ego_vehicle.bounding_box.location
+        )
+        ego_bb_global = carla.BoundingBox(
+            center_ego_bb_global, self.ego_vehicle.bounding_box.extent
+        )
         ego_bb_global.rotation = self.ego_transform.rotation
 
         if self.config_expert.visualize_bounding_boxes:
@@ -655,31 +920,42 @@ class Expert(ExpertData):
         )
 
         # Get future bounding boxes of pedestrians
-        nearby_pedestrians, nearby_pedestrian_ids = self.forecast_walkers(num_future_frames)
+        nearby_pedestrians, nearby_pedestrian_ids = self.forecast_walkers(
+            num_future_frames
+        )
 
         # Forecast the ego vehicle's bounding boxes for the future frames
-        ego_bounding_boxes = self.forecast_ego_agent(num_future_frames, initial_target_speed)
+        ego_bounding_boxes = self.forecast_ego_agent(
+            num_future_frames, initial_target_speed
+        )
 
         # Predict bounding boxes of other actors (vehicles, bicycles, etc.)
-        predicted_bounding_boxes = self.predict_other_actors_bounding_boxes(num_future_frames)
+        predicted_bounding_boxes = self.predict_other_actors_bounding_boxes(
+            num_future_frames
+        )
 
         # Compute the target speed with respect to the leading vehicle
-        target_speed_leading, speed_reduced_by_obj = self.compute_target_speed_wrt_leading_vehicle(
-            initial_target_speed,
-            predicted_bounding_boxes,
-            speed_reduced_by_obj,
+        target_speed_leading, speed_reduced_by_obj = (
+            self.compute_target_speed_wrt_leading_vehicle(
+                initial_target_speed,
+                predicted_bounding_boxes,
+                speed_reduced_by_obj,
+            )
         )
 
         # Compute the target speeds with respect to all actors (vehicles, bicycles, pedestrians)
-        target_speed_bicycle, target_speed_pedestrian, target_speed_vehicle, speed_reduced_by_obj = (
-            self.compute_target_speeds_wrt_all_actors(
-                initial_target_speed,
-                ego_bounding_boxes,
-                predicted_bounding_boxes,
-                speed_reduced_by_obj,
-                nearby_pedestrians,
-                nearby_pedestrian_ids,
-            )
+        (
+            target_speed_bicycle,
+            target_speed_pedestrian,
+            target_speed_vehicle,
+            speed_reduced_by_obj,
+        ) = self.compute_target_speeds_wrt_all_actors(
+            initial_target_speed,
+            ego_bounding_boxes,
+            predicted_bounding_boxes,
+            speed_reduced_by_obj,
+            nearby_pedestrians,
+            nearby_pedestrian_ids,
         )
 
         # Compute the target speed with respect to the red light
@@ -688,18 +964,28 @@ class Expert(ExpertData):
         )
 
         # Update the object causing the most speed reduction
-        if speed_reduced_by_obj is None or speed_reduced_by_obj[0] > target_speed_red_light:
+        if (
+            speed_reduced_by_obj is None
+            or speed_reduced_by_obj[0] > target_speed_red_light
+        ):
             speed_reduced_by_obj = [
                 target_speed_red_light,
-                None if self.next_traffic_light is None else self.next_traffic_light.type_id,
+                None
+                if self.next_traffic_light is None
+                else self.next_traffic_light.type_id,
                 None if self.next_traffic_light is None else self.next_traffic_light.id,
                 self.distance_to_next_traffic_light,
             ]
 
         # Compute the target speed with respect to the stop sign
-        target_speed_stop_sign = self.ego_agent_affected_by_stop_sign(initial_target_speed)
+        target_speed_stop_sign = self.ego_agent_affected_by_stop_sign(
+            initial_target_speed
+        )
         # Update the object causing the most speed reduction
-        if speed_reduced_by_obj is None or speed_reduced_by_obj[0] > target_speed_stop_sign:
+        if (
+            speed_reduced_by_obj is None
+            or speed_reduced_by_obj[0] > target_speed_stop_sign
+        ):
             speed_reduced_by_obj = [
                 target_speed_stop_sign,
                 None if self.next_stop_sign is None else self.next_stop_sign.type_id,
@@ -718,12 +1004,21 @@ class Expert(ExpertData):
         )
 
         # Set the hazard flags based on the target speed and its cause
-        if target_speed == target_speed_pedestrian and target_speed_pedestrian != initial_target_speed:
+        if (
+            target_speed == target_speed_pedestrian
+            and target_speed_pedestrian != initial_target_speed
+        ):
             self.walker_hazard = True
             self.walker_close = True
-        elif target_speed == target_speed_red_light and target_speed_red_light != initial_target_speed:
+        elif (
+            target_speed == target_speed_red_light
+            and target_speed_red_light != initial_target_speed
+        ):
             self.traffic_light_hazard = True
-        elif target_speed == target_speed_stop_sign and target_speed_stop_sign != initial_target_speed:
+        elif (
+            target_speed == target_speed_stop_sign
+            and target_speed_stop_sign != initial_target_speed
+        ):
             self.stop_sign_hazard = True
             self.stop_sign_close = True
 
@@ -731,7 +1026,9 @@ class Expert(ExpertData):
         brake = target_speed == 0
         return brake, target_speed, speed_reduced_by_obj
 
-    def _solve_obstacle_scenarios(self, target_speed: float) -> tuple[float, bool, list]:
+    def _solve_obstacle_scenarios(
+        self, target_speed: float
+    ) -> tuple[float, bool, list]:
         """
         This method handles various obstacle and scenario situations that may arise during navigation.
         It adjusts the target speed, modifies the route, and determines if the ego vehicle should keep driving or wait.
@@ -748,7 +1045,12 @@ class Expert(ExpertData):
         """
 
         keep_driving = False
-        speed_reduced_by_obj = [target_speed, None, None, None]  # [target_speed, type, id, distance]
+        speed_reduced_by_obj = [
+            target_speed,
+            None,
+            None,
+            None,
+        ]  # [target_speed, type, id, distance]
 
         # Only continue if there are some active scenarios available
         if len(CarlaDataProvider.active_scenarios) != 0:
@@ -760,25 +1062,46 @@ class Expert(ExpertData):
 
             if self.current_active_scenario_type == "InvadingTurn":
                 first_cone, last_cone, offset = [
-                    CarlaDataProvider.memory["InvadingTurn"][k] for k in ["first_cone", "last_cone", "offset"]
+                    CarlaDataProvider.memory["InvadingTurn"][k]
+                    for k in ["first_cone", "last_cone", "offset"]
                 ]
                 closest_distance = first_cone.get_location().distance(ego_location)
-                if closest_distance < self.config_expert.default_max_distance_to_process_scenario:
-                    self.privileged_route_planner.shift_route_for_invading_turn(first_cone, last_cone, offset)
+                if (
+                    closest_distance
+                    < self.config_expert.default_max_distance_to_process_scenario
+                ):
+                    LOG.info(
+                        "[Scenario Action] InvadingTurn: Shifting route for invading turn maneuver"
+                    )
+                    self.privileged_route_planner.shift_route_for_invading_turn(
+                        first_cone, last_cone, offset
+                    )
+                    LOG.info(
+                        "[Scenario Exit] InvadingTurn: Completed, cleaning up scenario"
+                    )
                     CarlaDataProvider.clean_current_active_scenario()
 
-            elif self.current_active_scenario_type in ["Accident", "ConstructionObstacle", "ParkedObstacle"]:
+            elif self.current_active_scenario_type in [
+                "Accident",
+                "ConstructionObstacle",
+                "ParkedObstacle",
+            ]:
                 first_actor, last_actor, direction = [
                     CarlaDataProvider.memory[self.current_active_scenario_type][k]
                     for k in ["first_actor", "last_actor", "direction"]
                 ]
 
-                horizontal_distance = expert_utils.get_horizontal_distance(self.ego_vehicle, first_actor)
+                horizontal_distance = expert_utils.get_horizontal_distance(
+                    self.ego_vehicle, first_actor
+                )
 
                 # Shift the route around the obstacles
                 if (
-                    horizontal_distance < self.config_expert.default_max_distance_to_process_scenario
-                    and not CarlaDataProvider.memory[self.current_active_scenario_type]["changed_route"]
+                    horizontal_distance
+                    < self.config_expert.default_max_distance_to_process_scenario
+                    and not CarlaDataProvider.memory[self.current_active_scenario_type][
+                        "changed_route"
+                    ]
                 ):
                     add_before_length = {
                         "Accident": self.config_expert.add_before_accident,
@@ -795,33 +1118,46 @@ class Expert(ExpertData):
                         "ConstructionObstacle": self.config_expert.transition_smoothness_factor_construction_obstacle,
                         "ParkedObstacle": self.config_expert.transition_smoothness_distance_parked_obstacle,
                     }[self.current_active_scenario_type]
-                    if self.current_active_scenario_type not in ["ConstructionObstacle"]:
+                    if self.current_active_scenario_type not in [
+                        "ConstructionObstacle"
+                    ]:
                         if self.visual_visibility == WeatherVisibility.LIMITED:
                             add_before_length -= 5.0
-                            transition_length -= int(4.0 * self.config_expert.points_per_meter)
+                            transition_length -= int(
+                                4.0 * self.config_expert.points_per_meter
+                            )
                         elif self.visual_visibility == WeatherVisibility.VERY_LIMITED:
                             add_before_length -= 7.0
-                            transition_length -= int(6.0 * self.config_expert.points_per_meter)
+                            transition_length -= int(
+                                6.0 * self.config_expert.points_per_meter
+                            )
                         LOG.info("Later switching because of bad weather")
                     if self.speed_limit < 15:
                         add_after_length = {
                             "Accident": 0.5,
                             "ConstructionObstacle": self.config_expert.add_after_construction_obstacle,
                             "ParkedObstacle": 0.5,
-                        }[self.current_active_scenario_type]  # Speed is low and we can switch earlier
+                        }[
+                            self.current_active_scenario_type
+                        ]  # Speed is low and we can switch earlier
                     lane_transition_factor = {
                         "Accident": 1.0,
                         "ConstructionObstacle": self.two_way_obstacle_distance_to_cones_factor,
                         "ParkedObstacle": 1.0,
                     }[self.current_active_scenario_type]
-                    from_index, _ = self.privileged_route_planner.shift_route_around_actors(
-                        first_actor,
-                        last_actor,
-                        direction,
-                        transition_length,
-                        lane_transition_factor=lane_transition_factor,
-                        extra_length_before=add_before_length,
-                        extra_length_after=add_after_length,
+                    LOG.info(
+                        f"[Route Change] {self.current_active_scenario_type}: Shifting route around obstacle, direction={direction}, distance={horizontal_distance:.1f}m"
+                    )
+                    from_index, _ = (
+                        self.privileged_route_planner.shift_route_around_actors(
+                            first_actor,
+                            last_actor,
+                            direction,
+                            transition_length,
+                            lane_transition_factor=lane_transition_factor,
+                            extra_length_before=add_before_length,
+                            extra_length_after=add_after_length,
+                        )
                     )
                     CarlaDataProvider.memory[self.current_active_scenario_type].update(
                         {
@@ -830,11 +1166,17 @@ class Expert(ExpertData):
                         }
                     )
 
-                elif CarlaDataProvider.memory[self.current_active_scenario_type]["changed_route"]:
+                elif CarlaDataProvider.memory[self.current_active_scenario_type][
+                    "changed_route"
+                ]:
                     first_actor_rel_pos = common_utils.get_relative_transform(
-                        self.ego_matrix, np.array(first_actor.get_transform().get_matrix())
+                        self.ego_matrix,
+                        np.array(first_actor.get_transform().get_matrix()),
                     )
                     if first_actor_rel_pos[0] < 3:
+                        LOG.info(
+                            f"[Scenario Exit] {self.current_active_scenario_type}: Passed obstacle, cleaning up scenario"
+                        )
                         CarlaDataProvider.clean_current_active_scenario()
             elif self.current_active_scenario_type in [
                 "AccidentTwoWays",
@@ -842,16 +1184,38 @@ class Expert(ExpertData):
                 "ParkedObstacleTwoWays",
                 "VehicleOpensDoorTwoWays",
             ]:
-                first_actor, last_actor, direction, changed_route, from_index, to_index, path_clear = [
+                (
+                    first_actor,
+                    last_actor,
+                    direction,
+                    changed_route,
+                    from_index,
+                    to_index,
+                    path_clear,
+                ) = [
                     CarlaDataProvider.memory[self.current_active_scenario_type][k]
-                    for k in ["first_actor", "last_actor", "direction", "changed_route", "from_index", "to_index", "path_clear"]
+                    for k in [
+                        "first_actor",
+                        "last_actor",
+                        "direction",
+                        "changed_route",
+                        "from_index",
+                        "to_index",
+                        "path_clear",
+                    ]
                 ]
 
                 # change the route if the ego is close enough to the obstacle
-                horizontal_distance = expert_utils.get_horizontal_distance(self.ego_vehicle, first_actor)
+                horizontal_distance = expert_utils.get_horizontal_distance(
+                    self.ego_vehicle, first_actor
+                )
 
                 # Shift the route around the obstacles
-                if horizontal_distance < self.config_expert.default_max_distance_to_process_scenario and not changed_route:
+                if (
+                    horizontal_distance
+                    < self.config_expert.default_max_distance_to_process_scenario
+                    and not changed_route
+                ):
                     transition_length = {
                         "AccidentTwoWays": self.config_expert.transition_length_accident_two_ways,
                         "ConstructionObstacleTwoWays": self.config_expert.transition_length_construction_obstacle_two_ways,
@@ -876,20 +1240,27 @@ class Expert(ExpertData):
                         "ParkedObstacleTwoWays": self.config_expert.factor_parked_obstacle_two_ways,
                         "VehicleOpensDoorTwoWays": self.two_way_vehicle_open_door_distance_to_center_line_factor,
                     }[self.current_active_scenario_type]
-                    if self.current_active_scenario_type not in ["ConstructionObstacleTwoWays"]:
+                    if self.current_active_scenario_type not in [
+                        "ConstructionObstacleTwoWays"
+                    ]:
                         if self.visual_visibility == WeatherVisibility.LIMITED:
                             add_before_length -= 0.5
                         elif self.visual_visibility == WeatherVisibility.VERY_LIMITED:
                             add_before_length -= 1.0
 
-                    from_index, to_index = self.privileged_route_planner.shift_route_around_actors(
-                        first_actor,
-                        last_actor,
-                        direction,
-                        transition_length,
-                        factor,
-                        add_before_length,
-                        add_after_length,
+                    LOG.info(
+                        f"[Route Change] {self.current_active_scenario_type}: Initiating two-way overtaking maneuver, direction={direction}, distance={horizontal_distance:.1f}m"
+                    )
+                    from_index, to_index = (
+                        self.privileged_route_planner.shift_route_around_actors(
+                            first_actor,
+                            last_actor,
+                            direction,
+                            transition_length,
+                            factor,
+                            add_before_length,
+                            add_after_length,
+                        )
                     )
 
                     changed_route = True
@@ -898,6 +1269,7 @@ class Expert(ExpertData):
                             "changed_route": changed_route,
                             "from_index": from_index,
                             "to_index": to_index,
+                            "path_clear": path_clear,
                         }
                     )
 
@@ -916,7 +1288,9 @@ class Expert(ExpertData):
                     )
                     if target_lane is None:
                         return target_speed, keep_driving, speed_reduced_by_obj
-                    prev_road_lane_ids = expert_utils.get_previous_road_lane_ids(self.config_expert, target_lane)
+                    prev_road_lane_ids = expert_utils.get_previous_road_lane_ids(
+                        self.config_expert, target_lane
+                    )
                     path_clear = self.is_two_ways_overtaking_path_clear(
                         int(from_index),
                         int(to_index),
@@ -924,15 +1298,21 @@ class Expert(ExpertData):
                         prev_road_lane_ids,
                         min_speed=self.two_way_overtake_speed,
                     )
-                    CarlaDataProvider.memory[self.current_active_scenario_type]["path_clear"] = path_clear
+                    CarlaDataProvider.memory[self.current_active_scenario_type][
+                        "path_clear"
+                    ] = path_clear
 
                 # If the overtaking path is clear, keep driving; otherwise, wait behind the obstacle
                 if path_clear:
                     target_speed = self.two_way_overtake_speed
                     if (
                         self.privileged_route_planner.route_index
-                        >= to_index - self.config_expert.distance_to_delete_scenario_in_two_ways
+                        >= to_index
+                        - self.config_expert.distance_to_delete_scenario_in_two_ways
                     ):
+                        LOG.info(
+                            f"[Scenario Exit] {self.current_active_scenario_type}: Overtaking completed, cleaning up scenario"
+                        )
                         CarlaDataProvider.clean_current_active_scenario()
                     keep_driving = True
                 else:
@@ -941,9 +1321,15 @@ class Expert(ExpertData):
                         "ConstructionObstacleTwoWays": 10,
                         "ParkedObstacleTwoWays": 10,
                         "VehicleOpensDoorTwoWays": 10,
-                    }[self.current_active_scenario_type]  # Move a bit to side instead of standing direct behind the obstacle
+                    }[
+                        self.current_active_scenario_type
+                    ]  # Move a bit to side instead of standing direct behind the obstacle
                     distance_to_merging_point = (
-                        float(from_index + offset - self.privileged_route_planner.route_index)
+                        float(
+                            from_index
+                            + offset
+                            - self.privileged_route_planner.route_index
+                        )
                         / self.config_expert.points_per_meter
                     )
                     target_speed = expert_utils.compute_target_speed_idm(
@@ -958,7 +1344,10 @@ class Expert(ExpertData):
                     )
 
                     # Update the object causing the most speed reduction
-                    if speed_reduced_by_obj is None or speed_reduced_by_obj[0] > target_speed:
+                    if (
+                        speed_reduced_by_obj is None
+                        or speed_reduced_by_obj[0] > target_speed
+                    ):
                         speed_reduced_by_obj = [
                             target_speed,
                             first_actor.type_id,
@@ -967,19 +1356,37 @@ class Expert(ExpertData):
                         ]
 
             elif self.current_active_scenario_type == "HazardAtSideLaneTwoWays":
-                first_actor, last_actor, changed_route, from_index, to_index, path_clear = [
+                (
+                    first_actor,
+                    last_actor,
+                    changed_route,
+                    from_index,
+                    to_index,
+                    path_clear,
+                ) = [
                     CarlaDataProvider.memory[self.current_active_scenario_type][k]
-                    for k in ["first_actor", "last_actor", "changed_route", "from_index", "to_index", "path_clear"]
+                    for k in [
+                        "first_actor",
+                        "last_actor",
+                        "changed_route",
+                        "from_index",
+                        "to_index",
+                        "path_clear",
+                    ]
                 ]
 
-                horizontal_distance = expert_utils.get_horizontal_distance(self.ego_vehicle, first_actor)
+                horizontal_distance = expert_utils.get_horizontal_distance(
+                    self.ego_vehicle, first_actor
+                )
 
                 if (
-                    horizontal_distance < self.config_expert.max_distance_to_process_hazard_at_side_lane_two_ways
+                    horizontal_distance
+                    < self.config_expert.max_distance_to_process_hazard_at_side_lane_two_ways
                     and not changed_route
                 ):
                     to_index = self.privileged_route_planner.get_closest_route_index(
-                        int(self.privileged_route_planner.route_index), last_actor.get_location()
+                        int(self.privileged_route_planner.route_index),
+                        last_actor.get_location(),
                     )
 
                     # Assume the bicycles don't drive too much during the overtaking process
@@ -987,7 +1394,9 @@ class Expert(ExpertData):
                     from_index = int(self.privileged_route_planner.route_index)
 
                     starting_wp = self.route_waypoints[0].get_left_lane()
-                    prev_road_lane_ids = expert_utils.get_previous_road_lane_ids(self.config_expert, starting_wp)
+                    prev_road_lane_ids = expert_utils.get_previous_road_lane_ids(
+                        self.config_expert, starting_wp
+                    )
                     path_clear = self.is_two_ways_overtaking_path_clear(
                         int(from_index),
                         int(to_index),
@@ -997,12 +1406,16 @@ class Expert(ExpertData):
                     )
 
                     if path_clear:
-                        transition_length = self.config_expert.transition_smoothness_distance
+                        transition_length = (
+                            self.config_expert.transition_smoothness_distance
+                        )
                         self.privileged_route_planner.shift_route_smoothly(
                             int(from_index), int(to_index), True, transition_length
                         )
                         changed_route = True
-                        CarlaDataProvider.memory[self.current_active_scenario_type].update(
+                        CarlaDataProvider.memory[
+                            self.current_active_scenario_type
+                        ].update(
                             {
                                 "changed_route": changed_route,
                                 "from_index": int(from_index),
@@ -1017,23 +1430,48 @@ class Expert(ExpertData):
                     if self.privileged_route_planner.route_index >= to_index:
                         CarlaDataProvider.clean_current_active_scenario()
                     # Overtake with max. 50 km/h
-                    target_speed, keep_driving = self.config_expert.default_overtake_speed, True
+                    target_speed, keep_driving = (
+                        self.config_expert.default_overtake_speed,
+                        True,
+                    )
 
             elif self.current_active_scenario_type == "HazardAtSideLane":
-                first_actor, last_actor, changed_first_part_of_route, from_index, to_index = [
+                (
+                    first_actor,
+                    last_actor,
+                    changed_first_part_of_route,
+                    from_index,
+                    to_index,
+                ) = [
                     CarlaDataProvider.memory[self.current_active_scenario_type][k]
-                    for k in ["first_actor", "last_actor", "changed_first_part_of_route", "from_index", "to_index"]
+                    for k in [
+                        "first_actor",
+                        "last_actor",
+                        "changed_first_part_of_route",
+                        "from_index",
+                        "to_index",
+                    ]
                 ]
 
-                horizontal_distance = expert_utils.get_horizontal_distance(self.ego_vehicle, last_actor)
+                horizontal_distance = expert_utils.get_horizontal_distance(
+                    self.ego_vehicle, last_actor
+                )
 
                 if (
-                    horizontal_distance < self.config_expert.max_distance_to_process_hazard_at_side_lane
+                    horizontal_distance
+                    < self.config_expert.max_distance_to_process_hazard_at_side_lane
                     and not changed_first_part_of_route
                 ):
-                    transition_length = self.config_expert.transition_smoothness_distance
-                    from_index, to_index = self.privileged_route_planner.shift_route_around_actors(
-                        first_actor, last_actor, "right", transition_length
+                    transition_length = (
+                        self.config_expert.transition_smoothness_distance
+                    )
+                    LOG.info(
+                        f"[Route Change] HazardAtSideLane: Shifting route right to avoid hazard, distance={horizontal_distance:.1f}m"
+                    )
+                    from_index, to_index = (
+                        self.privileged_route_planner.shift_route_around_actors(
+                            first_actor, last_actor, "right", transition_length
+                        )
                     )
 
                     to_index -= transition_length
@@ -1051,25 +1489,57 @@ class Expert(ExpertData):
                         last_actor, to_index
                     )
                     to_index = to_idx_
-                    CarlaDataProvider.memory[self.current_active_scenario_type]["to_index"] = to_index
+                    CarlaDataProvider.memory[self.current_active_scenario_type][
+                        "to_index"
+                    ] = to_index
                 if self.privileged_route_planner.route_index > to_index:
+                    LOG.info(
+                        "[Scenario Exit] HazardAtSideLane: Passed hazard, cleaning up scenario"
+                    )
                     CarlaDataProvider.clean_current_active_scenario()
 
             elif self.current_active_scenario_type == "YieldToEmergencyVehicle":
                 emergency_veh, changed_route, from_index, to_index, to_left = [
                     CarlaDataProvider.memory[self.current_active_scenario_type][k]
-                    for k in ["emergency_vehicle", "changed_route", "from_index", "to_index", "to_left"]
+                    for k in [
+                        "emergency_vehicle",
+                        "changed_route",
+                        "from_index",
+                        "to_index",
+                        "to_left",
+                    ]
                 ]
 
-                horizontal_distance = expert_utils.get_horizontal_distance(self.ego_vehicle, emergency_veh)
+                horizontal_distance = expert_utils.get_horizontal_distance(
+                    self.ego_vehicle, emergency_veh
+                )
 
-                if horizontal_distance < self.config_expert.default_max_distance_to_process_scenario and not changed_route:
+                if (
+                    horizontal_distance
+                    < self.config_expert.default_max_distance_to_process_scenario
+                    and not changed_route
+                ):
                     # Assume the emergency vehicle doesn't drive more than 20 m during the overtaking process
-                    from_index = self.privileged_route_planner.route_index + 30 * self.config_expert.points_per_meter
-                    to_index = from_index + int(2 * self.config_expert.points_per_meter) * self.config_expert.points_per_meter
+                    from_index = (
+                        self.privileged_route_planner.route_index
+                        + 30 * self.config_expert.points_per_meter
+                    )
+                    to_index = (
+                        from_index
+                        + int(2 * self.config_expert.points_per_meter)
+                        * self.config_expert.points_per_meter
+                    )
 
-                    transition_length = self.config_expert.transition_smoothness_distance
-                    to_left = self.route_waypoints[from_index].lane_change != carla.LaneChange.Right
+                    transition_length = (
+                        self.config_expert.transition_smoothness_distance
+                    )
+                    to_left = (
+                        self.route_waypoints[from_index].lane_change
+                        != carla.LaneChange.Right
+                    )
+                    LOG.info(
+                        f"[Route Change] YieldToEmergencyVehicle: Shifting route {'left' if to_left else 'right'} to yield to emergency vehicle"
+                    )
                     self.privileged_route_planner.shift_route_smoothly(
                         int(from_index), int(to_index), to_left, transition_length
                     )
@@ -1090,13 +1560,28 @@ class Expert(ExpertData):
                         to_left, to_index
                     )
                     to_index = to_idx_
-                    CarlaDataProvider.memory[self.current_active_scenario_type]["to_index"] = to_index
+                    CarlaDataProvider.memory[self.current_active_scenario_type][
+                        "to_index"
+                    ] = to_index
 
                     # Check if the emergency vehicle is in front of the ego vehicle
                     diff = emergency_veh.get_location() - ego_location
-                    dot_res = self.ego_vehicle.get_transform().get_forward_vector().dot(diff)
+                    dot_res = (
+                        self.ego_vehicle.get_transform().get_forward_vector().dot(diff)
+                    )
                     if dot_res > 0:
+                        LOG.info(
+                            "[Scenario Exit] YieldToEmergencyVehicle: Emergency vehicle passed, cleaning up scenario"
+                        )
                         CarlaDataProvider.clean_current_active_scenario()
+                    else:
+                        LOG.info(
+                            f"[Control] YieldToEmergencyVehicle: Setting overtake speed to {self.config_expert.default_overtake_speed * 3.6:.1f} km/h"
+                        )
+                        target_speed, keep_driving = (
+                            self.config_expert.default_overtake_speed,
+                            True,
+                        )
 
         # Negotiate gap
         self.construction_obstacle_two_ways_stuck = False
@@ -1108,17 +1593,23 @@ class Expert(ExpertData):
             if self.speed_limit > 15:
                 speed_constant = 2.75
             max_distance = speed_constant * self.ego_speed + 7
-            obstacle_detection = self._vehicle_obstacle_detected(max_distance=max_distance)
+            obstacle_detection = self._vehicle_obstacle_detected(
+                max_distance=max_distance
+            )
             if obstacle_detection[0]:
                 _, targ_id, dist = obstacle_detection
                 other = self.carla_world.get_actor(targ_id)
 
                 ego_yaw = self.ego_vehicle.get_transform().rotation.yaw
                 other_yaw = other.get_transform().rotation.yaw
-                relative_yaw = abs(common_utils.normalize_angle_degree(other_yaw - ego_yaw))
+                relative_yaw = abs(
+                    common_utils.normalize_angle_degree(other_yaw - ego_yaw)
+                )
 
                 # Only brake if roughly opposing direction (e.g. facing within 45° of us)
-                if relative_yaw > 135 and other.get_velocity().length() > 0.0:  # Only brake if the other vehicle is moving
+                if (
+                    relative_yaw > 135 and other.get_velocity().length() > 0.0
+                ):  # Only brake if the other vehicle is moving
                     self.construction_obstacle_two_ways_stuck = True
                     keep_driving = False
                     target_speed = 0.0
@@ -1134,17 +1625,23 @@ class Expert(ExpertData):
             if self.speed_limit > 15:
                 speed_constant = 2.75
             max_distance = speed_constant * self.ego_speed + 7
-            obstacle_detection = self._vehicle_obstacle_detected(max_distance=max_distance)
+            obstacle_detection = self._vehicle_obstacle_detected(
+                max_distance=max_distance
+            )
             if obstacle_detection[0]:
                 _, targ_id, dist = obstacle_detection
                 other = self.carla_world.get_actor(targ_id)
 
                 ego_yaw = self.ego_vehicle.get_transform().rotation.yaw
                 other_yaw = other.get_transform().rotation.yaw
-                relative_yaw = abs(common_utils.normalize_angle_degree(other_yaw - ego_yaw))
+                relative_yaw = abs(
+                    common_utils.normalize_angle_degree(other_yaw - ego_yaw)
+                )
 
                 # Only brake if roughly opposing direction (e.g. facing within 45° of us)
-                if relative_yaw > 135 and other.get_velocity().length() > 0.0:  # Only brake if the other vehicle is moving
+                if (
+                    relative_yaw > 135 and other.get_velocity().length() > 0.0
+                ):  # Only brake if the other vehicle is moving
                     self.accident_two_ways_stuck = True
                     keep_driving = False
                     target_speed = 0.0
@@ -1160,17 +1657,23 @@ class Expert(ExpertData):
             if self.speed_limit > 15:
                 speed_constant = 2.75
             max_distance = speed_constant * self.ego_speed + 7
-            obstacle_detection = self._vehicle_obstacle_detected(max_distance=max_distance)
+            obstacle_detection = self._vehicle_obstacle_detected(
+                max_distance=max_distance
+            )
             if obstacle_detection[0]:
                 _, targ_id, dist = obstacle_detection
                 other = self.carla_world.get_actor(targ_id)
 
                 ego_yaw = self.ego_vehicle.get_transform().rotation.yaw
                 other_yaw = other.get_transform().rotation.yaw
-                relative_yaw = abs(common_utils.normalize_angle_degree(other_yaw - ego_yaw))
+                relative_yaw = abs(
+                    common_utils.normalize_angle_degree(other_yaw - ego_yaw)
+                )
 
                 # Only brake if roughly opposing direction (e.g. facing within 45° of us)
-                if relative_yaw > 135 and other.get_velocity().length() > 0.0:  # Only brake if the other vehicle is moving
+                if (
+                    relative_yaw > 135 and other.get_velocity().length() > 0.0
+                ):  # Only brake if the other vehicle is moving
                     self.parked_obstacle_two_ways_stuck = True
                     keep_driving = False
                     target_speed = 0.0
@@ -1186,17 +1689,23 @@ class Expert(ExpertData):
             if self.speed_limit > 15:
                 speed_constant = 2.75
             max_distance = speed_constant * self.ego_speed + 7
-            obstacle_detection = self._vehicle_obstacle_detected(max_distance=max_distance)
+            obstacle_detection = self._vehicle_obstacle_detected(
+                max_distance=max_distance
+            )
             if obstacle_detection[0]:
                 _, targ_id, dist = obstacle_detection
                 other = self.carla_world.get_actor(targ_id)
 
                 ego_yaw = self.ego_vehicle.get_transform().rotation.yaw
                 other_yaw = other.get_transform().rotation.yaw
-                relative_yaw = abs(common_utils.normalize_angle_degree(other_yaw - ego_yaw))
+                relative_yaw = abs(
+                    common_utils.normalize_angle_degree(other_yaw - ego_yaw)
+                )
 
                 # Only brake if roughly opposing direction (e.g. facing within 45° of us)
-                if relative_yaw > 135 and other.get_velocity().length() > 0.0:  # Only brake if the other vehicle is moving
+                if (
+                    relative_yaw > 135 and other.get_velocity().length() > 0.0
+                ):  # Only brake if the other vehicle is moving
                     self.vehicle_opens_door_two_ways_stuck = True
                     keep_driving = False
                     target_speed = 0.0
@@ -1223,46 +1732,84 @@ class Expert(ExpertData):
         predicted_bounding_boxes = {}
 
         # --- Determine how wider we should make dangerous adversarial actors' bounding boxes
-        if self.current_active_scenario_type in [
-            "Accident",
-            "ConstructionObstacle",
-            "ParkedObstacle",
-            "HazardAtSideLane",
-        ]:  # Adversarials drive in same direction, we make their bounding boxes not too wide
-            adversarial_bb_extra_width = max((self.ego_lane_width - self.ego_vehicle.bounding_box.extent.y) / 2, 0) * 0.6
-        elif self.current_active_scenario_type in [
-            "SignalizedJunctionLeftTurn",
-            "NonSignalizedJunctionLeftTurn",
-            "SignalizedJunctionLeftTurnEnterFlow",
-            "NonSignalizedJunctionLeftTurnEnterFlow",
-            "InterurbanActorFlow",
-        ]:  # Adversarials drive in opposite direction, we make their bounding boxes wider
-            adversarial_bb_extra_width = max((self.ego_lane_width - self.ego_vehicle.bounding_box.extent.y) / 2, 0) * 0.8
-        elif self.current_active_scenario_type in [
-            "SignalizedJunctionRightTurn",
-            "NonSignalizedJunctionRightTurn",
-        ]:  # Adversarials drive in same direction, we make their bounding boxes even wider
+        if (
+            self.current_active_scenario_type
+            in [
+                "Accident",
+                "ConstructionObstacle",
+                "ParkedObstacle",
+                "HazardAtSideLane",
+            ]
+        ):  # Adversarials drive in same direction, we make their bounding boxes not too wide
             adversarial_bb_extra_width = (
-                max((self.ego_lane_width - self.ego_vehicle.bounding_box.extent.y) / 2, 0) * 1.75
+                max(
+                    (self.ego_lane_width - self.ego_vehicle.bounding_box.extent.y) / 2,
+                    0,
+                )
+                * 0.6
+            )
+        elif (
+            self.current_active_scenario_type
+            in [
+                "SignalizedJunctionLeftTurn",
+                "NonSignalizedJunctionLeftTurn",
+                "SignalizedJunctionLeftTurnEnterFlow",
+                "NonSignalizedJunctionLeftTurnEnterFlow",
+                "InterurbanActorFlow",
+            ]
+        ):  # Adversarials drive in opposite direction, we make their bounding boxes wider
+            adversarial_bb_extra_width = (
+                max(
+                    (self.ego_lane_width - self.ego_vehicle.bounding_box.extent.y) / 2,
+                    0,
+                )
+                * 0.8
+            )
+        elif (
+            self.current_active_scenario_type
+            in [
+                "SignalizedJunctionRightTurn",
+                "NonSignalizedJunctionRightTurn",
+            ]
+        ):  # Adversarials drive in same direction, we make their bounding boxes even wider
+            adversarial_bb_extra_width = (
+                max(
+                    (self.ego_lane_width - self.ego_vehicle.bounding_box.extent.y) / 2,
+                    0,
+                )
+                * 1.75
             )  # Right turn larger BB to avoid collisions bc of blinding fleck
 
         minimal_adversarial_bb_width = None
         if self.target_lane_width is not None:
-            minimal_adversarial_bb_width = adversarial_bb_extra_width + self.target_lane_width
+            minimal_adversarial_bb_width = (
+                adversarial_bb_extra_width + self.target_lane_width
+            )
 
         # --- Determine which adversarial actors to consider, ignore or make dangerous
-        dangerous_adversarial_actors_ids, safe_adversarial_actors_ids, ignored_adversarial_actors_ids = (
-            self.adversarial_actors_ids
-        )
+        (
+            dangerous_adversarial_actors_ids,
+            safe_adversarial_actors_ids,
+            ignored_adversarial_actors_ids,
+        ) = self.adversarial_actors_ids
 
         # Filter out nearby actors within the detection radius, excluding the ego vehicle
-        nearby_actors = [actor for actor in self.vehicles_inside_bev if actor.id != self.ego_vehicle.id]
+        nearby_actors = [
+            actor
+            for actor in self.vehicles_inside_bev
+            if actor.id != self.ego_vehicle.id
+        ]
 
         # If there are nearby actors, calculate their future bounding boxes
         if nearby_actors:
             # Get the previous control inputs (steering, throttle, brake) for the nearby actors
             previous_controls = [actor.get_control() for actor in nearby_actors]
-            previous_actions = np.array([[control.steer, control.throttle, control.brake] for control in previous_controls])
+            previous_actions = np.array(
+                [
+                    [control.steer, control.throttle, control.brake]
+                    for control in previous_controls
+                ]
+            )
 
             # Get the current velocities, locations, and headings of the nearby actors
             velocities = []
@@ -1272,19 +1819,38 @@ class Expert(ExpertData):
 
             velocities = np.array(velocities)
             locations = np.array(
-                [[actor.get_location().x, actor.get_location().y, actor.get_location().z] for actor in nearby_actors]
+                [
+                    [
+                        actor.get_location().x,
+                        actor.get_location().y,
+                        actor.get_location().z,
+                    ]
+                    for actor in nearby_actors
+                ]
             )
-            headings = np.deg2rad(np.array([actor.get_transform().rotation.yaw for actor in nearby_actors]))
+            headings = np.deg2rad(
+                np.array(
+                    [actor.get_transform().rotation.yaw for actor in nearby_actors]
+                )
+            )
 
             # Initialize arrays to store future locations, headings, and velocities
-            future_locations = np.empty((num_future_frames, len(nearby_actors), 3), dtype="float")
-            future_headings = np.empty((num_future_frames, len(nearby_actors)), dtype="float")
-            future_velocities = np.empty((num_future_frames, len(nearby_actors)), dtype="float")
+            future_locations = np.empty(
+                (num_future_frames, len(nearby_actors), 3), dtype="float"
+            )
+            future_headings = np.empty(
+                (num_future_frames, len(nearby_actors)), dtype="float"
+            )
+            future_velocities = np.empty(
+                (num_future_frames, len(nearby_actors)), dtype="float"
+            )
 
             # Forecast the future locations, headings, and velocities for the nearby actors
             for i in range(num_future_frames):
-                locations, headings, velocities = self.vehicle_model.forecast_other_vehicles(
-                    locations, headings, velocities, previous_actions
+                locations, headings, velocities = (
+                    self.vehicle_model.forecast_other_vehicles(
+                        locations, headings, velocities, previous_actions
+                    )
                 )
                 future_locations[i] = locations.copy()
                 future_velocities[i] = velocities.copy()
@@ -1305,7 +1871,9 @@ class Expert(ExpertData):
                     )
 
                     # Calculate the future rotation of the actor
-                    rotation = carla.Rotation(pitch=0, yaw=future_headings[i, actor_idx], roll=0)
+                    rotation = carla.Rotation(
+                        pitch=0, yaw=future_headings[i, actor_idx], roll=0
+                    )
 
                     # Get the extent (dimensions) of the actor's bounding box
                     extent = actor.bounding_box.extent
@@ -1321,18 +1889,24 @@ class Expert(ExpertData):
                     )
                     length_factor = (
                         self.config_expert.slow_speed_extent_factor_ego
-                        if future_velocities[i, actor_idx] < self.config_expert.extent_other_vehicles_bbs_speed_threshold
+                        if future_velocities[i, actor_idx]
+                        < self.config_expert.extent_other_vehicles_bbs_speed_threshold
                         else max(
                             s,
-                            self.config_expert.high_speed_min_extent_x_other_vehicle * float(i) / float(num_future_frames),
+                            self.config_expert.high_speed_min_extent_x_other_vehicle
+                            * float(i)
+                            / float(num_future_frames),
                         )
                     )
                     width_factor = (
                         self.config_expert.slow_speed_extent_factor_ego
-                        if future_velocities[i, actor_idx] < self.config_expert.extent_other_vehicles_bbs_speed_threshold
+                        if future_velocities[i, actor_idx]
+                        < self.config_expert.extent_other_vehicles_bbs_speed_threshold
                         else max(
                             self.config_expert.high_speed_min_extent_y_other_vehicle,
-                            self.config_expert.high_speed_extent_y_factor_other_vehicle * float(i) / float(num_future_frames),
+                            self.config_expert.high_speed_extent_y_factor_other_vehicle
+                            * float(i)
+                            / float(num_future_frames),
                         )
                     )
 
@@ -1340,7 +1914,9 @@ class Expert(ExpertData):
                         if actor.type_id in constants.BIKER_MESHES:
                             length_factor = 4.0
                             width_factor = 10.0
-                    elif self.current_active_scenario_type in ["NonSignalizedJunctionRightTurn"]:
+                    elif self.current_active_scenario_type in [
+                        "NonSignalizedJunctionRightTurn"
+                    ]:
                         if actor.id in dangerous_adversarial_actors_ids:
                             length_factor = 1.5
                             width_factor = minimal_adversarial_bb_width / (extent.y * 2)
@@ -1350,7 +1926,9 @@ class Expert(ExpertData):
                         elif actor.id in ignored_adversarial_actors_ids:
                             length_factor = 0
                             width_factor = 0
-                    elif self.current_active_scenario_type in ["SignalizedJunctionRightTurn"]:
+                    elif self.current_active_scenario_type in [
+                        "SignalizedJunctionRightTurn"
+                    ]:
                         if actor.id in dangerous_adversarial_actors_ids:
                             length_factor = 1.6
                             width_factor = minimal_adversarial_bb_width / (extent.y * 2)
@@ -1437,7 +2015,10 @@ class Expert(ExpertData):
                 )
 
                 # Update the object causing the most speed reduction
-                if speed_reduced_by_obj is None or speed_reduced_by_obj[0] > target_speed_wrt_leading_vehicle:
+                if (
+                    speed_reduced_by_obj is None
+                    or speed_reduced_by_obj[0] > target_speed_wrt_leading_vehicle
+                ):
                     speed_reduced_by_obj = [
                         target_speed_wrt_leading_vehicle,
                         vehicle.type_id,
@@ -1448,11 +2029,16 @@ class Expert(ExpertData):
             if self.config_expert.visualize_bounding_boxes:
                 for vehicle_id in predicted_bounding_boxes.keys():
                     # check if vehicle is in front of the ego vehicle
-                    if vehicle_id in self.leading_vehicle_ids and not self.near_lane_change:
+                    if (
+                        vehicle_id in self.leading_vehicle_ids
+                        and not self.near_lane_change
+                    ):
                         vehicle = self.carla_world.get_actor(vehicle_id)
                         extent = vehicle.bounding_box.extent
                         bb = carla.BoundingBox(vehicle.get_location(), extent)
-                        bb.rotation = carla.Rotation(pitch=0, yaw=vehicle.get_transform().rotation.yaw, roll=0)
+                        bb.rotation = carla.Rotation(
+                            pitch=0, yaw=vehicle.get_transform().rotation.yaw, roll=0
+                        )
                         self.carla_world.debug.draw_box(
                             box=bb,
                             rotation=bb.rotation,
@@ -1464,7 +2050,9 @@ class Expert(ExpertData):
                         vehicle = self.carla_world.get_actor(vehicle_id)
                         extent = vehicle.bounding_box.extent
                         bb = carla.BoundingBox(vehicle.get_location(), extent)
-                        bb.rotation = carla.Rotation(pitch=0, yaw=vehicle.get_transform().rotation.yaw, roll=0)
+                        bb.rotation = carla.Rotation(
+                            pitch=0, yaw=vehicle.get_transform().rotation.yaw, roll=0
+                        )
                         self.carla_world.debug.draw_box(
                             box=bb,
                             rotation=bb.rotation,
@@ -1517,18 +2105,28 @@ class Expert(ExpertData):
                 # Skip leading and rear vehicles if not near a lane change
                 if vehicle_id in self.leading_vehicle_ids and not self.near_lane_change:
                     continue
-                elif vehicle_id in self.trailing_vehicle_ids and not self.near_lane_change:
+                elif (
+                    vehicle_id in self.trailing_vehicle_ids
+                    and not self.near_lane_change
+                ):
                     continue
                 else:
                     # Check if the ego bounding box intersects with the predicted bounding box of the actor
-                    intersects_with_ego = expert_utils.check_obb_intersection(ego_bounding_box, bounding_boxes[i])
+                    intersects_with_ego = expert_utils.check_obb_intersection(
+                        ego_bounding_box, bounding_boxes[i]
+                    )
 
                     if intersects_with_ego:
                         blocking_actor = self.carla_world.get_actor(vehicle_id)
                         # Handle the case when the blocking actor is a bicycle
-                        if "base_type" in blocking_actor.attributes and blocking_actor.attributes["base_type"] == "bicycle":
+                        if (
+                            "base_type" in blocking_actor.attributes
+                            and blocking_actor.attributes["base_type"] == "bicycle"
+                        ):
                             other_speed = blocking_actor.get_velocity().length()
-                            distance_to_actor = ego_vehicle_location.distance(blocking_actor.get_location())
+                            distance_to_actor = ego_vehicle_location.distance(
+                                blocking_actor.get_location()
+                            )
 
                             # Compute the target speed for bicycles using the IDM
                             target_speed_bicycle = min(
@@ -1536,7 +2134,8 @@ class Expert(ExpertData):
                                 expert_utils.compute_target_speed_idm(
                                     config=self.config_expert,
                                     desired_speed=initial_target_speed,
-                                    leading_actor_length=blocking_actor.bounding_box.extent.x * 2,
+                                    leading_actor_length=blocking_actor.bounding_box.extent.x
+                                    * 2,
                                     ego_speed=self.ego_speed,
                                     leading_actor_speed=other_speed,
                                     distance_to_leading_actor=distance_to_actor,
@@ -1546,7 +2145,10 @@ class Expert(ExpertData):
                             )
 
                             # Update the object causing the most speed reduction
-                            if speed_reduced_by_obj is None or speed_reduced_by_obj[0] > target_speed_bicycle:
+                            if (
+                                speed_reduced_by_obj is None
+                                or speed_reduced_by_obj[0] > target_speed_bicycle
+                            ):
                                 speed_reduced_by_obj = [
                                     target_speed_bicycle,
                                     blocking_actor.type_id,
@@ -1559,11 +2161,18 @@ class Expert(ExpertData):
                             self.vehicle_hazard = True  # Set the vehicle hazard flag
                             self.vehicle_affecting_id = vehicle_id  # Store the ID of the vehicle causing the hazard
                             color = hazard_color  # Change the following colors from green to red (no hazard to hazard)
-                            target_speed_vehicle = 0.0  # Set the target speed for vehicles to zero
-                            distance_to_actor = blocking_actor.get_location().distance(ego_vehicle_location)
+                            target_speed_vehicle = (
+                                0.0  # Set the target speed for vehicles to zero
+                            )
+                            distance_to_actor = blocking_actor.get_location().distance(
+                                ego_vehicle_location
+                            )
 
                             # Update the object causing the most speed reduction
-                            if speed_reduced_by_obj is None or speed_reduced_by_obj[0] > target_speed_vehicle:
+                            if (
+                                speed_reduced_by_obj is None
+                                or speed_reduced_by_obj[0] > target_speed_vehicle
+                            ):
                                 speed_reduced_by_obj = [
                                     target_speed_vehicle,
                                     blocking_actor.type_id,
@@ -1572,11 +2181,17 @@ class Expert(ExpertData):
                                 ]
 
             # Iterate over nearby pedestrians and check for intersections with the ego bounding box
-            for pedestrian_bb, pedestrian_id in zip(nearby_walkers, nearby_walkers_ids, strict=False):
-                if expert_utils.check_obb_intersection(ego_bounding_box, pedestrian_bb[i]):
+            for pedestrian_bb, pedestrian_id in zip(
+                nearby_walkers, nearby_walkers_ids, strict=False
+            ):
+                if expert_utils.check_obb_intersection(
+                    ego_bounding_box, pedestrian_bb[i]
+                ):
                     color = hazard_color
                     blocking_actor = self.carla_world.get_actor(pedestrian_id)
-                    distance_to_actor = ego_vehicle_location.distance(blocking_actor.get_location())
+                    distance_to_actor = ego_vehicle_location.distance(
+                        blocking_actor.get_location()
+                    )
 
                     # Compute the target speed for pedestrians using the IDM
                     target_speed_pedestrian = min(
@@ -1584,7 +2199,8 @@ class Expert(ExpertData):
                         expert_utils.compute_target_speed_idm(
                             config=self.config_expert,
                             desired_speed=initial_target_speed,
-                            leading_actor_length=0.5 + self.ego_vehicle.bounding_box.extent.x,
+                            leading_actor_length=0.5
+                            + self.ego_vehicle.bounding_box.extent.x,
                             ego_speed=self.ego_speed,
                             leading_actor_speed=0.0,
                             distance_to_leading_actor=distance_to_actor,
@@ -1594,7 +2210,10 @@ class Expert(ExpertData):
                     )
 
                     # Update the object causing the most speed reduction
-                    if speed_reduced_by_obj is None or speed_reduced_by_obj[0] > target_speed_pedestrian:
+                    if (
+                        speed_reduced_by_obj is None
+                        or speed_reduced_by_obj[0] > target_speed_pedestrian
+                    ):
                         speed_reduced_by_obj = [
                             target_speed_pedestrian,
                             blocking_actor.type_id,
@@ -1609,10 +2228,17 @@ class Expert(ExpertData):
                     color=color,
                     life_time=self.config_expert.draw_life_time,
                 )
-        return float(target_speed_bicycle), float(target_speed_pedestrian), float(target_speed_vehicle), speed_reduced_by_obj
+        return (
+            float(target_speed_bicycle),
+            float(target_speed_pedestrian),
+            float(target_speed_vehicle),
+            speed_reduced_by_obj,
+        )
 
     @beartype
-    def forecast_ego_agent(self, num_future_frames: int, initial_target_speed: float) -> list:
+    def forecast_ego_agent(
+        self, num_future_frames: int, initial_target_speed: float
+    ) -> list:
         """
         Forecast the future states of the ego agent using the kinematic bicycle model and assume their is no hazard to
         check subsequently whether the ego vehicle would collide.
@@ -1628,13 +2254,23 @@ class Expert(ExpertData):
         self.privileged_route_planner.save()
 
         # Initialize the initial state without braking
-        location = np.array([self.ego_transform.location.x, self.ego_transform.location.y, self.ego_transform.location.z])
+        location = np.array(
+            [
+                self.ego_transform.location.x,
+                self.ego_transform.location.y,
+                self.ego_transform.location.z,
+            ]
+        )
         heading_angle = np.array([np.deg2rad(self.ego_transform.rotation.yaw)])
         speed = np.array([self.ego_speed])
 
         # Calculate the throttle command based on the target speed and current speed
-        throttle = self._longitudinal_controller.get_throttle_extrapolation(initial_target_speed, self.ego_speed)
-        steering = self._turn_controller.step(self.route_waypoints_np, speed, location, heading_angle.item())
+        throttle = self._longitudinal_controller.get_throttle_extrapolation(
+            initial_target_speed, self.ego_speed
+        )
+        steering = self._turn_controller.step(
+            self.route_waypoints_np, speed, location, heading_angle.item()
+        )
         action = np.array([steering, throttle, 0.0]).flatten()
 
         future_bounding_boxes = []
@@ -1646,9 +2282,15 @@ class Expert(ExpertData):
             )
 
             # Update the route and extrapolate steering and throttle commands
-            extrapolated_route, _, _, _, _, _, _ = self.privileged_route_planner.run_step(location)
-            steering = self._turn_controller.step(extrapolated_route, speed, location, heading_angle.item())
-            throttle = self._longitudinal_controller.get_throttle_extrapolation(initial_target_speed, speed)
+            extrapolated_route, _, _, _, _, _, _ = (
+                self.privileged_route_planner.run_step(location)
+            )
+            steering = self._turn_controller.step(
+                extrapolated_route, speed, location, heading_angle.item()
+            )
+            throttle = self._longitudinal_controller.get_throttle_extrapolation(
+                initial_target_speed, speed
+            )
             action = np.array([steering, throttle, 0.0]).flatten()
 
             heading_angle_degrees = np.rad2deg(heading_angle).item()
@@ -1670,10 +2312,16 @@ class Expert(ExpertData):
                 else self.config_expert.high_speed_extent_factor_ego_y
             )
 
-            transform = carla.Transform(carla.Location(x=location[0].item(), y=location[1].item(), z=location[2].item()))
+            transform = carla.Transform(
+                carla.Location(
+                    x=location[0].item(), y=location[1].item(), z=location[2].item()
+                )
+            )
 
             ego_bounding_box = carla.BoundingBox(transform.location, extent)
-            ego_bounding_box.rotation = carla.Rotation(pitch=0, yaw=heading_angle_degrees, roll=0)
+            ego_bounding_box.rotation = carla.Rotation(
+                pitch=0, yaw=heading_angle_degrees, roll=0
+            )
 
             future_bounding_boxes.append(ego_bounding_box)
 
@@ -1683,7 +2331,9 @@ class Expert(ExpertData):
         return future_bounding_boxes
 
     @beartype
-    def forecast_walkers(self, number_of_future_frames: int) -> tuple[list, list]:  # -> tuple[list, list]:
+    def forecast_walkers(
+        self, number_of_future_frames: int
+    ) -> tuple[list, list]:  # -> tuple[list, list]:
         """
         Forecast the future locations of pedestrians in the vicinity of the ego vehicle assuming they
         keep their velocity and direction
@@ -1707,13 +2357,24 @@ class Expert(ExpertData):
 
         # Extract pedestrian locations, speeds, and directions
         pedestrian_locations = np.array(
-            [[ped.get_location().x, ped.get_location().y, ped.get_location().z] for ped in pedestrians]
+            [
+                [ped.get_location().x, ped.get_location().y, ped.get_location().z]
+                for ped in pedestrians
+            ]
         )
-        pedestrian_speeds = np.array([ped.get_velocity().length() for ped in pedestrians])
-        pedestrian_speeds = np.maximum(pedestrian_speeds, self.config_expert.min_walker_speed)
+        pedestrian_speeds = np.array(
+            [ped.get_velocity().length() for ped in pedestrians]
+        )
+        pedestrian_speeds = np.maximum(
+            pedestrian_speeds, self.config_expert.min_walker_speed
+        )
         pedestrian_directions = np.array(
             [
-                [ped.get_control().direction.x, ped.get_control().direction.y, ped.get_control().direction.z]
+                [
+                    ped.get_control().direction.x,
+                    ped.get_control().direction.y,
+                    ped.get_control().direction.z,
+                ]
                 for ped in pedestrians
             ]
         )
@@ -1736,8 +2397,12 @@ class Expert(ExpertData):
                 roll=bb.rotation.roll + transform.rotation.roll,
             )
             extent = bb.extent
-            extent.x = max(self.config_expert.pedestrian_minimum_extent, extent.x)  # Ensure a minimum width
-            extent.y = max(self.config_expert.pedestrian_minimum_extent, extent.y)  # Ensure a minimum length
+            extent.x = max(
+                self.config_expert.pedestrian_minimum_extent, extent.x
+            )  # Ensure a minimum width
+            extent.y = max(
+                self.config_expert.pedestrian_minimum_extent, extent.y
+            )  # Ensure a minimum length
 
             pedestrian_future_bboxes = []
             for j in range(number_of_future_frames):
@@ -1772,7 +2437,11 @@ class Expert(ExpertData):
 
         self.close_traffic_lights.clear()
 
-        for traffic_light, traffic_light_center, traffic_light_waypoints in self.list_traffic_lights:
+        for (
+            traffic_light,
+            traffic_light_center,
+            traffic_light_waypoints,
+        ) in self.list_traffic_lights:
             center_loc = carla.Location(traffic_light_center)
             if center_loc.distance(self.ego_location) > self.config_expert.light_radius:
                 continue
@@ -1780,29 +2449,48 @@ class Expert(ExpertData):
             for wp in traffic_light_waypoints:
                 # * 0.9 to make the box slightly smaller than the street to prevent overlapping boxes.
                 length_bounding_box = carla.Vector3D(
-                    (wp.lane_width / 2.0) * 0.9, traffic_light.trigger_volume.extent.y, traffic_light.trigger_volume.extent.z
+                    (wp.lane_width / 2.0) * 0.9,
+                    traffic_light.trigger_volume.extent.y,
+                    traffic_light.trigger_volume.extent.z,
                 )
                 length_bounding_box = carla.Vector3D(1.5, 1.5, 0.5)
 
                 wp_location = wp.transform
                 traffic_light_location = traffic_light.get_transform()
                 traffic_light_pos_on_street = common_utils.get_relative_transform(
-                    ego_matrix=np.array(wp_location.get_matrix()), vehicle_matrix=np.array(traffic_light_location.get_matrix())
+                    ego_matrix=np.array(wp_location.get_matrix()),
+                    vehicle_matrix=np.array(traffic_light_location.get_matrix()),
                 )
                 traffic_light_bb_location = carla.Location(
                     x=wp_location.location.x,
                     y=wp_location.location.y,
-                    z=wp_location.location.z + traffic_light_pos_on_street[-1],  # z of traffic light is relative to street
+                    z=wp_location.location.z
+                    + traffic_light_pos_on_street[
+                        -1
+                    ],  # z of traffic light is relative to street
                 )
-                bounding_box = carla.BoundingBox(traffic_light_bb_location, length_bounding_box)
+                bounding_box = carla.BoundingBox(
+                    traffic_light_bb_location, length_bounding_box
+                )
 
                 global_rot = traffic_light.get_transform().rotation
-                bounding_box.rotation = carla.Rotation(pitch=global_rot.pitch, yaw=global_rot.yaw, roll=global_rot.roll)
+                bounding_box.rotation = carla.Rotation(
+                    pitch=global_rot.pitch, yaw=global_rot.yaw, roll=global_rot.roll
+                )
 
-                affects_ego = self.next_traffic_light is not None and traffic_light.id == self.next_traffic_light.id
+                affects_ego = (
+                    self.next_traffic_light is not None
+                    and traffic_light.id == self.next_traffic_light.id
+                )
 
                 self.close_traffic_lights.append(
-                    [traffic_light, bounding_box, traffic_light.state, traffic_light.id, affects_ego]
+                    [
+                        traffic_light,
+                        bounding_box,
+                        traffic_light.state,
+                        traffic_light.id,
+                        affects_ego,
+                    ]
                 )
 
                 self.visualize_traffic_lights(traffic_light, wp, bounding_box)
@@ -1820,27 +2508,44 @@ class Expert(ExpertData):
                 self.next_traffic_light.id
             ]  # Red light bounding box of the traffic light projected to ego road, doesn't have to be on same lane as ego
             if next_traffic_light_bb is not None:
-                distance_ego_to_traffic_light_bb = next_traffic_light_bb["position"][0]  # Longitudinal distance
+                distance_ego_to_traffic_light_bb = next_traffic_light_bb["position"][
+                    0
+                ]  # Longitudinal distance
 
-                if next_traffic_light_bb["is_over_head_traffic_light"]:  # Overhead traffic light, must stand much further
+                if next_traffic_light_bb[
+                    "is_over_head_traffic_light"
+                ]:  # Overhead traffic light, must stand much further
                     distance_to_traffic_light_stop_point = max(
-                        distance_ego_to_traffic_light_bb - self.config_expert.idm_overhead_red_light_minimum_distance, 0
+                        distance_ego_to_traffic_light_bb
+                        - self.config_expert.idm_overhead_red_light_minimum_distance,
+                        0,
                     )
                     self.over_head_traffic_light = True
-                elif next_traffic_light_bb["is_europe_traffic_light"]:  # Overhead traffic light, must stand much further
+                elif next_traffic_light_bb[
+                    "is_europe_traffic_light"
+                ]:  # Overhead traffic light, must stand much further
                     distance_to_traffic_light_stop_point = max(
-                        distance_ego_to_traffic_light_bb - self.config_expert.idm_europe_red_light_minimum_distance, 0
+                        distance_ego_to_traffic_light_bb
+                        - self.config_expert.idm_europe_red_light_minimum_distance,
+                        0,
                     )
                     self.europe_traffic_light = True
                 else:  # Traffic light is on other side of intersection, we can stop normally
-                    distance_to_traffic_light_stop_point = distance_ego_to_traffic_light_bb
+                    distance_to_traffic_light_stop_point = (
+                        distance_ego_to_traffic_light_bb
+                    )
             else:
-                LOG.info("Warning: Could not find traffic light bounding box, using default distance to stop point.")
+                LOG.info(
+                    "Warning: Could not find traffic light bounding box, using default distance to stop point."
+                )
 
         if self.next_traffic_light is not None:
             CarlaDataProvider.memory["next_traffic_light"] = self.next_traffic_light
         # If green light, just skip
-        if self.next_traffic_light is None or self.next_traffic_light.state == carla.TrafficLightState.Green:
+        if (
+            self.next_traffic_light is None
+            or self.next_traffic_light.state == carla.TrafficLightState.Green
+        ):
             # No traffic light or green light, continue with the current target speed
             return target_speed
 
@@ -1875,21 +2580,33 @@ from {target_speed:.2f} to {new_target_speed:.2f}"""
             The adjusted target speed for the ego vehicle.
         """
         self.close_stop_signs.clear()
-        stop_signs = self.get_nearby_object(self.actors.filter("*traffic.stop*"), self.config_expert.light_radius)
+        stop_signs = self.get_nearby_object(
+            self.actors.filter("*traffic.stop*"), self.config_expert.light_radius
+        )
 
         for stop_sign in stop_signs:
-            center_bb_stop_sign = stop_sign.get_transform().transform(stop_sign.trigger_volume.location)
+            center_bb_stop_sign = stop_sign.get_transform().transform(
+                stop_sign.trigger_volume.location
+            )
             stop_sign_extent = carla.Vector3D(1.5, 1.5, 0.5)
-            bounding_box_stop_sign = carla.BoundingBox(center_bb_stop_sign, stop_sign_extent)
+            bounding_box_stop_sign = carla.BoundingBox(
+                center_bb_stop_sign, stop_sign_extent
+            )
             rotation_stop_sign = stop_sign.get_transform().rotation
             bounding_box_stop_sign.rotation = carla.Rotation(
-                pitch=rotation_stop_sign.pitch, yaw=rotation_stop_sign.yaw, roll=rotation_stop_sign.roll
+                pitch=rotation_stop_sign.pitch,
+                yaw=rotation_stop_sign.yaw,
+                roll=rotation_stop_sign.roll,
             )
 
             affects_ego = (
-                self.next_stop_sign is not None and self.next_stop_sign.id == stop_sign.id and not self.cleared_stop_sign
+                self.next_stop_sign is not None
+                and self.next_stop_sign.id == stop_sign.id
+                and not self.cleared_stop_sign
             )
-            self.close_stop_signs.append([bounding_box_stop_sign, stop_sign.id, affects_ego])
+            self.close_stop_signs.append(
+                [bounding_box_stop_sign, stop_sign.id, affects_ego]
+            )
 
             self.visualize_stop_signs(bounding_box_stop_sign, affects_ego)
 
@@ -1910,7 +2627,11 @@ from {target_speed:.2f} to {new_target_speed:.2f}"""
             self.waiting_ticks_at_stop_sign = 0
         else:
             # Set the stop sign flag if we are closer than 3m and speed is low enough
-            if self.ego_speed < 0.1 and distance_to_stop_sign < self.config_expert.clearing_distance_to_stop_sign:
+            if (
+                self.ego_speed < 0.1
+                and distance_to_stop_sign
+                < self.config_expert.clearing_distance_to_stop_sign
+            ):
                 self.waiting_ticks_at_stop_sign += 1
                 if self.waiting_ticks_at_stop_sign > 25:
                     self.cleared_stop_sign = True
@@ -1918,7 +2639,9 @@ from {target_speed:.2f} to {new_target_speed:.2f}"""
                 self.waiting_ticks_at_stop_sign = 0
 
         # Set the distance to stop sign as infinity if the stop sign has been cleared
-        distance_to_stop_sign = np.inf if self.cleared_stop_sign else distance_to_stop_sign
+        distance_to_stop_sign = (
+            np.inf if self.cleared_stop_sign else distance_to_stop_sign
+        )
 
         # If being a sensory agent, we use the more consistent distance to stop sign using bounding box
         if (
@@ -1946,10 +2669,16 @@ from {target_speed:.2f} to {new_target_speed:.2f}"""
 
     @beartype
     def _get_actor_forward_speed(self, actor: carla.Actor) -> float:
-        return self._get_forward_speed(transform=actor.get_transform(), velocity=actor.get_velocity())
+        return self._get_forward_speed(
+            transform=actor.get_transform(), velocity=actor.get_velocity()
+        )
 
     @beartype
-    def _get_forward_speed(self, transform: carla.Transform | None = None, velocity: carla.Vector3D | None = None) -> float:
+    def _get_forward_speed(
+        self,
+        transform: carla.Transform | None = None,
+        velocity: carla.Vector3D | None = None,
+    ) -> float:
         """
         Calculate the forward speed of the vehicle based on its transform and velocity.
 
@@ -2025,8 +2754,12 @@ from {target_speed:.2f} to {new_target_speed:.2f}"""
                     break
 
                 r_vec = wp.transform.get_right_vector()
-                p1 = wp.transform.location + carla.Location(r_ext * r_vec.x, r_ext * r_vec.y)
-                p2 = wp.transform.location + carla.Location(l_ext * r_vec.x, l_ext * r_vec.y)
+                p1 = wp.transform.location + carla.Location(
+                    r_ext * r_vec.x, r_ext * r_vec.y
+                )
+                p2 = wp.transform.location + carla.Location(
+                    l_ext * r_vec.x, l_ext * r_vec.y
+                )
                 route_bb.extend([[p1.x, p1.y, p1.z], [p2.x, p2.y, p2.z]])
 
             # Two points don't create a polygon, nothing to check
@@ -2037,7 +2770,9 @@ from {target_speed:.2f} to {new_target_speed:.2f}"""
 
         ego_transform = self.ego_vehicle.get_transform()
         ego_location = ego_transform.location
-        ego_wpt = self.carla_world_map.get_waypoint(ego_location, lane_type=carla.libcarla.LaneType.Any)
+        ego_wpt = self.carla_world_map.get_waypoint(
+            ego_location, lane_type=carla.libcarla.LaneType.Any
+        )
 
         # Get the right offset
         if ego_wpt.lane_id < 0 and lane_offset != 0:
@@ -2049,7 +2784,10 @@ from {target_speed:.2f} to {new_target_speed:.2f}"""
             self.ego_vehicle.bounding_box.extent.x * ego_transform.get_forward_vector()
         )
 
-        opposite_invasion = abs(self._offset) + self.ego_vehicle.bounding_box.extent.y > ego_wpt.lane_width / 2
+        opposite_invasion = (
+            abs(self._offset) + self.ego_vehicle.bounding_box.extent.y
+            > ego_wpt.lane_width / 2
+        )
         use_bbs = self._use_bbs_detection or opposite_invasion or ego_wpt.is_junction
 
         # Get the route bounding box
@@ -2063,12 +2801,16 @@ from {target_speed:.2f} to {new_target_speed:.2f}"""
             if target_transform.location.distance(ego_location) > max_distance:
                 continue
 
-            target_wpt = self.carla_world_map.get_waypoint(target_transform.location, lane_type=carla.LaneType.Any)
+            target_wpt = self.carla_world_map.get_waypoint(
+                target_transform.location, lane_type=carla.LaneType.Any
+            )
 
             # General approach for junctions and vehicles invading other lanes due to the offset
             if (use_bbs or target_wpt.is_junction) and route_polygon:
                 target_bb = target_vehicle.bounding_box
-                target_vertices = target_bb.get_world_vertices(target_vehicle.get_transform())
+                target_vertices = target_bb.get_world_vertices(
+                    target_vehicle.get_transform()
+                )
                 target_list = [[v.x, v.y, v.z] for v in target_vertices]
                 target_polygon = Polygon(target_list)
 
@@ -2076,16 +2818,28 @@ from {target_speed:.2f} to {new_target_speed:.2f}"""
                     return (
                         True,
                         target_vehicle.id,
-                        float(compute_distance(target_vehicle.get_location(), ego_location)),
+                        float(
+                            compute_distance(
+                                target_vehicle.get_location(), ego_location
+                            )
+                        ),
                     )
 
             # Simplified approach, using only the plan waypoints (similar to TM)
             else:
-                if target_wpt.road_id != ego_wpt.road_id or target_wpt.lane_id != ego_wpt.lane_id + lane_offset:
-                    next_wpt = self._local_planner.get_incoming_waypoint_and_direction(steps=3)[0]
+                if (
+                    target_wpt.road_id != ego_wpt.road_id
+                    or target_wpt.lane_id != ego_wpt.lane_id + lane_offset
+                ):
+                    next_wpt = self._local_planner.get_incoming_waypoint_and_direction(
+                        steps=3
+                    )[0]
                     if not next_wpt:
                         continue
-                    if target_wpt.road_id != next_wpt.road_id or target_wpt.lane_id != next_wpt.lane_id + lane_offset:
+                    if (
+                        target_wpt.road_id != next_wpt.road_id
+                        or target_wpt.lane_id != next_wpt.lane_id + lane_offset
+                    ):
                         continue
 
                 target_forward_vector = target_transform.get_forward_vector()
@@ -2105,14 +2859,22 @@ from {target_speed:.2f} to {new_target_speed:.2f}"""
                     return (
                         True,
                         target_vehicle.id,
-                        float(compute_distance(target_transform.location, ego_transform.location)),
+                        float(
+                            compute_distance(
+                                target_transform.location, ego_transform.location
+                            )
+                        ),
                     )
 
         return False, None, -1.0
 
     @beartype
     def save_meta(
-        self, control: carla.VehicleControl, target_speed: float, tick_data: dict, speed_reduced_by_obj: list | None
+        self,
+        control: carla.VehicleControl,
+        target_speed: float,
+        tick_data: dict,
+        speed_reduced_by_obj: list | None,
     ) -> dict:
         """
         Save the driving data for the current frame.
@@ -2129,38 +2891,61 @@ from {target_speed:.2f} to {new_target_speed:.2f}"""
         frame = self.step // self.config_expert.data_save_freq
 
         # Extract relevant data from inputs
-        previous_target_points = [tp.tolist() for tp in self._command_planner.previous_target_points]
+        previous_target_points = [
+            tp.tolist() for tp in self._command_planner.previous_target_points
+        ]
         previous_commands = [int(i) for i in self._command_planner.previous_commands]
         next_target_points = [tp[0].tolist() for tp in self._command_planner.route]
-        next_commands = [int(self._command_planner.route[i][1]) for i in range(len(self._command_planner.route))]
+        next_commands = [
+            int(self._command_planner.route[i][1])
+            for i in range(len(self._command_planner.route))
+        ]
 
         # Get the remaining route points in the local coordinate frame
         dense_route = []
-        remaining_route = self.remaining_route[: self.config_expert.num_route_points_saved]
+        remaining_route = self.remaining_route[
+            : self.config_expert.num_route_points_saved
+        ]
 
         changed_route = bool(
             (
-                self.privileged_route_planner.route_points[self.privileged_route_planner.route_index]
-                != self.privileged_route_planner.original_route_points[self.privileged_route_planner.route_index]
+                self.privileged_route_planner.route_points[
+                    self.privileged_route_planner.route_index
+                ]
+                != self.privileged_route_planner.original_route_points[
+                    self.privileged_route_planner.route_index
+                ]
             ).any()
         )
         for checkpoint in remaining_route:
             dense_route.append(
                 common_utils.inverse_conversion_2d(
-                    checkpoint[:2], self.ego_location_array[:2], self.ego_orientation_rad
+                    checkpoint[:2],
+                    self.ego_location_array[:2],
+                    self.ego_orientation_rad,
                 ).tolist()
             )
 
         # Extract speed reduction object information
-        speed_reduced_by_obj_type, speed_reduced_by_obj_id, speed_reduced_by_obj_distance = None, None, None
+        (
+            speed_reduced_by_obj_type,
+            speed_reduced_by_obj_id,
+            speed_reduced_by_obj_distance,
+        ) = None, None, None
         if speed_reduced_by_obj is not None:
-            speed_reduced_by_obj_type, speed_reduced_by_obj_id, speed_reduced_by_obj_distance = speed_reduced_by_obj[1:]
+            (
+                speed_reduced_by_obj_type,
+                speed_reduced_by_obj_id,
+                speed_reduced_by_obj_distance,
+            ) = speed_reduced_by_obj[1:]
             # Convert numpy to float so that it can be saved to json.
             if speed_reduced_by_obj_distance is not None:
                 speed_reduced_by_obj_distance = float(speed_reduced_by_obj_distance)
 
         ego_wp: carla.Waypoint = self.carla_world_map.get_waypoint(
-            self.ego_vehicle.get_location(), project_to_road=True, lane_type=carla.libcarla.LaneType.Any
+            self.ego_vehicle.get_location(),
+            project_to_road=True,
+            lane_type=carla.libcarla.LaneType.Any,
         )
         next_wps = expert_utils.wps_next_until_lane_end(ego_wp)
         try:
@@ -2173,7 +2958,9 @@ from {target_speed:.2f} to {new_target_speed:.2f}"""
             distance_to_junction_ego = 0.0
             # get distance to ego vehicle
         elif len(next_lane_wps_ego) > 0 and next_lane_wps_ego[0].is_junction:
-            distance_to_junction_ego = next_lane_wps_ego[0].transform.location.distance(ego_wp.transform.location)
+            distance_to_junction_ego = next_lane_wps_ego[0].transform.location.distance(
+                ego_wp.transform.location
+            )
         else:
             distance_to_junction_ego = None
 
@@ -2189,7 +2976,9 @@ from {target_speed:.2f} to {new_target_speed:.2f}"""
             distance_to_junction_ego = 0.0
             # get distance to ego vehicle
         elif len(next_lane_wps_ego) > 0 and next_lane_wps_ego[0].is_junction:
-            distance_to_junction_ego = next_lane_wps_ego[0].transform.location.distance(ego_wp.transform.location)
+            distance_to_junction_ego = next_lane_wps_ego[0].transform.location.distance(
+                ego_wp.transform.location
+            )
         else:
             distance_to_junction_ego = None
 
@@ -2214,19 +3003,29 @@ from {target_speed:.2f} to {new_target_speed:.2f}"""
         else:
             tl_state = str(tl[0].state)
 
-        privileged_yaw = np.radians(self.ego_vehicle.get_transform().rotation.yaw)  # convert from degrees to radians
-        dangerous_adversarial_actors_ids, safe_adversarial_actors_ids, ignored_adversarial_actors_ids = (
-            self.adversarial_actors_ids
-        )
+        privileged_yaw = np.radians(
+            self.ego_vehicle.get_transform().rotation.yaw
+        )  # convert from degrees to radians
+        (
+            dangerous_adversarial_actors_ids,
+            safe_adversarial_actors_ids,
+            ignored_adversarial_actors_ids,
+        ) = self.adversarial_actors_ids
         data = {
             "num_dangerous_adversarial": len(dangerous_adversarial_actors_ids),
             "num_safe_adversarial": len(safe_adversarial_actors_ids),
             "num_ignored_adversarial": len(ignored_adversarial_actors_ids),
-            "rear_adversarial_id": -1 if self.rear_adversarial_actor is None else self.rear_adversarial_actor.id,
+            "rear_adversarial_id": -1
+            if self.rear_adversarial_actor is None
+            else self.rear_adversarial_actor.id,
             "town": self.town,
-            "privileged_past_positions": np.array(self.privileged_ego_past_positions, dtype=np.float32)[::-1],
+            "privileged_past_positions": np.array(
+                self.privileged_ego_past_positions, dtype=np.float32
+            )[::-1],
             "past_positions": np.array(self.ego_past_positions, dtype=np.float32)[::-1],
-            "past_filtered_state": np.array(self.ego_past_filtered_state, dtype=np.float32)[::-1],
+            "past_filtered_state": np.array(
+                self.ego_past_filtered_state, dtype=np.float32
+            )[::-1],
             "past_speeds": np.array(self.speeds_queue, dtype=np.float32)[::-1],
             "past_yaws": np.array(self.ego_past_yaws, dtype=np.float32)[::-1],
             "speed": tick_data["speed"],
@@ -2258,7 +3057,9 @@ from {target_speed:.2f} to {new_target_speed:.2f}"""
             "brake": bool(control.brake),
             "perturbation_translation": self.perturbation_translation,
             "perturbation_rotation": self.perturbation_rotation,
-            "ego_matrix": np.array(self.ego_vehicle.get_transform().get_matrix(), dtype=np.float32),
+            "ego_matrix": np.array(
+                self.ego_vehicle.get_transform().get_matrix(), dtype=np.float32
+            ),
             "scenario": self.scenario_name,
             "traffic_light_state": tl_state,
             "distance_to_next_junction": self.distance_to_next_junction,
@@ -2357,10 +3158,14 @@ from {target_speed:.2f} to {new_target_speed:.2f}"""
         next_gps_target_points_dict = {}
         next_gps_commands_dict = {}
         for k, v in self.gps_waypoint_planners_dict.items():
-            previous_gps_target_points_dict[k] = [tp.tolist() for tp in v.previous_target_points]
+            previous_gps_target_points_dict[k] = [
+                tp.tolist() for tp in v.previous_target_points
+            ]
             previous_gps_commands_dict[k] = [int(i) for i in v.previous_commands]
             next_gps_target_points_dict[k] = [tp[0].tolist() for tp in v.route]
-            next_gps_commands_dict[k] = [int(v.route[i][1]) for i in range(len(v.route))]
+            next_gps_commands_dict[k] = [
+                int(v.route[i][1]) for i in range(len(v.route))
+            ]
 
         for k, v in previous_gps_target_points_dict.items():
             data[f"previous_gps_target_points_{k}"] = v
@@ -2376,7 +3181,9 @@ from {target_speed:.2f} to {new_target_speed:.2f}"""
         next_target_points_dict = {}
         next_commands_dict = {}
         for k, v in self._command_planners_dict.items():
-            previous_target_points_dict[k] = [tp.tolist() for tp in v.previous_target_points]
+            previous_target_points_dict[k] = [
+                tp.tolist() for tp in v.previous_target_points
+            ]
             previous_commands_dict[k] = [int(i) for i in v.previous_commands]
             next_target_points_dict[k] = [tp[0].tolist() for tp in v.route]
             next_commands_dict[k] = [int(v.route[i][1]) for i in range(len(v.route))]
@@ -2390,7 +3197,6 @@ from {target_speed:.2f} to {new_target_speed:.2f}"""
         for k, v in next_commands_dict.items():
             data[f"next_commands_{k}"] = v
 
-        if not self.config_expert.eval_expert:
-            self.metas.append((self.step, frame, data))
+        self.metas.append((self.step, frame, data))
 
         return data

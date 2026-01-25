@@ -70,7 +70,9 @@ def angle2class(angle: float, num_dir_bins: int) -> tuple[int, float]:
 
 
 @beartype
-def convert_gps_to_carla(gps: npt.NDArray, lat_ref: float, lon_ref: float) -> npt.NDArray:
+def convert_gps_to_carla(
+    gps: npt.NDArray, lat_ref: float, lon_ref: float
+) -> npt.NDArray:
     """
     Converts GPS signal into the CARLA coordinate frame.
 
@@ -87,7 +89,12 @@ def convert_gps_to_carla(gps: npt.NDArray, lat_ref: float, lon_ref: float) -> np
     scale = math.cos(lat_ref * math.pi / 180.0)
     my = math.log(math.tan((lat + 90) * math.pi / 360.0)) * (EARTH_RADIUS_EQUA * scale)
     mx = (lon * (math.pi * EARTH_RADIUS_EQUA * scale)) / 180.0
-    y = scale * EARTH_RADIUS_EQUA * math.log(math.tan((90.0 + lat_ref) * math.pi / 360.0)) - my
+    y = (
+        scale
+        * EARTH_RADIUS_EQUA
+        * math.log(math.tan((90.0 + lat_ref) * math.pi / 360.0))
+        - my
+    )
     x = mx - scale * lon_ref * math.pi * EARTH_RADIUS_EQUA / 180.0
     gps = np.array([x, y, gps[2]])
 
@@ -96,7 +103,8 @@ def convert_gps_to_carla(gps: npt.NDArray, lat_ref: float, lon_ref: float) -> np
 
 @beartype
 def find_gps_ref(
-    global_plan_world_coord: list[tuple[carla.Transform, RoadOption]], global_plan: list[tuple[dict[str, float], RoadOption]]
+    global_plan_world_coord: list[tuple[carla.Transform, RoadOption]],
+    global_plan: list[tuple[dict[str, float], RoadOption]],
 ) -> tuple[float, float]:
     """The CARLA leaderboard does not expose the lat lon reference value of the GPS which make it impossible to use the
     GPS because the scale is not known. In the past this was not an issue since the reference was constant 0.0.
@@ -132,9 +140,13 @@ def find_gps_ref(
                 - math.cos(x * math.pi / 180.0) * y
             )
             eq2 = (
-                math.log(math.tan((lat + 90.0) * math.pi / 360.0)) * earth_radius_equa * math.cos(x * math.pi / 180.0)
+                math.log(math.tan((lat + 90.0) * math.pi / 360.0))
+                * earth_radius_equa
+                * math.cos(x * math.pi / 180.0)
                 + locy
-                - math.cos(x * math.pi / 180.0) * earth_radius_equa * math.log(math.tan((90.0 + x) * math.pi / 360.0))
+                - math.cos(x * math.pi / 180.0)
+                * earth_radius_equa
+                * math.log(math.tan((90.0 + x) * math.pi / 360.0))
             )
             return [eq1, eq2]
 
@@ -148,7 +160,11 @@ def find_gps_ref(
 
 @beartype
 def is_point_in_camera_frustum(
-    x: float | int, y: float | int, config: TrainingConfig, center_x: float | int = 0, center_y: float | int = 0
+    x: float | int,
+    y: float | int,
+    config: TrainingConfig,
+    center_x: float | int = 0,
+    center_y: float | int = 0,
 ) -> bool:
     """Check if a point is within the camera's field of view frustum.
 
@@ -212,7 +228,8 @@ def is_box_in_camera_frustum(box: dict[str, Any], config: TrainingConfig) -> boo
 
 
 def transform_lidar_to_bounding_box(
-    lidar_points: jt.Float[npt.NDArray, "n 3"], bb_in_vehicle_system: jt.Float[npt.NDArray, "5"]
+    lidar_points: jt.Float[npt.NDArray, "n 3"],
+    bb_in_vehicle_system: jt.Float[npt.NDArray, "5"],
 ) -> jt.Float[npt.NDArray, "n 2"]:
     """Transform LiDAR points from ego coordinate system to bounding box local coordinates.
 
@@ -227,7 +244,9 @@ def transform_lidar_to_bounding_box(
     bb_x, bb_y, _, _, bb_yaw = bb_in_vehicle_system[:5]
 
     # Create inverse rotation matrix for yaw
-    rotation_matrix = np.array([[np.cos(bb_yaw), np.sin(bb_yaw)], [-np.sin(bb_yaw), np.cos(bb_yaw)]])
+    rotation_matrix = np.array(
+        [[np.cos(bb_yaw), np.sin(bb_yaw)], [-np.sin(bb_yaw), np.cos(bb_yaw)]]
+    )
 
     # Translate LiDAR points relative to the bounding box center
     translated_points = lidar_points[:, :2] - np.array([bb_x, bb_y])
@@ -324,7 +343,9 @@ def normalize_angle_degree(x: float) -> float:
     return x
 
 
-def euler_deg_to_mat(roll: float, pitch: float, yaw: float) -> jt.Float[npt.NDArray, "3 3"]:
+def euler_deg_to_mat(
+    roll: float, pitch: float, yaw: float
+) -> jt.Float[npt.NDArray, "3 3"]:
     """Convert Euler angles in degrees to rotation matrix.
 
     Computes the 3D rotation matrix from roll, pitch, and yaw angles
@@ -349,7 +370,9 @@ def euler_deg_to_mat(roll: float, pitch: float, yaw: float) -> jt.Float[npt.NDAr
 
 
 def lidar_to_ego_coordinate(
-    lidar_rot: list[float], lidar_pos: list[float], lidar: jt.Float[npt.NDArray, "... 3"]
+    lidar_rot: list[float],
+    lidar_pos: list[float],
+    lidar: jt.Float[npt.NDArray, "... 3"],
 ) -> jt.Float[npt.NDArray, "... 3"]:
     """Convert LiDAR points from sensor frame to ego vehicle coordinate system.
 
@@ -364,12 +387,16 @@ def lidar_to_ego_coordinate(
     rotation_matrix = euler_deg_to_mat(lidar_rot[0], lidar_rot[1], lidar_rot[2])
     translation = np.array(lidar_pos)
     lidar_points = (rotation_matrix @ lidar[1][:, :3].T).T + translation
-    lidar_points[:, 2] = lidar_points[:, 2] - lidar_pos[-1] / 2  # Not sure why we need this :/
+    lidar_points[:, 2] = (
+        lidar_points[:, 2] - lidar_pos[-1] / 2
+    )  # Not sure why we need this :/
     return lidar_points
 
 
 def radar_points_to_ego(
-    raw_radar: jt.Float[npt.NDArray, "n 4"], sensor_pos: list[float], sensor_rot: list[float]
+    raw_radar: jt.Float[npt.NDArray, "n 4"],
+    sensor_pos: list[float],
+    sensor_rot: list[float],
 ) -> jt.Float[npt.NDArray, "n 4"]:
     """Transform radar points from sensor frame to ego vehicle coordinate system.
 
@@ -403,7 +430,9 @@ def radar_points_to_ego(
 
 @beartype
 def align_lidar(
-    lidar: jt.Float[npt.NDArray, "n 3"], translation: jt.Float[npt.NDArray, " 3"], yaw: float
+    lidar: jt.Float[npt.NDArray, "n 3"],
+    translation: jt.Float[npt.NDArray, " 3"],
+    yaw: float,
 ) -> jt.Float[npt.NDArray, "n 3"]:
     """
     Translates and rotates a LiDAR into a new coordinate system.
@@ -430,7 +459,9 @@ def align_lidar(
 
 @beartype
 def inverse_conversion_2d(
-    point: jt.Float[npt.NDArray, " 2"], translation: jt.Float[npt.NDArray, " 2"], yaw: float
+    point: jt.Float[npt.NDArray, " 2"],
+    translation: jt.Float[npt.NDArray, " 2"],
+    yaw: float,
 ) -> jt.Float[npt.NDArray, " 2"]:
     """
     Performs a forward coordinate conversion on a 2D point.
@@ -442,13 +473,17 @@ def inverse_conversion_2d(
     Returns:
         Converted point.
     """
-    rotation_matrix = np.array([[np.cos(yaw), -np.sin(yaw)], [np.sin(yaw), np.cos(yaw)]])
+    rotation_matrix = np.array(
+        [[np.cos(yaw), -np.sin(yaw)], [np.sin(yaw), np.cos(yaw)]]
+    )
     return rotation_matrix.T @ (point - translation)
 
 
 @beartype
 def conversion_2d(
-    point: jt.Float[npt.NDArray, " 2"], translation: jt.Float[npt.NDArray, " 2"], yaw: float
+    point: jt.Float[npt.NDArray, " 2"],
+    translation: jt.Float[npt.NDArray, " 2"],
+    yaw: float,
 ) -> jt.Float[npt.NDArray, " 2"]:
     """
     Performs a forward coordinate conversion on a 2D point
@@ -460,7 +495,9 @@ def conversion_2d(
     Returns:
         Converted point.
     """
-    rotation_matrix = np.array([[np.cos(yaw), -np.sin(yaw)], [np.sin(yaw), np.cos(yaw)]])
+    rotation_matrix = np.array(
+        [[np.cos(yaw), -np.sin(yaw)], [np.sin(yaw), np.cos(yaw)]]
+    )
 
     converted_point = rotation_matrix @ point + translation
     return converted_point
@@ -484,7 +521,9 @@ def preprocess_compass(compass: float) -> float:
 
 
 @beartype
-def get_world_coordinate_2d(ego_transform: carla.Transform, local_location: carla.Location) -> carla.Location:
+def get_world_coordinate_2d(
+    ego_transform: carla.Transform, local_location: carla.Location
+) -> carla.Location:
     """
     Ignore pitch and roll of car to get only 2D position with only yaw.
     """
@@ -504,7 +543,9 @@ def get_world_coordinate_2d(ego_transform: carla.Transform, local_location: carl
 
 
 @beartype
-def get_relative_transform(ego_matrix: npt.NDArray, vehicle_matrix: npt.NDArray) -> npt.NDArray:
+def get_relative_transform(
+    ego_matrix: npt.NDArray, vehicle_matrix: npt.NDArray
+) -> npt.NDArray:
     """Returns the position of the vehicle matrix in the ego coordinate system.
 
     Args:
@@ -532,7 +573,9 @@ def extract_yaw_from_matrix(matrix: jt.Float[npt.NDArray, "4 4"]) -> float:
     return yaw
 
 
-def encode_depth_8bit(depth: jt.Float[npt.NDArray, "h w"]) -> jt.UInt8[npt.NDArray, "h w"]:
+def encode_depth_8bit(
+    depth: jt.Float[npt.NDArray, "h w"],
+) -> jt.UInt8[npt.NDArray, "h w"]:
     """Encode a depth map into 8-bit format for visualization.
 
     Clips depth values and scales them to fit within 0-255 range.
@@ -548,7 +591,9 @@ def encode_depth_8bit(depth: jt.Float[npt.NDArray, "h w"]) -> jt.UInt8[npt.NDArr
     return depth.astype(np.uint8)
 
 
-def encode_depth_16bit(depth: jt.Float[npt.NDArray, "h w"]) -> jt.UInt16[npt.NDArray, "h w"]:
+def encode_depth_16bit(
+    depth: jt.Float[npt.NDArray, "h w"],
+) -> jt.UInt16[npt.NDArray, "h w"]:
     """Encode a depth map into 16-bit format for visualization.
 
     Clips depth values and scales them to fit within 0-65535 range.
@@ -564,7 +609,9 @@ def encode_depth_16bit(depth: jt.Float[npt.NDArray, "h w"]) -> jt.UInt16[npt.NDA
     return depth.astype(np.uint16)
 
 
-def decode_depth_16bit(encoded_depth: jt.UInt16[npt.NDArray, "h w"]) -> jt.Float[npt.NDArray, "h w"]:
+def decode_depth_16bit(
+    encoded_depth: jt.UInt16[npt.NDArray, "h w"],
+) -> jt.Float[npt.NDArray, "h w"]:
     """Decode a 16-bit encoded depth map back to original depth values.
 
     Args:
@@ -574,11 +621,15 @@ def decode_depth_16bit(encoded_depth: jt.UInt16[npt.NDArray, "h w"]) -> jt.Float
         Decoded depth values in meters.
     """
     encoded_depth = encoded_depth.astype(np.float32)
-    decoded_depth = (encoded_depth / (2**16 - 1)) * 96  # Scale back to original depth range
+    decoded_depth = (
+        encoded_depth / (2**16 - 1)
+    ) * 96  # Scale back to original depth range
     return decoded_depth
 
 
-def decode_depth_8bit(encoded_depth: jt.UInt8[npt.NDArray, "h w"]) -> jt.Float[npt.NDArray, "h w"]:
+def decode_depth_8bit(
+    encoded_depth: jt.UInt8[npt.NDArray, "h w"],
+) -> jt.Float[npt.NDArray, "h w"]:
     """Decode an 8-bit encoded depth map back to original depth values.
 
     Args:
@@ -592,7 +643,9 @@ def decode_depth_8bit(encoded_depth: jt.UInt8[npt.NDArray, "h w"]) -> jt.Float[n
     return decoded_depth
 
 
-def decode_depth(encoded_depth: jt.Integer[npt.NDArray, "h w"]) -> jt.Float[npt.NDArray, "h w"]:
+def decode_depth(
+    encoded_depth: jt.Integer[npt.NDArray, "h w"],
+) -> jt.Float[npt.NDArray, "h w"]:
     """Decode a depth map from 8-bit or 16-bit format back to original depth values.
 
     Automatically detects the input format and applies the appropriate decoding.
@@ -611,11 +664,15 @@ def decode_depth(encoded_depth: jt.Integer[npt.NDArray, "h w"]) -> jt.Float[npt.
     elif encoded_depth.dtype == np.uint16:
         return decode_depth_16bit(encoded_depth)
     else:
-        raise ValueError("Unsupported data type for encoded depth. Expected uint8 or uint16.")
+        raise ValueError(
+            "Unsupported data type for encoded depth. Expected uint8 or uint16."
+        )
 
 
 @beartype
-def waypoints_curvature(waypoints: jt.Float[torch.Tensor, "n 2"] | jt.Float[npt.NDArray, "n 2"]) -> float:
+def waypoints_curvature(
+    waypoints: jt.Float[torch.Tensor, "n 2"] | jt.Float[npt.NDArray, "n 2"],
+) -> float:
     """Compute average absolute curvature of a waypoint trajectory.
 
     Args:
@@ -626,7 +683,9 @@ def waypoints_curvature(waypoints: jt.Float[torch.Tensor, "n 2"] | jt.Float[npt.
     """
     if isinstance(waypoints, np.ndarray):
         waypoints = torch.from_numpy(waypoints)
-    angles = torch.atan2(waypoints[:, 1], waypoints[:, 0])  # Get angles in range [-pi, pi]
+    angles = torch.atan2(
+        waypoints[:, 1], waypoints[:, 0]
+    )  # Get angles in range [-pi, pi]
     return float(torch.mean(torch.abs(angles)))  # Compute average absolute angle
 
 
@@ -639,12 +698,16 @@ def waypoints_signed_curvature(waypoints: torch.Tensor) -> torch.Tensor:
     Returns:
         Average signed curvature as scalar tensor.
     """
-    angles = torch.atan2(waypoints[:, 1], waypoints[:, 0])  # Get angles in range [-pi, pi]
+    angles = torch.atan2(
+        waypoints[:, 1], waypoints[:, 0]
+    )  # Get angles in range [-pi, pi]
     return torch.mean(angles)  # Compute average angle
 
 
 @beartype
-def average_displacement_error(predictions: torch.Tensor, observed_traj: torch.Tensor) -> float:
+def average_displacement_error(
+    predictions: torch.Tensor, observed_traj: torch.Tensor
+) -> float:
     """Compute L2 distance between proposed trajectories and ground truth.
 
     Args:
@@ -658,11 +721,15 @@ def average_displacement_error(predictions: torch.Tensor, observed_traj: torch.T
         predictions = predictions.detach().cpu().float().numpy()
     if isinstance(observed_traj, torch.Tensor):
         observed_traj = observed_traj.detach().cpu().float().numpy()
-    return float(np.linalg.norm(predictions - observed_traj, axis=-1).mean(axis=-1).mean())
+    return float(
+        np.linalg.norm(predictions - observed_traj, axis=-1).mean(axis=-1).mean()
+    )
 
 
 @beartype
-def final_displacement_error(predictions: torch.Tensor, observed_traj: torch.Tensor) -> float:
+def final_displacement_error(
+    predictions: torch.Tensor, observed_traj: torch.Tensor
+) -> float:
     """Compute final L2 distance between proposed trajectories and ground truth.
 
     Args:
@@ -676,7 +743,9 @@ def final_displacement_error(predictions: torch.Tensor, observed_traj: torch.Ten
         predictions = predictions.detach().cpu().float().numpy()
     if isinstance(observed_traj, torch.Tensor):
         observed_traj = observed_traj.detach().cpu().float().numpy()
-    return float(np.linalg.norm(predictions[:, -1] - observed_traj[:, -1], axis=-1).mean())
+    return float(
+        np.linalg.norm(predictions[:, -1] - observed_traj[:, -1], axis=-1).mean()
+    )
 
 
 @beartype

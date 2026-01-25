@@ -189,7 +189,8 @@ class SignalizedJunctionRightTurn(JunctionRightTurn):
                 self._init_tl_dict[tl] = carla.TrafficLightState.Red
 
         if add_scenario_type:
-            CarlaDataProvider.active_scenarios.append((type(self).__name__, [None, None, None, False, 1e9, 1e9, False], id(self))) # added
+            from srunner.scenariomanager.carla_data_provider import ActiveScenario
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
             CarlaDataProvider.memory[
                 type(self).__name__
             ].update({
@@ -252,7 +253,8 @@ class NonSignalizedJunctionRightTurn(JunctionRightTurn):
         """
         super()._initialize_actors(config)
         if add_scenario_type:
-            CarlaDataProvider.active_scenarios.append((type(self).__name__, [None, None, None, False, 1e9, 1e9, False], id(self))) # added
+            from srunner.scenariomanager.carla_data_provider import ActiveScenario
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
             CarlaDataProvider.memory[
                 type(self).__name__
             ].update({

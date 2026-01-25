@@ -12,16 +12,18 @@ bad road conditions, etc. and checks to see if the vehicle
 regains control and corrects it's course.
 """
 
-from numpy import random
-import py_trees
 import operator
 
 import carla
-
+import py_trees
+from numpy import random
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import AddNoiseToRouteEgo
-from srunner.scenariomanager.scenarioatomics.atomic_criteria import CollisionTest
-from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import DriveDistance, InTriggerDistanceToLocation
+from srunner.scenariomanager.scenarioatomics.atomic_behaviors import \
+    AddNoiseToRouteEgo
+from srunner.scenariomanager.scenarioatomics.atomic_criteria import \
+    CollisionTest
+from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (
+    DriveDistance, InTriggerDistanceToLocation)
 from srunner.scenarios.basic_scenario import BasicScenario
 from srunner.tools.scenario_helper import get_waypoint_in_distance
 
@@ -102,7 +104,8 @@ class ControlLoss(BasicScenario):
         self.other_actors.append(first_debris)
         self.other_actors.append(second_debris)
         self.other_actors.append(third_debris)
-        CarlaDataProvider.active_scenarios.append((type(self).__name__, [None, None, None, False, 1e9, 1e9, False], id(self))) # added
+        from srunner.scenariomanager.carla_data_provider import ActiveScenario
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
 
     def _get_noise_parameters(self):
         """Randomizes the mean to be either positive or negative"""

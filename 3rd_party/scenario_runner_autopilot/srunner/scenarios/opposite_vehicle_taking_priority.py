@@ -201,7 +201,8 @@ class OppositeVehicleRunningRedLight(OppositeVehicleJunction):
                 self._tl_dict[tl] = carla.TrafficLightState.Green
             else:
                 self._tl_dict[tl] = carla.TrafficLightState.Red
-        CarlaDataProvider.active_scenarios.append((type(self).__name__, [self.opposite_actor, None, self._direction, False, 1e9, 1e9, False], id(self))) # added
+        from srunner.scenariomanager.carla_data_provider import ActiveScenario
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=self.opposite_actor, metadata=self._direction, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
         CarlaDataProvider.memory[type(self).__name__]["adversarial_actors"].append(self.opposite_actor)
 
     def _create_behavior(self):
@@ -333,5 +334,6 @@ class OppositeVehicleTakingPriority(OppositeVehicleJunction):
         Override this method in child class to provide custom initialization.
         """
         super()._initialize_actors(config)
-        CarlaDataProvider.active_scenarios.append((type(self).__name__, [self.opposite_actor, None, self._direction, False, 1e9, 1e9, False], id(self))) # added
+        from srunner.scenariomanager.carla_data_provider import ActiveScenario
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=self.opposite_actor, metadata=self._direction, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
         CarlaDataProvider.memory[type(self).__name__]["adversarial_actors"].append(self.opposite_actor)

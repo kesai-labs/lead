@@ -8,22 +8,20 @@
 
 from __future__ import print_function
 
-import py_trees
 import carla
-
+import py_trees
 from agents.navigation.local_planner import RoadOption
-
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (ActorDestroy,
-                                                                      BatchActorTransformSetter,
-                                                                      CutIn,
-                                                                      BasicAgentBehavior,
-                                                                      Idle)
-from srunner.scenariomanager.scenarioatomics.atomic_criteria import CollisionTest
-from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (InTriggerDistanceToLocation,
-                                                                               InTimeToArrivalToLocation)
+from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
+    ActorDestroy, BasicAgentBehavior, BatchActorTransformSetter, CutIn, Idle)
+from srunner.scenariomanager.scenarioatomics.atomic_criteria import \
+    CollisionTest
+from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (
+    InTimeToArrivalToLocation, InTriggerDistanceToLocation)
 from srunner.scenarios.basic_scenario import BasicScenario
-from srunner.tools.background_manager import RemoveRoadLane, LeaveSpaceInFront, ReAddRoadLane, ChangeRoadBehavior
+from srunner.tools.background_manager import (ChangeRoadBehavior,
+                                              LeaveSpaceInFront, ReAddRoadLane,
+                                              RemoveRoadLane)
 
 
 def get_value_parameter(config, name, p_type, default):
@@ -201,7 +199,8 @@ class StaticCutIn(BasicScenario):
                 raise ValueError("Couldn't find a proper position for the cut in vehicle")
             blocker_wp = next_wps[0]
 
-        CarlaDataProvider.active_scenarios.append((type(self).__name__, [None, None, None, False, 1e9, 1e9, False], id(self))) # added
+        from srunner.scenariomanager.carla_data_provider import ActiveScenario
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
         CarlaDataProvider.memory[
             type(self).__name__
         ]["cut_in_vehicle"] = self._adversary_actor  # added

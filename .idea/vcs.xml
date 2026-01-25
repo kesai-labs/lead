@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="VcsDirectoryMappings">
+    <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/3rd_party/Bench2Drive" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/3rd_party/CARLA_0915/Plugins" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/3rd_party/CARLA_0915/Plugins/carlaviz" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/3rd_party/CARLA_0915/Plugins/carlaviz/backend/third_party/xviz" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/3rd_party/CARLA_0915/Plugins/telecarla" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/3rd_party/CARLA_0915/Plugins/testpilot" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/3rd_party/alpamayo" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/3rd_party/leaderboard" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/3rd_party/leaderboard_autopilot" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/3rd_party/navsim_workspace/navsimv1.1" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/3rd_party/navsim_workspace/navsimv2.2" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/3rd_party/scenario_runner" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/3rd_party/scenario_runner_autopilot" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/outputs/checkpoints" vcs="Git" />
+  </component>
+</project>

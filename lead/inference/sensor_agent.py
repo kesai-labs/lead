@@ -25,7 +25,10 @@ from lead.common.sensor_setup import av_sensor_setup
 from lead.data_loader import carla_dataset_utils, training_cache
 from lead.data_loader.carla_dataset_utils import rasterize_lidar
 from lead.expert import expert_utils
-from lead.inference.closed_loop_inference import ClosedLoopInference, ClosedLoopPrediction
+from lead.inference.closed_loop_inference import (
+    ClosedLoopInference,
+    ClosedLoopPrediction,
+)
 from lead.inference.config_closed_loop import ClosedLoopConfig
 from lead.inference.video_recorder import VideoRecorder
 from lead.training.config_training import TrainingConfig
@@ -61,7 +64,9 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         # Load the config saved during training
         if self.config_closed_loop.is_bench2drive:
             path_to_conf_file = path_to_conf_file.split("+")[0]
-        with open(os.path.join(path_to_conf_file, "config.json"), encoding="utf-8") as f:
+        with open(
+            os.path.join(path_to_conf_file, "config.json"), encoding="utf-8"
+        ) as f:
             json_config = f.read()
             json_config = json.loads(json_config)
 
@@ -89,20 +94,26 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
             bb_buffer=self.bb_buffer,
         )
         self.force_move_post_processor = ForceMovePostProcessor(
-            config=self.training_config, config_test_time=self.config_closed_loop, lidar_queue=self.lidar_pc_queue
+            config=self.training_config,
+            config_test_time=self.config_closed_loop,
+            lidar_queue=self.lidar_pc_queue,
         )
         self.metric_info = {}
         self.meters_travelled = 0.0
 
         # Infraction tracking
         self.infractions_log = []  # List of {"step": int, "infraction": str}
-        self.tracked_infraction_ids = set()  # Track which infractions we've already logged
+        self.tracked_infraction_ids = (
+            set()
+        )  # Track which infractions we've already logged
         self.scenario = None  # Will be set by set_scenario() method
 
         self.track = autonomous_agent.Track.SENSORS
 
         if not shutil.which("ffmpeg"):
-            raise RuntimeError("ffmpeg is not installed or not found in PATH. Please install ffmpeg to use video compression.")
+            raise RuntimeError(
+                "ffmpeg is not installed or not found in PATH. Please install ffmpeg to use video compression."
+            )
 
     def set_scenario(self, scenario):
         """Set the scenario reference to track infractions.
@@ -140,7 +151,9 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
             weather_name = self.config_closed_loop.custom_weather
 
         if weather_name is not None:
-            weather = carla.WeatherParameters(**self.config_expert.weather_settings[weather_name])
+            weather = carla.WeatherParameters(
+                **self.config_expert.weather_settings[weather_name]
+            )
             self._world.set_weather(weather)
             LOG.info(f"Set weather to: {weather_name}")
             # night mode
@@ -148,7 +161,10 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
             if expert_utils.get_night_mode(weather):
                 for vehicle in vehicles:
                     vehicle.set_light_state(
-                        carla.VehicleLightState(carla.VehicleLightState.Position | carla.VehicleLightState.LowBeam)
+                        carla.VehicleLightState(
+                            carla.VehicleLightState.Position
+                            | carla.VehicleLightState.LowBeam
+                        )
                     )
             else:
                 for vehicle in vehicles:
@@ -211,29 +227,44 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
                                 "step": self.step,
                                 "infraction": criterion.name,
                                 "frame": event.get_frame(),
-                                "message": event.get_message() if hasattr(event, "get_message") else "",
-                                "event_type": str(event.get_type()) if hasattr(event, "get_type") else "",
+                                "message": event.get_message()
+                                if hasattr(event, "get_message")
+                                else "",
+                                "event_type": str(event.get_type())
+                                if hasattr(event, "get_type")
+                                else "",
                                 "meters_travelled": round(self.meters_travelled, 2),
                             }
 
                             self.infractions_log.append(infraction_info)
-                            LOG.info(f"[SensorAgent] Infraction detected at step {self.step}: {criterion.name}")
+                            LOG.info(
+                                f"[SensorAgent] Infraction detected at step {self.step}: {criterion.name}"
+                            )
 
                     # If no events remain for this criterion, remove it from tracking
                     # This allows continuous infractions to be logged again if they reoccur
-                    if not criterion.events and criterion_key in self.tracked_infraction_ids:
+                    if (
+                        not criterion.events
+                        and criterion_key in self.tracked_infraction_ids
+                    ):
                         self.tracked_infraction_ids.discard(criterion_key)
 
             # Save infractions log to JSON
-            if self.config_closed_loop.save_path is not None and hasattr(self, "infractions_log"):
-                infractions_path = self.config_closed_loop.save_path / "infractions.json"
+            if self.config_closed_loop.save_path is not None and hasattr(
+                self, "infractions_log"
+            ):
+                infractions_path = (
+                    self.config_closed_loop.save_path / "infractions.json"
+                )
                 infractions_data = {
                     "infractions": self.infractions_log,
                     "video_fps": self.config_closed_loop.video_fps,
                 }
                 with open(infractions_path, "w") as f:
                     json.dump(infractions_data, f, indent=4)
-                LOG.info(f"[SensorAgent] Saved {len(self.infractions_log)} infractions to {infractions_path}")
+                LOG.info(
+                    f"[SensorAgent] Saved {len(self.infractions_log)} infractions to {infractions_path}"
+                )
 
         except Exception as e:
             LOG.warning(f"[SensorAgent] Error checking infractions: {e}")
@@ -252,9 +283,13 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         def transform(point: list[float]) -> jt.Float[npt.NDArray, " 2"]:
             # Use filtered or noisy position based on training config
             ego_position = (
-                self.filtered_state[:2] if self.config_closed_loop.use_kalman_filter else input_data["noisy_state"][:2]
+                self.filtered_state[:2]
+                if self.config_closed_loop.use_kalman_filter
+                else input_data["noisy_state"][:2]
             )
-            return common_utils.inverse_conversion_2d(np.array(point), np.array(ego_position), self.compass)
+            return common_utils.inverse_conversion_2d(
+                np.array(point), np.array(ego_position), self.compass
+            )
 
         next_target_points = [tp[0].tolist() for tp in planner.route]
         next_commands = [int(planner.route[i][1]) for i in range(len(planner.route))]
@@ -263,7 +298,11 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         filtered_tp_list = []
         filtered_command_list = []
         for pt, cmd in zip(next_target_points, next_commands, strict=False):
-            if len(next_target_points) == 2 or not filtered_tp_list or not np.allclose(pt[:2], filtered_tp_list[-1][:2]):
+            if (
+                len(next_target_points) == 2
+                or not filtered_tp_list
+                or not np.allclose(pt[:2], filtered_tp_list[-1][:2])
+            ):
                 filtered_tp_list.append(pt)
                 filtered_command_list.append(cmd)
         next_target_points = filtered_tp_list
@@ -280,19 +319,27 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
             input_data["target_point_previous"] = transform(next_target_points[0][:2])
 
         input_data["command"] = carla_dataset_utils.command_to_one_hot(next_commands[0])
-        input_data["next_command"] = carla_dataset_utils.command_to_one_hot(next_commands[1])
+        input_data["next_command"] = carla_dataset_utils.command_to_one_hot(
+            next_commands[1]
+        )
 
     @beartype
     @torch.inference_mode()
     def tick(self, input_data: dict) -> dict:
         """Pre-processes sensor data"""
-        input_data = super().tick(input_data, use_kalman_filter=self.training_config.use_kalman_filter_for_gps)
+        input_data = super().tick(
+            input_data, use_kalman_filter=self.training_config.use_kalman_filter_for_gps
+        )
 
         # Simulate JPEG compression to avoid train-test mismatch
         rgb = input_data["rgb"]
         input_data["original_rgb"] = rgb.copy()
         rgb = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
-        _, rgb = cv2.imencode(".jpg", rgb, [int(cv2.IMWRITE_JPEG_QUALITY), self.config_closed_loop.jpeg_quality])
+        _, rgb = cv2.imencode(
+            ".jpg",
+            rgb,
+            [int(cv2.IMWRITE_JPEG_QUALITY), self.config_closed_loop.jpeg_quality],
+        )
         rgb = cv2.imdecode(rgb, cv2.IMREAD_UNCHANGED)
         rgb = np.transpose(rgb, (2, 0, 1))
         input_data["rgb"] = rgb
@@ -304,18 +351,31 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
             if input_data["rgb"] is not None:
                 _, h, w = input_data["rgb"].shape
                 input_data["rgb"] = input_data["rgb"][:, :, crop_pixels:-crop_pixels]
-                input_data["rgb"] = np.transpose(input_data["rgb"], (1, 2, 0))  # -> (H, W_crop, C)
-                input_data["rgb"] = cv2.resize(input_data["rgb"], (w, h), interpolation=cv2.INTER_LINEAR)
-                input_data["rgb"] = np.transpose(input_data["rgb"], (2, 0, 1))  # -> (C, H, W)
+                input_data["rgb"] = np.transpose(
+                    input_data["rgb"], (1, 2, 0)
+                )  # -> (H, W_crop, C)
+                input_data["rgb"] = cv2.resize(
+                    input_data["rgb"], (w, h), interpolation=cv2.INTER_LINEAR
+                )
+                input_data["rgb"] = np.transpose(
+                    input_data["rgb"], (2, 0, 1)
+                )  # -> (C, H, W)
             # original_rgb: (H, W, C)
             if input_data["original_rgb"] is not None:
                 h, w = input_data["original_rgb"].shape[:2]
-                input_data["original_rgb"] = input_data["original_rgb"][:, crop_pixels:-crop_pixels, :]
-                input_data["original_rgb"] = cv2.resize(input_data["original_rgb"], (w, h), interpolation=cv2.INTER_LINEAR)
+                input_data["original_rgb"] = input_data["original_rgb"][
+                    :, crop_pixels:-crop_pixels, :
+                ]
+                input_data["original_rgb"] = cv2.resize(
+                    input_data["original_rgb"], (w, h), interpolation=cv2.INTER_LINEAR
+                )
 
         # Cut cameras down to only used cameras
         for modality in ["rgb", "original_rgb"]:
-            if self.training_config.num_used_cameras != self.training_config.num_available_cameras:
+            if (
+                self.training_config.num_used_cameras
+                != self.training_config.num_available_cameras
+            ):
                 n = self.training_config.num_available_cameras
                 w = input_data[modality].shape[2] // n
 
@@ -328,15 +388,31 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
                 input_data[modality] = np.concatenate(rgb_slices, axis=2)
 
         # Plan next target point and command.
-        self.set_target_points(input_data, pop_distance=self.config_closed_loop.route_planner_min_distance)
+        self.set_target_points(
+            input_data, pop_distance=self.config_closed_loop.route_planner_min_distance
+        )
         if self.config_closed_loop.sensor_agent_pop_distance_adaptive:
             dense_points = (
-                np.linalg.norm(input_data["target_point"] - input_data["target_point_next"]) < 10.0
-                and min(np.linalg.norm(input_data["target_point_previous"]), np.linalg.norm(input_data["target_point"])) < 10.0
+                np.linalg.norm(
+                    input_data["target_point"] - input_data["target_point_next"]
+                )
+                < 10.0
+                and min(
+                    np.linalg.norm(input_data["target_point_previous"]),
+                    np.linalg.norm(input_data["target_point"]),
+                )
+                < 10.0
             )
             dense_points = dense_points or (
-                np.linalg.norm(input_data["target_point_previous"] - input_data["target_point"]) < 10.0
-                and min(np.linalg.norm(input_data["target_point_previous"]), np.linalg.norm(input_data["target_point"])) < 10.0
+                np.linalg.norm(
+                    input_data["target_point_previous"] - input_data["target_point"]
+                )
+                < 10.0
+                and min(
+                    np.linalg.norm(input_data["target_point_previous"]),
+                    np.linalg.norm(input_data["target_point"]),
+                )
+                < 10.0
             )
             if dense_points:
                 self.set_target_points(input_data, pop_distance=4.0)
@@ -356,26 +432,40 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         lidar = lidar[lidar[:, -1] < self.training_config.training_used_lidar_steps]
 
         # At inference time, simulate laspy quantization to avoid train-test mismatch
-        lidar[:, 0] = np.round(lidar[:, 0] / self.config_expert.point_precision_x) * self.config_expert.point_precision_x
-        lidar[:, 1] = np.round(lidar[:, 1] / self.config_expert.point_precision_y) * self.config_expert.point_precision_y
-        lidar[:, 2] = np.round(lidar[:, 2] / self.config_expert.point_precision_z) * self.config_expert.point_precision_z
+        lidar[:, 0] = (
+            np.round(lidar[:, 0] / self.config_expert.point_precision_x)
+            * self.config_expert.point_precision_x
+        )
+        lidar[:, 1] = (
+            np.round(lidar[:, 1] / self.config_expert.point_precision_y)
+            * self.config_expert.point_precision_y
+        )
+        lidar[:, 2] = (
+            np.round(lidar[:, 2] / self.config_expert.point_precision_z)
+            * self.config_expert.point_precision_z
+        )
 
         # Convert to pseudo image
-        input_data["rasterized_lidar"] = rasterize_lidar(config=self.training_config, lidar=lidar[:, :3])[..., None]
+        input_data["rasterized_lidar"] = rasterize_lidar(
+            config=self.training_config, lidar=lidar[:, :3]
+        )[..., None]
 
         # Simulate training time compression to avoid train-test mismatch
         input_data["rasterized_lidar"] = training_cache.compress_float_image(
             input_data["rasterized_lidar"], self.training_config
         )
-        input_data["rasterized_lidar"] = training_cache.decompress_float_image(input_data["rasterized_lidar"]).squeeze()[
-            None, None
-        ]
+        input_data["rasterized_lidar"] = training_cache.decompress_float_image(
+            input_data["rasterized_lidar"]
+        ).squeeze()[None, None]
 
         # Radar input preprocessing
         if self.training_config.use_radars:
             # Preprocess radar input using the same function as during training
             input_data["radar"] = np.concatenate(
-                carla_dataset_utils.preprocess_radar_input(self.training_config, input_data), axis=0
+                carla_dataset_utils.preprocess_radar_input(
+                    self.training_config, input_data
+                ),
+                axis=0,
             )
 
         return input_data
@@ -401,52 +491,96 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
 
         # Transform the data into torch tensor comforting with data loader's format.
         input_data_tensors = {
-            "rgb": torch.Tensor(input_data["rgb"]).to(self.device, dtype=torch.float32)[None],
-            "rasterized_lidar": torch.Tensor(input_data["rasterized_lidar"]).to(self.device, dtype=torch.float32),
+            "rgb": torch.Tensor(input_data["rgb"]).to(self.device, dtype=torch.float32)[
+                None
+            ],
+            "rasterized_lidar": torch.Tensor(input_data["rasterized_lidar"]).to(
+                self.device, dtype=torch.float32
+            ),
             "target_point_previous": torch.Tensor(input_data["target_point_previous"])
             .to(self.device, dtype=torch.float32)
             .view(1, 2),
-            "target_point": torch.Tensor(input_data["target_point"]).to(self.device, dtype=torch.float32).view(1, 2),
-            "target_point_next": (torch.Tensor(input_data["target_point_next"]).to(self.device, dtype=torch.float32)).view(
-                1, 2
-            ),
-            "speed": torch.Tensor([input_data["speed"]]).to(self.device, dtype=torch.float32).view(1),
-            "command": torch.Tensor(input_data["command"]).to(self.device, dtype=torch.float32).view(1, 6),
-            "next_command": torch.Tensor(input_data["next_command"]).to(self.device, dtype=torch.float32).view(1, 6),
+            "target_point": torch.Tensor(input_data["target_point"])
+            .to(self.device, dtype=torch.float32)
+            .view(1, 2),
+            "target_point_next": (
+                torch.Tensor(input_data["target_point_next"]).to(
+                    self.device, dtype=torch.float32
+                )
+            ).view(1, 2),
+            "speed": torch.Tensor([input_data["speed"]])
+            .to(self.device, dtype=torch.float32)
+            .view(1),
+            "command": torch.Tensor(input_data["command"])
+            .to(self.device, dtype=torch.float32)
+            .view(1, 6),
+            "next_command": torch.Tensor(input_data["next_command"])
+            .to(self.device, dtype=torch.float32)
+            .view(1, 6),
             "town": np.array([self._world.get_map().name.split("/")[-1]]),
         }
 
         # Add radar data if available
         if self.training_config.use_radars and "radar" in input_data:
-            input_data_tensors["radar"] = torch.Tensor(input_data["radar"]).to(self.device, dtype=torch.float32)[None]
+            input_data_tensors["radar"] = torch.Tensor(input_data["radar"]).to(
+                self.device, dtype=torch.float32
+            )[None]
 
         # Save input log if need
-        if self.config_closed_loop.save_path is not None and self.config_closed_loop.produce_input_log:
+        if (
+            self.config_closed_loop.save_path is not None
+            and self.config_closed_loop.produce_input_log
+        ):
             torch.save(
-                {k: v.to(torch.device("cpu")) if isinstance(v, torch.Tensor) else v for k, v in input_data_tensors.items()},
-                os.path.join(self.config_closed_loop.input_log_path, str(self.step).zfill(5)) + ".pth",
+                {
+                    k: v.to(torch.device("cpu")) if isinstance(v, torch.Tensor) else v
+                    for k, v in input_data_tensors.items()
+                },
+                os.path.join(
+                    self.config_closed_loop.input_log_path, str(self.step).zfill(5)
+                )
+                + ".pth",
             )
 
         # Forward pass
-        closed_loop_prediction: ClosedLoopPrediction = self.closed_loop_inference.forward(data=input_data_tensors)
+        closed_loop_prediction: ClosedLoopPrediction = (
+            self.closed_loop_inference.forward(data=input_data_tensors)
+        )
         # Update bounding boxes
         if (
             closed_loop_prediction.pred_bounding_box_vehicle_system is not None
             and len(closed_loop_prediction.pred_bounding_box_vehicle_system) > 0
         ):
-            self.bb_buffer.append(closed_loop_prediction.pred_bounding_box_vehicle_system)
+            self.bb_buffer.append(
+                closed_loop_prediction.pred_bounding_box_vehicle_system
+            )
 
         # Post-processing heuristic
         self.stop_sign_post_processor.update_stop_box(
-            self.ego_past_positions[-2][0], self.ego_past_positions[-2][1], self.ego_past_yaws[-2], 0.0, 0.0, 0.0
+            self.ego_past_positions[-2][0],
+            self.ego_past_positions[-2][1],
+            self.ego_past_yaws[-2],
+            0.0,
+            0.0,
+            0.0,
         )
-        closed_loop_prediction.throttle, closed_loop_prediction.brake = self.force_move_post_processor.adjust(
-            input_data["speed"].item(), closed_loop_prediction.throttle, closed_loop_prediction.brake
+        closed_loop_prediction.throttle, closed_loop_prediction.brake = (
+            self.force_move_post_processor.adjust(
+                input_data["speed"].item(),
+                closed_loop_prediction.throttle,
+                closed_loop_prediction.brake,
+            )
         )
-        closed_loop_prediction.throttle, closed_loop_prediction.brake = self.stop_sign_post_processor.adjust(
-            input_data["speed"].item(), closed_loop_prediction.throttle, closed_loop_prediction.brake
+        closed_loop_prediction.throttle, closed_loop_prediction.brake = (
+            self.stop_sign_post_processor.adjust(
+                input_data["speed"].item(),
+                closed_loop_prediction.throttle,
+                closed_loop_prediction.brake,
+            )
         )
-        self.meters_travelled += input_data["speed"].item() * self.config_closed_loop.carla_frame_rate
+        self.meters_travelled += (
+            input_data["speed"].item() * self.config_closed_loop.carla_frame_rate
+        )
         input_data["meters_travelled"] = self.meters_travelled
 
         self.control = carla.VehicleControl(
@@ -475,17 +609,28 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
                         else np.inf
                     ]
                 ),
-                "stuck_detector": torch.Tensor([int(self.force_move_post_processor.stuck_detector)]).int(),
-                "force_move": torch.Tensor([int(self.force_move_post_processor.force_move)]).int(),
+                "stuck_detector": torch.Tensor(
+                    [int(self.force_move_post_processor.stuck_detector)]
+                ).int(),
+                "force_move": torch.Tensor(
+                    [int(self.force_move_post_processor.force_move)]
+                ).int(),
                 "route_curvature": torch.Tensor(
-                    [common_utils.waypoints_curvature(closed_loop_prediction.pred_route.squeeze())]
+                    [
+                        common_utils.waypoints_curvature(
+                            closed_loop_prediction.pred_route.squeeze()
+                        )
+                    ]
                 ),
                 "meters_travelled": torch.Tensor([self.meters_travelled]),
             }
         )
 
         # Save input images as PNG and video
-        if self.config_closed_loop.save_path is not None and self.step % self.config_closed_loop.produce_frame_frequency == 0:
+        if (
+            self.config_closed_loop.save_path is not None
+            and self.step % self.config_closed_loop.produce_frame_frequency == 0
+        ):
             # Get the RGB image for visualization (before JPEG compression)
             input_image = input_data["original_rgb"].copy()
 
@@ -495,7 +640,10 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
                 self.video_recorder.save_input_video_frame(input_image)
 
         # Save demo images
-        if self.config_closed_loop.save_path is not None and self.step % self.config_closed_loop.produce_frame_frequency == 0:
+        if (
+            self.config_closed_loop.save_path is not None
+            and self.step % self.config_closed_loop.produce_frame_frequency == 0
+        ):
             # Get predicted route and waypoints (if available)
             pred_waypoints = (
                 closed_loop_prediction.pred_future_waypoints[0]
@@ -522,7 +670,10 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         # Save abstract debug images
         if (
             self.config_closed_loop.save_path is not None
-            and (self.config_closed_loop.produce_debug_video or self.config_closed_loop.produce_debug_image)
+            and (
+                self.config_closed_loop.produce_debug_video
+                or self.config_closed_loop.produce_debug_image
+            )
             and self.step % self.config_closed_loop.produce_frame_frequency == 0
         ):
             # Produce image
@@ -544,7 +695,9 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         if self.config_closed_loop.is_bench2drive and hasattr(self, "get_metric_info"):
             metric = self.get_metric_info()
             self.metric_info[self.step] = metric
-            with open(f"{self.config_closed_loop.save_path}/metric_info.json", "w") as outfile:
+            with open(
+                f"{self.config_closed_loop.save_path}/metric_info.json", "w"
+            ) as outfile:
                 json.dump(self.metric_info, outfile, indent=4)
         return self.control
 
@@ -599,7 +752,10 @@ class StopSignPostProcessor:
             stop_carla_box.rotation = carla.Rotation(0.0, np.rad2deg(stop_box.yaw), 0.0)
 
             stop_sign_distance = np.linalg.norm([stop_box.x, stop_box.y])
-            boxes_intersect = stop_sign_distance < self.config_test_time.slower_for_stop_sign_dist_threshold
+            boxes_intersect = (
+                stop_sign_distance
+                < self.config_test_time.slower_for_stop_sign_dist_threshold
+            )
             if boxes_intersect and self.clear_stop_sign_cool_down <= 0:
                 if ego_speed > 0.01:
                     # LOG.info("Stop sign intersection detected.")
@@ -610,15 +766,22 @@ class StopSignPostProcessor:
                     stop_sign_stop_predicted = False
                     self.stop_sign_buffer.pop()
                     # Stop signs don't come in herds, so we know we don't need to clear one for a while.
-                    self.clear_stop_sign_cool_down = self.config_test_time.slower_for_stop_sign_cool_down
+                    self.clear_stop_sign_cool_down = (
+                        self.config_test_time.slower_for_stop_sign_cool_down
+                    )
                     self.slower_stop_sign_count = 0
             elif (
                 self.slower_for_stop_sign_cool_down <= 0
-                and stop_sign_distance < self.config_test_time.slower_for_stop_sign_dist_threshold
+                and stop_sign_distance
+                < self.config_test_time.slower_for_stop_sign_dist_threshold
             ):
                 # LOG.info("Stop sign in range for slower.")
-                self.slower_stop_sign_count = self.config_test_time.slower_for_stop_sign_count
-                self.slower_for_stop_sign_cool_down = self.config_test_time.slower_for_stop_sign_cool_down
+                self.slower_stop_sign_count = (
+                    self.config_test_time.slower_for_stop_sign_count
+                )
+                self.slower_for_stop_sign_cool_down = (
+                    self.config_test_time.slower_for_stop_sign_cool_down
+                )
 
         if len(self.stop_sign_buffer) > 0:
             # Remove boxes that are too far away
@@ -631,7 +794,10 @@ class StopSignPostProcessor:
             current_throttle = 0.0
             current_brake = True
 
-        if self.config_test_time.slower_for_stop_sign and self.slower_stop_sign_count > 0:
+        if (
+            self.config_test_time.slower_for_stop_sign
+            and self.slower_stop_sign_count > 0
+        ):
             # LOG.info("Slowing down for stop sign.")
             current_throttle = np.clip(
                 current_throttle,
@@ -644,13 +810,21 @@ class StopSignPostProcessor:
 
     @beartype
     def update_stop_box(
-        self, x: float, y: float, orientation: float, x_target: float, y_target: float, orientation_target: float
+        self,
+        x: float,
+        y: float,
+        orientation: float,
+        x_target: float,
+        y_target: float,
+        orientation_target: float,
     ):
         if not self.config_test_time.slower_for_stop_sign:
             return
         if len(self.stop_sign_buffer) != 0:
             self.stop_sign_buffer.append(
-                self.stop_sign_buffer[0].update(x, y, orientation, x_target, y_target, orientation_target)
+                self.stop_sign_buffer[0].update(
+                    x, y, orientation, x_target, y_target, orientation_target
+                )
             )
 
 
@@ -658,7 +832,12 @@ class ForceMovePostProcessor:
     """Forces the agent to move after a certain time of being stuck."""
 
     @beartype
-    def __init__(self, config: TrainingConfig, config_test_time: ClosedLoopConfig, lidar_queue: deque):
+    def __init__(
+        self,
+        config: TrainingConfig,
+        config_test_time: ClosedLoopConfig,
+        lidar_queue: deque,
+    ):
         self.config = config
         self.config_test_time = config_test_time
         self.stuck_detector = 0
@@ -666,8 +845,12 @@ class ForceMovePostProcessor:
         self.lidar_buffer = lidar_queue
 
     @beartype
-    def adjust(self, ego_speed: float, current_throttle: float, current_brake: float) -> tuple[float, float]:
-        if ego_speed < 0.1:  # 0.1 is just an arbitrary low number to threshold when the car is stopped
+    def adjust(
+        self, ego_speed: float, current_throttle: float, current_brake: float
+    ) -> tuple[float, float]:
+        if (
+            ego_speed < 0.1
+        ):  # 0.1 is just an arbitrary low number to threshold when the car is stopped
             self.stuck_detector += 1
         else:
             self.stuck_detector = 0
@@ -699,7 +882,9 @@ class ForceMovePostProcessor:
                 LOG.info("Creeping overriden by safety box.")
             if not emergency_stop:
                 LOG.info("Detected agent being stuck.")
-                current_throttle = max(self.config_test_time.sensor_agent_stuck_throttle, current_throttle)
+                current_throttle = max(
+                    self.config_test_time.sensor_agent_stuck_throttle, current_throttle
+                )
                 current_brake = 0.0
                 self.force_move -= 1
             else:

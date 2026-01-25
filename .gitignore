@@ -1,5 +1,3 @@
-.idea/
-
 # Byte-compiled / optimized / DLL files
 **/__pycache__/
 *.py[cod]
@@ -195,3 +193,4 @@ outputs/local_evaluation
 ar1_venv
 3rd_party/carla_route_generator
 alpasim-metric-bench2drive/
+/*.prof

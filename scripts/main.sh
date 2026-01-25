@@ -3,11 +3,7 @@ export CARLA_VERSION="0915"
 export CARLA_ROOT="${LEAD_PROJECT_ROOT}/3rd_party/CARLA_${CARLA_VERSION}"
 
 # Python paths
-export PYTHONPATH=${CARLA_ROOT}/PythonAPI:${PYTHONPATH}
 export PYTHONPATH=${CARLA_ROOT}/PythonAPI/carla:${PYTHONPATH}
-export PYTHONPATH=${CARLA_ROOT}/PythonAPI/carla/dist/carla-${CARLA_VERSION}-py3.10-linux-x86_64.egg:${PYTHONPATH}
-export PYTHONPATH=$LEAD_PROJECT_ROOT/3rd_party/leaderboard_autopilot:$PYTHONPATH
-export PYTHONPATH=$LEAD_PROJECT_ROOT/3rd_party/scenario_runner_autopilot:$PYTHONPATH
 
 # System paths
 export PATH=$LEAD_PROJECT_ROOT:$PATH

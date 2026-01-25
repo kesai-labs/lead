@@ -10,10 +10,10 @@ Simple freeride scenario. No action, no triggers. Ego vehicle can simply cruise 
 """
 
 import py_trees
-
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
 from srunner.scenariomanager.scenarioatomics.atomic_behaviors import Idle
-from srunner.scenariomanager.scenarioatomics.atomic_criteria import CollisionTest
+from srunner.scenariomanager.scenarioatomics.atomic_criteria import \
+    CollisionTest
 from srunner.scenarios.basic_scenario import BasicScenario
 
 
@@ -44,7 +44,9 @@ class FreeRide(BasicScenario):
         """
         super()._initialize_actors(config)
         if add_scenario_type:
-            CarlaDataProvider.active_scenarios.append((type(self).__name__, [None, None, None, False, 1e9, 1e9, False], id(self))) # added
+            from srunner.scenariomanager.carla_data_provider import \
+                ActiveScenario
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
 
     def _setup_scenario_trigger(self, config):
         """

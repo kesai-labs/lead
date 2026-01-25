@@ -14,7 +14,9 @@ from lead.training.config_training import TrainingConfig
 
 
 @beartype
-def normalize_imagenet(x: jt.Float[torch.Tensor, "B 3 H W"]) -> jt.Float[torch.Tensor, "B 3 H W"]:
+def normalize_imagenet(
+    x: jt.Float[torch.Tensor, "B 3 H W"],
+) -> jt.Float[torch.Tensor, "B 3 H W"]:
     """Normalize input images according to ImageNet standards.
     Args:
         x: Input images batch.
@@ -52,11 +54,15 @@ def patch_norm_fp32(module: torch.nn.Module) -> torch.nn.Module:
         The patched module with FP32 normalization operations.
     """
     for child in module.modules():
-        if isinstance(child, nn.modules.batchnorm._BatchNorm | nn.GroupNorm | nn.LayerNorm):
+        if isinstance(
+            child, nn.modules.batchnorm._BatchNorm | nn.GroupNorm | nn.LayerNorm
+        ):
             # Ensure parameters are in FP32
             child.float()
             # Patch the forward method to handle input/output dtype conversion
-            child.forward = _fp32_forward_wrapper(child.forward).__get__(child, type(child))
+            child.forward = _fp32_forward_wrapper(child.forward).__get__(
+                child, type(child)
+            )
     return module
 
 
@@ -124,7 +130,9 @@ def force_fp32(apply_to: tuple[str, ...] | None = None):
 
 
 @beartype
-def gen_sineembed_for_position(pos_tensor: jt.Float[torch.Tensor, "B 2"], hidden_dim: int = 64):
+def gen_sineembed_for_position(
+    pos_tensor: jt.Float[torch.Tensor, "B 2"], hidden_dim: int = 64
+):
     """Mostly copy-paste from https://github.com/IDEA-opensource/DAB-DETR
     Args:
         pos_tensor: Last dimension is (x, y). Values are expected to be in range [0, 1].
@@ -132,7 +140,9 @@ def gen_sineembed_for_position(pos_tensor: jt.Float[torch.Tensor, "B 2"], hidden
     Returns:
         Positional embedding with shape (B, hidden_dim)
     """
-    assert 0 <= pos_tensor.min() and pos_tensor.max() <= 1, "pos_tensor values should be in range [0, 1]"
+    assert 0 <= pos_tensor.min() and pos_tensor.max() <= 1, (
+        "pos_tensor values should be in range [0, 1]"
+    )
     half_hidden_dim = hidden_dim // 2
     scale = 2 * math.pi
     dim_t = torch.arange(half_hidden_dim, dtype=torch.float32, device=pos_tensor.device)
@@ -141,8 +151,12 @@ def gen_sineembed_for_position(pos_tensor: jt.Float[torch.Tensor, "B 2"], hidden
     y_embed = pos_tensor[..., 1] * scale
     pos_x = x_embed[..., None] / dim_t
     pos_y = y_embed[..., None] / dim_t
-    pos_x = torch.stack((pos_x[..., 0::2].sin(), pos_x[..., 1::2].cos()), dim=-1).flatten(-2)
-    pos_y = torch.stack((pos_y[..., 0::2].sin(), pos_y[..., 1::2].cos()), dim=-1).flatten(-2)
+    pos_x = torch.stack(
+        (pos_x[..., 0::2].sin(), pos_x[..., 1::2].cos()), dim=-1
+    ).flatten(-2)
+    pos_y = torch.stack(
+        (pos_y[..., 0::2].sin(), pos_y[..., 1::2].cos()), dim=-1
+    ).flatten(-2)
     pos = torch.cat((pos_y, pos_x), dim=-1)
     return pos
 
@@ -159,7 +173,12 @@ def unit_normalize_bev_points(
     Returns:
         Normalized BEV points of shape in range [0, 1].
     """
-    min_x, max_x, min_y, max_y = config.min_x_meter, config.max_x_meter, config.min_y_meter, config.max_y_meter
+    min_x, max_x, min_y, max_y = (
+        config.min_x_meter,
+        config.max_x_meter,
+        config.min_y_meter,
+        config.max_y_meter,
+    )
     if isinstance(points, torch.Tensor):
         points = points.clone()
     else:
@@ -199,13 +218,18 @@ def bev_grid_sample(
     grid = torch.stack([u, v], dim=-1)  # (B, N, 2)
     grid = grid.view(B, N, 1, 2)  # (B, N, 1, 2)
 
-    sampled = F.grid_sample(bev, grid, mode="bilinear", align_corners=True)  # (B, D, N, 1)
+    sampled = F.grid_sample(
+        bev, grid, mode="bilinear", align_corners=True
+    )  # (B, D, N, 1)
 
     return sampled.squeeze(-1).permute(0, 2, 1)  # (B, N, D)
 
 
 def class2angle(
-    angle_cls: torch.Tensor, angle_res: torch.Tensor, config: TrainingConfig, limit_period: bool = True
+    angle_cls: torch.Tensor,
+    angle_res: torch.Tensor,
+    config: TrainingConfig,
+    limit_period: bool = True,
 ) -> torch.Tensor:
     """Convert discrete angle class and residual back to continuous angle.
 

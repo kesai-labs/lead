@@ -16,16 +16,16 @@ The ego vehicle may need to brake to avoid a collision.
 """
 
 import random
-import py_trees
-import carla
 
+import carla
+import py_trees
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (ActorTransformSetter,
-                                                                      LaneChange,
-                                                                      WaypointFollower,
-                                                                      AccelerateToCatchUp)
-from srunner.scenariomanager.scenarioatomics.atomic_criteria import CollisionTest
-from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import InTriggerDistanceToVehicle, DriveDistance
+from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
+    AccelerateToCatchUp, ActorTransformSetter, LaneChange, WaypointFollower)
+from srunner.scenariomanager.scenarioatomics.atomic_criteria import \
+    CollisionTest
+from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (
+    DriveDistance, InTriggerDistanceToVehicle)
 from srunner.scenarios.basic_scenario import BasicScenario
 
 
@@ -88,7 +88,8 @@ class CutIn(BasicScenario):
                            other_actor_transform.location.z + 105),
             other_actor_transform.rotation)
 
-        CarlaDataProvider.active_scenarios.append((type(self).__name__, [None, None, None, False, 1e9, 1e9, False], id(self))) # added
+        from srunner.scenariomanager.carla_data_provider import ActiveScenario
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
 
     def _create_behavior(self):
         """

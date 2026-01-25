@@ -55,7 +55,9 @@ def kill_all_carla_servers(ports):
                     if conns.laddr.port in ports:
                         try:
                             proc.kill()
-                        except psutil.NoSuchProcess:  # Catch the error caused by the process no longer existing
+                        except (
+                            psutil.NoSuchProcess
+                        ):  # Catch the error caused by the process no longer existing
                             pass  # Ignore it
 
 
@@ -68,10 +70,22 @@ class MapImage:
     def draw_map_image(carla_map_local, pixels_per_meter_local, precision=0.05):
         waypoints = carla_map_local.generate_waypoints(2)
         margin = 100
-        max_x = max(waypoints, key=lambda x: x.transform.location.x).transform.location.x + margin
-        max_y = max(waypoints, key=lambda x: x.transform.location.y).transform.location.y + margin
-        min_x = min(waypoints, key=lambda x: x.transform.location.x).transform.location.x - margin
-        min_y = min(waypoints, key=lambda x: x.transform.location.y).transform.location.y - margin
+        max_x = (
+            max(waypoints, key=lambda x: x.transform.location.x).transform.location.x
+            + margin
+        )
+        max_y = (
+            max(waypoints, key=lambda x: x.transform.location.y).transform.location.y
+            + margin
+        )
+        min_x = (
+            min(waypoints, key=lambda x: x.transform.location.x).transform.location.x
+            - margin
+        )
+        min_y = (
+            min(waypoints, key=lambda x: x.transform.location.y).transform.location.y
+            - margin
+        )
 
         world_offset = np.array([min_x, min_y], dtype=np.float32)
         width_in_meters = max(max_x - min_x, max_y - min_y)
@@ -81,7 +95,9 @@ class MapImage:
         shoulder_surface = np.zeros((width_in_pixels, width_in_pixels))
         parking_surface = np.zeros((width_in_pixels, width_in_pixels))
         sidewalk_surface = np.zeros((width_in_pixels, width_in_pixels))
-        lane_marking_yellow_broken_surface = np.zeros((width_in_pixels, width_in_pixels))
+        lane_marking_yellow_broken_surface = np.zeros(
+            (width_in_pixels, width_in_pixels)
+        )
         lane_marking_yellow_solid_surface = np.zeros((width_in_pixels, width_in_pixels))
         lane_marking_white_broken_surface = np.zeros((width_in_pixels, width_in_pixels))
         lane_marking_white_solid_surface = np.zeros((width_in_pixels, width_in_pixels))
@@ -131,13 +147,55 @@ class MapImage:
                         sidewalk[1].append(right)
                     right = right.get_right_lane()
 
-            MapImage.draw_lane(road_surface, waypoints, COLOR_WHITE, pixels_per_meter_local, world_offset)
-            MapImage.draw_lane(sidewalk_surface, sidewalk[0], COLOR_WHITE, pixels_per_meter_local, world_offset)
-            MapImage.draw_lane(sidewalk_surface, sidewalk[1], COLOR_WHITE, pixels_per_meter_local, world_offset)
-            MapImage.draw_lane(shoulder_surface, shoulder[0], COLOR_WHITE, pixels_per_meter_local, world_offset)
-            MapImage.draw_lane(shoulder_surface, shoulder[1], COLOR_WHITE, pixels_per_meter_local, world_offset)
-            MapImage.draw_lane(parking_surface, parking[0], COLOR_WHITE, pixels_per_meter_local, world_offset)
-            MapImage.draw_lane(parking_surface, parking[1], COLOR_WHITE, pixels_per_meter_local, world_offset)
+            MapImage.draw_lane(
+                road_surface,
+                waypoints,
+                COLOR_WHITE,
+                pixels_per_meter_local,
+                world_offset,
+            )
+            MapImage.draw_lane(
+                sidewalk_surface,
+                sidewalk[0],
+                COLOR_WHITE,
+                pixels_per_meter_local,
+                world_offset,
+            )
+            MapImage.draw_lane(
+                sidewalk_surface,
+                sidewalk[1],
+                COLOR_WHITE,
+                pixels_per_meter_local,
+                world_offset,
+            )
+            MapImage.draw_lane(
+                shoulder_surface,
+                shoulder[0],
+                COLOR_WHITE,
+                pixels_per_meter_local,
+                world_offset,
+            )
+            MapImage.draw_lane(
+                shoulder_surface,
+                shoulder[1],
+                COLOR_WHITE,
+                pixels_per_meter_local,
+                world_offset,
+            )
+            MapImage.draw_lane(
+                parking_surface,
+                parking[0],
+                COLOR_WHITE,
+                pixels_per_meter_local,
+                world_offset,
+            )
+            MapImage.draw_lane(
+                parking_surface,
+                parking[1],
+                COLOR_WHITE,
+                pixels_per_meter_local,
+                world_offset,
+            )
 
             if not waypoint.is_junction:
                 MapImage.draw_lane_marking_single_side(
@@ -169,8 +227,12 @@ class MapImage:
         for stopline_vertices in TrafficLightHandler.list_stopline_vtx:
             for loc_left, loc_right in stopline_vertices:
                 stopline_points = [
-                    MapImage.world_to_pixel(loc_left, pixels_per_meter_local, world_offset),
-                    MapImage.world_to_pixel(loc_right, pixels_per_meter_local, world_offset),
+                    MapImage.world_to_pixel(
+                        loc_left, pixels_per_meter_local, world_offset
+                    ),
+                    MapImage.world_to_pixel(
+                        loc_right, pixels_per_meter_local, world_offset
+                    ),
                 ]
                 MapImage.draw_line(stopline_surface, stopline_points, 2)
 
@@ -184,7 +246,9 @@ class MapImage:
             "shoulder": _make_mask(shoulder_surface),
             "parking": _make_mask(parking_surface),
             "sidewalk": _make_mask(sidewalk_surface),
-            "lane_marking_yellow_broken": _make_mask(lane_marking_yellow_broken_surface),
+            "lane_marking_yellow_broken": _make_mask(
+                lane_marking_yellow_broken_surface
+            ),
             "lane_marking_yellow_solid": _make_mask(lane_marking_yellow_solid_surface),
             "lane_marking_white_broken": _make_mask(lane_marking_white_broken_surface),
             "lane_marking_white_solid": _make_mask(lane_marking_white_solid_surface),
@@ -219,7 +283,9 @@ class MapImage:
         markings_list = []
         temp_waypoints = []
         for sample in waypoints:
-            lane_marking = sample.left_lane_marking if sign < 0 else sample.right_lane_marking
+            lane_marking = (
+                sample.left_lane_marking if sign < 0 else sample.right_lane_marking
+            )
 
             if lane_marking is None:
                 continue
@@ -249,42 +315,73 @@ class MapImage:
 
         # Add last marking
         last_markings = MapImage.get_lane_markings(
-            previous_marking_type, previous_marking_color, temp_waypoints, sign, pixels_per_meter_local, world_offset
+            previous_marking_type,
+            previous_marking_color,
+            temp_waypoints,
+            sign,
+            pixels_per_meter_local,
+            world_offset,
         )
 
         for marking in last_markings:
             markings_list.append(marking)
         # Once the lane markings have been simplified to Solid or Broken lines, we draw them
         for markings in markings_list:
-            if markings[1] == carla.LaneMarkingColor.White and markings[0] == carla.LaneMarkingType.Solid:
+            if (
+                markings[1] == carla.LaneMarkingColor.White
+                and markings[0] == carla.LaneMarkingType.Solid
+            ):
                 MapImage.draw_line(lane_marking_white_solid_surface, markings[2], 1)
-            elif markings[1] == carla.LaneMarkingColor.Yellow and markings[0] == carla.LaneMarkingType.Solid:
+            elif (
+                markings[1] == carla.LaneMarkingColor.Yellow
+                and markings[0] == carla.LaneMarkingType.Solid
+            ):
                 MapImage.draw_line(lane_marking_yellow_solid_surface, markings[2], 1)
-            elif markings[1] == carla.LaneMarkingColor.White and markings[0] == carla.LaneMarkingType.Broken:
+            elif (
+                markings[1] == carla.LaneMarkingColor.White
+                and markings[0] == carla.LaneMarkingType.Broken
+            ):
                 MapImage.draw_line(lane_marking_white_broken_surface, markings[2], 1)
-            elif markings[1] == carla.LaneMarkingColor.Yellow and markings[0] == carla.LaneMarkingType.Broken:
+            elif (
+                markings[1] == carla.LaneMarkingColor.Yellow
+                and markings[0] == carla.LaneMarkingType.Broken
+            ):
                 MapImage.draw_line(lane_marking_yellow_broken_surface, markings[2], 1)
 
             MapImage.draw_line(lane_marking_all_surface, markings[2], 1)
 
     @staticmethod
-    def get_lane_markings(lane_marking_type, lane_marking_color, waypoints, sign, pixels_per_meter_local, world_offset):
+    def get_lane_markings(
+        lane_marking_type,
+        lane_marking_color,
+        waypoints,
+        sign,
+        pixels_per_meter_local,
+        world_offset,
+    ):
         """For multiple lane marking types (SolidSolid, BrokenSolid, SolidBroken and BrokenBroken), it converts them
         as a combination of Broken and Solid lines"""
         margin = 0.25
         marking_1 = [
             MapImage.world_to_pixel(
-                MapImage.lateral_shift(w.transform, sign * w.lane_width * 0.5), pixels_per_meter_local, world_offset
+                MapImage.lateral_shift(w.transform, sign * w.lane_width * 0.5),
+                pixels_per_meter_local,
+                world_offset,
             )
             for w in waypoints
         ]
 
-        if lane_marking_type in (carla.LaneMarkingType.Broken, carla.LaneMarkingType.Solid):
+        if lane_marking_type in (
+            carla.LaneMarkingType.Broken,
+            carla.LaneMarkingType.Solid,
+        ):
             return [(lane_marking_type, lane_marking_color, marking_1)]
         else:
             marking_2 = [
                 MapImage.world_to_pixel(
-                    MapImage.lateral_shift(w.transform, sign * (w.lane_width * 0.5 + margin * 2)),
+                    MapImage.lateral_shift(
+                        w.transform, sign * (w.lane_width * 0.5 + margin * 2)
+                    ),
                     pixels_per_meter_local,
                     world_offset,
                 )
@@ -316,16 +413,25 @@ class MapImage:
     def draw_line(surface, points, width):
         """Draws solid lines in a surface given a set of points, width and color"""
         if len(points) >= 2:
-            cv.polylines(surface, np.array([points], dtype=np.int32), False, 255, thickness=1)
+            cv.polylines(
+                surface, np.array([points], dtype=np.int32), False, 255, thickness=1
+            )
 
     @staticmethod
     def draw_lane(surface, wp_list, color, pixels_per_meter_local, world_offset):
         """Renders a single lane in a surface and with a specified color"""
-        lane_left_side = [MapImage.lateral_shift(w.transform, -w.lane_width * 0.5) for w in wp_list]
-        lane_right_side = [MapImage.lateral_shift(w.transform, w.lane_width * 0.5) for w in wp_list]
+        lane_left_side = [
+            MapImage.lateral_shift(w.transform, -w.lane_width * 0.5) for w in wp_list
+        ]
+        lane_right_side = [
+            MapImage.lateral_shift(w.transform, w.lane_width * 0.5) for w in wp_list
+        ]
 
         polygon = lane_left_side + list(reversed(lane_right_side))
-        polygon = [MapImage.world_to_pixel(x, pixels_per_meter_local, world_offset) for x in polygon]
+        polygon = [
+            MapImage.world_to_pixel(x, pixels_per_meter_local, world_offset)
+            for x in polygon
+        ]
 
         if len(polygon) > 2:
             cv.fillPoly(surface, np.array([polygon], dtype=np.int32), 255)
@@ -346,13 +452,22 @@ class MapImage:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--save_dir", default="carla_gym/core/obs_manager/birdview/maps")
-    parser.add_argument("--pixels_per_meter", type=float, default=2.0)
-    parser.add_argument("--carla_sh_path", default="/home/ubuntu/apps/carla/carla994/CarlaUE4.sh")
     parser.add_argument(
-        "--carla_root", type=str, default=r"/home/jaeger/ordnung/internal/carla_9_15", help="folder containing carla"
+        "--save_dir", default="carla_gym/core/obs_manager/birdview/maps"
     )
-    parser.add_argument("--gpu_id", default=0, type=int, help="id to run the carla server on")
+    parser.add_argument("--pixels_per_meter", type=float, default=2.0)
+    parser.add_argument(
+        "--carla_sh_path", default="/home/ubuntu/apps/carla/carla994/CarlaUE4.sh"
+    )
+    parser.add_argument(
+        "--carla_root",
+        type=str,
+        default=r"/home/jaeger/ordnung/internal/carla_9_15",
+        help="folder containing carla",
+    )
+    parser.add_argument(
+        "--gpu_id", default=0, type=int, help="id to run the carla server on"
+    )
 
     args = parser.parse_args()
     client_ports = []
@@ -413,10 +528,14 @@ if __name__ == "__main__":
             hf_pixels_per_meter = float(map_hf.attrs["pixels_per_meter"])
             map_hf.close()
             if np.isclose(hf_pixels_per_meter, pixels_per_meter):
-                print(f"{carla_map}.h5 with pixels_per_meter={pixels_per_meter:.2f} already exists.")
+                print(
+                    f"{carla_map}.h5 with pixels_per_meter={pixels_per_meter:.2f} already exists."
+                )
                 continue
 
-        print(f"Generating {carla_map}.h5 with pixels_per_meter={pixels_per_meter:.2f}.")
+        print(
+            f"Generating {carla_map}.h5 with pixels_per_meter={pixels_per_meter:.2f}."
+        )
         world = client.load_world(carla_map, reset_settings=False)
 
         dict_masks = MapImage.draw_map_image(world.get_map(), pixels_per_meter)
@@ -426,12 +545,39 @@ if __name__ == "__main__":
             hf.attrs["world_offset_in_meters"] = dict_masks["world_offset"]
             hf.attrs["width_in_meters"] = dict_masks["width_in_meters"]
             hf.attrs["width_in_pixels"] = dict_masks["width_in_pixels"]
-            hf.create_dataset("road", data=dict_masks["road"], compression="gzip", compression_opts=9)
-            hf.create_dataset("shoulder", data=dict_masks["shoulder"], compression="gzip", compression_opts=9)
-            hf.create_dataset("parking", data=dict_masks["parking"], compression="gzip", compression_opts=9)
-            hf.create_dataset("sidewalk", data=dict_masks["sidewalk"], compression="gzip", compression_opts=9)
-            hf.create_dataset("stopline", data=dict_masks["stopline"], compression="gzip", compression_opts=9)
-            hf.create_dataset("lane_marking_all", data=dict_masks["lane_marking_all"], compression="gzip", compression_opts=9)
+            hf.create_dataset(
+                "road", data=dict_masks["road"], compression="gzip", compression_opts=9
+            )
+            hf.create_dataset(
+                "shoulder",
+                data=dict_masks["shoulder"],
+                compression="gzip",
+                compression_opts=9,
+            )
+            hf.create_dataset(
+                "parking",
+                data=dict_masks["parking"],
+                compression="gzip",
+                compression_opts=9,
+            )
+            hf.create_dataset(
+                "sidewalk",
+                data=dict_masks["sidewalk"],
+                compression="gzip",
+                compression_opts=9,
+            )
+            hf.create_dataset(
+                "stopline",
+                data=dict_masks["stopline"],
+                compression="gzip",
+                compression_opts=9,
+            )
+            hf.create_dataset(
+                "lane_marking_all",
+                data=dict_masks["lane_marking_all"],
+                compression="gzip",
+                compression_opts=9,
+            )
             hf.create_dataset(
                 "lane_marking_yellow_broken",
                 data=dict_masks["lane_marking_yellow_broken"],

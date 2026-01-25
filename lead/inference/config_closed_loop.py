@@ -14,7 +14,9 @@ class ClosedLoopConfig(OpenLoopConfig):
     def __init__(self, raise_error_on_missing_key: bool = True):
         super().__init__(raise_error_on_missing_key=raise_error_on_missing_key)
         self.load_from_environment(
-            loaded_config=None, env_key="LEAD_CLOSED_LOOP_CONFIG", raise_error_on_missing_key=raise_error_on_missing_key
+            loaded_config=None,
+            env_key="LEAD_CLOSED_LOOP_CONFIG",
+            raise_error_on_missing_key=raise_error_on_missing_key,
         )
 
     # --- Kalman Filter Settings ---

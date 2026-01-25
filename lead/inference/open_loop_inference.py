@@ -61,7 +61,9 @@ class OpenLoopInference:
                     map_location=self.device,
                     weights_only=True,
                 )
-                net.load_state_dict(state_dict, strict=config_open_loop.strict_weight_load)
+                net.load_state_dict(
+                    state_dict, strict=config_open_loop.strict_weight_load
+                )
                 net.cuda(device=self.device).eval()
                 self.nets.append(net)
         self.step = 4  # Constant so produced images start with 5, not really important
@@ -86,41 +88,53 @@ class OpenLoopInference:
             pred_target_speed_scalar: The aggregated target speed.
             pred_target_speed_distribution: The aggregated target speed distribution.
         """
-        pred_routes = pred_future_waypoints = pred_target_speed_scalar = pred_target_speed_distribution = (
-            pred_future_headings
-        ) = None
+        pred_routes = pred_future_waypoints = pred_target_speed_scalar = (
+            pred_target_speed_distribution
+        ) = pred_future_headings = None
 
         if self.config_training.use_planning_decoder:
             if self.config_training.predict_target_speed:
-                pred_target_speed_logits = torch.stack([pred.pred_target_speed_distribution[0] for pred in predictions]).mean(
-                    dim=0, keepdim=True
-                )  # Average target speed logits.
+                pred_target_speed_logits = torch.stack(
+                    [pred.pred_target_speed_distribution[0] for pred in predictions]
+                ).mean(dim=0, keepdim=True)  # Average target speed logits.
 
-                pred_target_speed_distribution = F.softmax(pred_target_speed_logits, dim=-1)  # softmax probabilities.
+                pred_target_speed_distribution = F.softmax(
+                    pred_target_speed_logits, dim=-1
+                )  # softmax probabilities.
                 pred_target_speed_scalar = decode_two_hot(
-                    pred_target_speed_distribution, self.config_training.target_speed_classes, self.device
+                    pred_target_speed_distribution,
+                    self.config_training.target_speed_classes,
+                    self.device,
                 ).reshape(1, 1)  # Decode to scalar.
                 if (
-                    pred_target_speed_distribution[0, 0] > self.config_open_loop.brake_threshold
+                    pred_target_speed_distribution[0, 0]
+                    > self.config_open_loop.brake_threshold
                 ):  # Brake if we are confident enough.
                     pred_target_speed_scalar = torch.Tensor([0.0]).reshape(1, -1)
-                if self.config_open_loop.lower_target_speed:  # Optionally lower the target speed.
-                    pred_target_speed_scalar *= self.config_open_loop.lower_target_speed_factor
+                if (
+                    self.config_open_loop.lower_target_speed
+                ):  # Optionally lower the target speed.
+                    pred_target_speed_scalar *= (
+                        self.config_open_loop.lower_target_speed_factor
+                    )
 
             if self.config_training.predict_temporal_spatial_waypoints:
-                pred_future_waypoints = torch.stack([pred.pred_future_waypoints[0] for pred in predictions]).mean(
-                    dim=0, keepdim=True
-                )  # Average waypoints.
+                pred_future_waypoints = torch.stack(
+                    [pred.pred_future_waypoints[0] for pred in predictions]
+                ).mean(dim=0, keepdim=True)  # Average waypoints.
 
             if self.config_training.predict_spatial_path:
-                pred_routes = torch.stack([pred.pred_route[0] for pred in predictions]).mean(
-                    dim=0, keepdim=True
-                )  # Average route.
+                pred_routes = torch.stack(
+                    [pred.pred_route[0] for pred in predictions]
+                ).mean(dim=0, keepdim=True)  # Average route.
 
-            if self.config_training.use_navsim_data and predictions[0].pred_headings is not None:
-                pred_future_headings = torch.stack([pred.pred_headings[0] for pred in predictions]).mean(
-                    dim=0, keepdim=True
-                )  # Average headings.
+            if (
+                self.config_training.use_navsim_data
+                and predictions[0].pred_headings is not None
+            ):
+                pred_future_headings = torch.stack(
+                    [pred.pred_headings[0] for pred in predictions]
+                ).mean(dim=0, keepdim=True)  # Average headings.
 
         return (
             pred_routes,
@@ -144,20 +158,27 @@ class OpenLoopInference:
         pred_bounding_boxes_vehicle_system, pred_bounding_boxes_image_system = [], []
         if self.config_training.detect_boxes:
             for prediction in predictions:
-                pred_bb = prediction.pred_bounding_box.pred_bounding_box_vehicle_system.squeeze().reshape(-1, 9)
+                pred_bb = prediction.pred_bounding_box.pred_bounding_box_vehicle_system.squeeze().reshape(
+                    -1, 9
+                )
                 if len(pred_bb) > 0:
                     pred_bounding_boxes_vehicle_system.append(pred_bb)
 
         if len(pred_bounding_boxes_vehicle_system) > 0:
-            pred_bounding_boxes_vehicle_system = inference_utils.non_maximum_suppression(
-                pred_bounding_boxes_vehicle_system, float(self.config_training.iou_threshold_nms)
+            pred_bounding_boxes_vehicle_system = (
+                inference_utils.non_maximum_suppression(
+                    pred_bounding_boxes_vehicle_system,
+                    float(self.config_training.iou_threshold_nms),
+                )
             )
 
-            pred_bounding_boxes_image_system = carla_dataset_utils.bb_vehicle_to_image_system(
-                pred_bounding_boxes_vehicle_system,
-                self.config_training.pixels_per_meter,
-                self.config_training.min_x_meter,
-                self.config_training.min_y_meter,
+            pred_bounding_boxes_image_system = (
+                carla_dataset_utils.bb_vehicle_to_image_system(
+                    pred_bounding_boxes_vehicle_system,
+                    self.config_training.pixels_per_meter,
+                    self.config_training.min_x_meter,
+                    self.config_training.min_y_meter,
+                )
             )
 
             pred_bounding_boxes_vehicle_system = [
@@ -206,14 +227,22 @@ class OpenLoopInference:
             pred_bev_semantic = []
             for prediction in predictions:
                 pred_bev_semantic.append(prediction.pred_bev_semantic)
-            stacked = torch.stack(pred_bev_semantic, dim=0)  # (num_models, num_batches, num_classes, H, W)
-            ch0 = stacked[:, :, 0].min(dim=0).values.unsqueeze(1)  # (num_batches, 1, H, W)
-            others = stacked[:, :, 1:].max(dim=0).values  # (num_batches, num_classes-1, H, W)
+            stacked = torch.stack(
+                pred_bev_semantic, dim=0
+            )  # (num_models, num_batches, num_classes, H, W)
+            ch0 = (
+                stacked[:, :, 0].min(dim=0).values.unsqueeze(1)
+            )  # (num_batches, 1, H, W)
+            others = (
+                stacked[:, :, 1:].max(dim=0).values
+            )  # (num_batches, num_classes-1, H, W)
             return torch.cat([ch0, others], dim=1)  # (num_batches, num_classes, H, W)
         return None
 
     @beartype
-    def ensemble_depth(self, predictions: list[Prediction]) -> jt.Float[torch.Tensor, "B img_height img_width"] | None:
+    def ensemble_depth(
+        self, predictions: list[Prediction]
+    ) -> jt.Float[torch.Tensor, "B img_height img_width"] | None:
         """
         Args:
             predictions: List of dictionaries containing the predictions of each model
@@ -242,9 +271,15 @@ class OpenLoopInference:
             pred_semantic = []
             for prediction in predictions:
                 pred_semantic.append(prediction.pred_semantic)
-            stacked = torch.stack(pred_semantic, dim=0)  # (num_models, num_batches, num_classes, H, W)
-            ch0 = stacked[:, :, 0].min(dim=0).values.unsqueeze(1)  # (num_batches, 1, H, W)
-            others = stacked[:, :, 1:].max(dim=0).values  # (num_batches, num_classes-1, H, W)
+            stacked = torch.stack(
+                pred_semantic, dim=0
+            )  # (num_models, num_batches, num_classes, H, W)
+            ch0 = (
+                stacked[:, :, 0].min(dim=0).values.unsqueeze(1)
+            )  # (num_batches, 1, H, W)
+            others = (
+                stacked[:, :, 1:].max(dim=0).values
+            )  # (num_batches, num_classes-1, H, W)
             return torch.cat([ch0, others], dim=1)  # (num_batches, num_classes, H, W)
         return None
 
@@ -262,7 +297,9 @@ class OpenLoopInference:
             None,
         )
         if self.config_training.carla_leaderboard_mode:
-            pred_bounding_boxes_vehicle_system, pred_bounding_boxes_image_system = self.ensemble_bounding_boxes(predictions)
+            pred_bounding_boxes_vehicle_system, pred_bounding_boxes_image_system = (
+                self.ensemble_bounding_boxes(predictions)
+            )
 
         # BEV semantic map
         pred_bev_semantic = None
@@ -280,9 +317,13 @@ class OpenLoopInference:
             pred_depth = self.ensemble_depth(predictions)
 
         # Planning
-        pred_route, pred_future_waypoints, pred_target_speed_scalar, pred_target_speed_distribution, pred_future_headings = (
-            self.ensemble_planning_decoder(predictions)
-        )
+        (
+            pred_route,
+            pred_future_waypoints,
+            pred_target_speed_scalar,
+            pred_target_speed_distribution,
+            pred_future_headings,
+        ) = self.ensemble_planning_decoder(predictions)
 
         return OpenLoopPrediction(
             pred_future_waypoints=pred_future_waypoints,
@@ -324,11 +365,17 @@ class OpenLoopPrediction:
     pred_future_waypoints: jt.Float[torch.Tensor, "bs n_waypoints 2"] | None
     pred_future_headings: jt.Float[torch.Tensor, "bs n_waypoints"] | None
     pred_target_speed_scalar: jt.Float[torch.Tensor, "bs 1"] | None
-    pred_target_speed_distribution: jt.Float[torch.Tensor, "bs num_speed_classes"] | None
+    pred_target_speed_distribution: (
+        jt.Float[torch.Tensor, "bs num_speed_classes"] | None
+    )
     pred_route: jt.Float[torch.Tensor, "bs n_checkpoints 2"] | None
-    pred_semantic: jt.Float[torch.Tensor, "bs num_sem_classes img_height img_width"] | None
+    pred_semantic: (
+        jt.Float[torch.Tensor, "bs num_sem_classes img_height img_width"] | None
+    )
     pred_depth: jt.Float[torch.Tensor, "bs img_height img_width"] | None
-    pred_bev_semantic: jt.Float[torch.Tensor, "bs num_bev_classes bev_height bev_width"] | None
+    pred_bev_semantic: (
+        jt.Float[torch.Tensor, "bs num_bev_classes bev_height bev_width"] | None
+    )
     pred_bounding_box_vehicle_system: list[PredictedBoundingBox] | None
     pred_bounding_box_image_system: list[PredictedBoundingBox] | None
     pred_radar_predictions: None

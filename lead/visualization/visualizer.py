@@ -13,7 +13,11 @@ from PIL import Image, ImageDraw, ImageFont
 
 import lead.common.common_utils as common_utils
 import lead.common.constants as constants
-from lead.common.constants import CARLA_NAVIGATION_COMMAND_STR_MAP, RadarLabels, TransfuserBoundingBoxIndex
+from lead.common.constants import (
+    CARLA_NAVIGATION_COMMAND_STR_MAP,
+    RadarLabels,
+    TransfuserBoundingBoxIndex,
+)
 from lead.data_loader import carla_dataset_utils
 from lead.inference.closed_loop_inference import ClosedLoopPrediction
 from lead.inference.config_closed_loop import ClosedLoopConfig
@@ -63,11 +67,20 @@ class Visualizer:
         # Initialize variables for visualization
         self.rasterized_lidar = data.get("rasterized_lidar")
 
-        self.size_width = int((self.config.max_y_meter - self.config.min_y_meter) * self.config.pixels_per_meter)
-        self.size_height = int((self.config.max_x_meter - self.config.min_x_meter) * self.config.pixels_per_meter)
+        self.size_width = int(
+            (self.config.max_y_meter - self.config.min_y_meter)
+            * self.config.pixels_per_meter
+        )
+        self.size_height = int(
+            (self.config.max_x_meter - self.config.min_x_meter)
+            * self.config.pixels_per_meter
+        )
         self.origin = (
             (self.size_height * self.scale_factor)
-            // ((self.config.max_x_meter - self.config.min_x_meter) / max((-self.config.min_x_meter), 1)),
+            // (
+                (self.config.max_x_meter - self.config.min_x_meter)
+                / max((-self.config.min_x_meter), 1)
+            ),
             (self.size_width * self.scale_factor) // 2,
         )
         self.loc_pixels_per_meter = self.config.pixels_per_meter * self.scale_factor
@@ -86,7 +99,10 @@ class Visualizer:
 
         self.bev_image = cv2.resize(
             bev_img,
-            dsize=(bev_img.shape[1] * self.scale_factor, bev_img.shape[0] * self.scale_factor),
+            dsize=(
+                bev_img.shape[1] * self.scale_factor,
+                bev_img.shape[0] * self.scale_factor,
+            ),
             interpolation=cv2.INTER_NEAREST,
         )
 
@@ -193,16 +209,22 @@ class Visualizer:
                 px = int(origin[0] + xm * ppm)
                 py = int(origin[1] + ym * ppm)
 
-                rpx = int(np.clip(min_r + (abs(vk) / vmax) * (max_r - min_r), min_r, max_r))
+                rpx = int(
+                    np.clip(min_r + (abs(vk) / vmax) * (max_r - min_r), min_r, max_r)
+                )
                 filled = vk > 0  # filled = approaching, outline = receding
 
-                viz_utils.draw_gaussian_blob(bev, px, py, rpx, constants.RADAR_COLOR, filled)
+                viz_utils.draw_gaussian_blob(
+                    bev, px, py, rpx, constants.RADAR_COLOR, filled
+                )
 
         # Visualize radar detections labels
         if plot_detection_label:
             radar_detections = self.data.get("radar_detections")
             radar_detection_waypoints = self.data.get("radar_detection_waypoints")
-            radar_detection_num_waypoints = self.data.get("radar_detection_num_waypoints")
+            radar_detection_num_waypoints = self.data.get(
+                "radar_detection_num_waypoints"
+            )
 
             if radar_detections is not None:
                 radar_detections = radar_detections[0].cpu().numpy()
@@ -212,26 +234,43 @@ class Visualizer:
                 if valid_detections.shape[0] > 0:
                     x = valid_detections[:, 0]  # x coordinates
                     y = valid_detections[:, 1]  # y coordinates
-                    v = np.abs(np.nan_to_num(valid_detections[:, 2], nan=0.0))  # velocity magnitude
+                    v = np.abs(
+                        np.nan_to_num(valid_detections[:, 2], nan=0.0)
+                    )  # velocity magnitude
 
                     for xm, ym, vk in zip(x, y, v, strict=False):
                         px = int(origin[0] + xm * ppm)
                         py = int(origin[1] + ym * ppm)
 
-                        rpx = 1 + int(np.clip(min_r + (abs(vk) / vmax) * (max_r - min_r), min_r, max_r))
+                        rpx = 1 + int(
+                            np.clip(
+                                min_r + (abs(vk) / vmax) * (max_r - min_r), min_r, max_r
+                            )
+                        )
                         filled = vk > 0  # filled = approaching, outline = receding
-                        viz_utils.draw_gaussian_blob(bev, px, py, rpx, constants.RADAR_DETECTION_COLOR, filled)
+                        viz_utils.draw_gaussian_blob(
+                            bev, px, py, rpx, constants.RADAR_DETECTION_COLOR, filled
+                        )
 
                 # Draw waypoints for valid detections
-                if radar_detection_waypoints is not None and radar_detection_num_waypoints is not None:
-                    radar_detection_waypoints = radar_detection_waypoints[0].cpu().numpy()
-                    radar_detection_num_waypoints = radar_detection_num_waypoints[0].cpu().numpy()
+                if (
+                    radar_detection_waypoints is not None
+                    and radar_detection_num_waypoints is not None
+                ):
+                    radar_detection_waypoints = (
+                        radar_detection_waypoints[0].cpu().numpy()
+                    )
+                    radar_detection_num_waypoints = (
+                        radar_detection_num_waypoints[0].cpu().numpy()
+                    )
 
                     # Get waypoints only for valid detections
                     valid_waypoints = radar_detection_waypoints[valid_mask]
                     valid_num_waypoints = radar_detection_num_waypoints[valid_mask]
 
-                    for waypoints, num_wps in zip(valid_waypoints, valid_num_waypoints, strict=False):
+                    for waypoints, num_wps in zip(
+                        valid_waypoints, valid_num_waypoints, strict=False
+                    ):
                         if num_wps > 0:
                             # Draw waypoints as small circles
                             for i in range(int(num_wps)):
@@ -272,7 +311,11 @@ class Visualizer:
                                 )
 
         # Visualize radar detection predictions
-        if plot_detection_prediction and self.predictions is not None and self.predictions.pred_radar_predictions is not None:
+        if (
+            plot_detection_prediction
+            and self.predictions is not None
+            and self.predictions.pred_radar_predictions is not None
+        ):
             radar_predictions = self.predictions.pred_radar_predictions[0].cpu()
             valid_mask = torch.sigmoid(radar_predictions[:, RadarLabels.VALID]) > 0.5
             valid_predictions = radar_predictions[valid_mask].detach().float().numpy()
@@ -280,15 +323,23 @@ class Visualizer:
             if valid_predictions.shape[0] > 0:
                 x = valid_predictions[:, 0]  # x coordinates
                 y = valid_predictions[:, 1]  # y coordinates
-                v = np.abs(np.nan_to_num(valid_predictions[:, 2], nan=0.0))  # velocity magnitude
+                v = np.abs(
+                    np.nan_to_num(valid_predictions[:, 2], nan=0.0)
+                )  # velocity magnitude
 
                 for xm, ym, vk in zip(x, y, v, strict=False):
                     px = int(origin[0] + xm * ppm)
                     py = int(origin[1] + ym * ppm)
 
-                    rpx = 1 + int(np.clip(min_r + (abs(vk) / vmax) * (max_r - min_r), min_r, max_r))
+                    rpx = 1 + int(
+                        np.clip(
+                            min_r + (abs(vk) / vmax) * (max_r - min_r), min_r, max_r
+                        )
+                    )
                     filled = vk > 0  # filled = approaching, outline = receding
-                    viz_utils.draw_gaussian_blob(bev, px, py, rpx, constants.RADAR_DETECTION_COLOR, filled)
+                    viz_utils.draw_gaussian_blob(
+                        bev, px, py, rpx, constants.RADAR_DETECTION_COLOR, filled
+                    )
 
     def _process_all_perspectives(self, training=False):
         self.perspectives = {}
@@ -313,11 +364,20 @@ class Visualizer:
                 else:
                     perspective = perspective.unsqueeze(0)
 
-            perspective_image = perspective.permute(1, 2, 0).detach().cpu().float().numpy().astype(np.uint8)
+            perspective_image = (
+                perspective.permute(1, 2, 0)
+                .detach()
+                .cpu()
+                .float()
+                .numpy()
+                .astype(np.uint8)
+            )
             perspective_image = np.ascontiguousarray(perspective_image)
 
             if perspective_modality == "semantic":
-                converter = np.uint8(list(constants.TRANSFUSER_SEMANTIC_COLORS.values()))
+                converter = np.uint8(
+                    list(constants.TRANSFUSER_SEMANTIC_COLORS.values())
+                )
                 perspective_image = converter[perspective_image[..., 0]]
             if perspective_modality == "depth":
                 image = perspective_image[..., 0].astype(np.float32)
@@ -329,12 +389,20 @@ class Visualizer:
                 perspective_image = cv2.applyColorMap(log_image, cv2.COLORMAP_WINTER)
 
             # Draw target speed prediction on RGB image
-            if perspective_modality == "rgb" and training and self.predictions is not None:
+            if (
+                perspective_modality == "rgb"
+                and training
+                and self.predictions is not None
+            ):
                 if (
                     hasattr(self.predictions, "pred_target_speed_scalar")
                     and self.predictions.pred_target_speed_scalar is not None
                 ):
-                    pred_speed = float(self.predictions.pred_target_speed_scalar.detach().cpu().float()[0])
+                    pred_speed = float(
+                        self.predictions.pred_target_speed_scalar.detach()
+                        .cpu()
+                        .float()[0]
+                    )
 
                     # Position: lower middle of the image
                     img_height, img_width = perspective_image.shape[:2]
@@ -365,7 +433,10 @@ class Visualizer:
                     draw.rectangle(
                         [
                             (x - padding_horizontal, y - padding_top),
-                            (x + text_width + padding_horizontal, y + text_height + padding_bottom),
+                            (
+                                x + text_width + padding_horizontal,
+                                y + text_height + padding_bottom,
+                            ),
                         ],
                         fill=(0, 0, 0, 180),
                     )
@@ -377,7 +448,9 @@ class Visualizer:
 
             self.perspectives[perspective_modality] = perspective_image
 
-    def _concatenate_all_perspectives_and_bev(self, border_size: int = 10, border_color: tuple = (255, 255, 255)) -> np.ndarray:
+    def _concatenate_all_perspectives_and_bev(
+        self, border_size: int = 10, border_color: tuple = (255, 255, 255)
+    ) -> np.ndarray:
         """
         Concatenate all perspectives vertically, then add BEV on the left side with white borders.
 
@@ -414,7 +487,13 @@ class Visualizer:
             # Add top border (except for first image)
             if i > 0:
                 top_border = np.full(
-                    (border_size, img.shape[1], img.shape[2] if len(img.shape) == 3 else 1), border_color, dtype=np.uint8
+                    (
+                        border_size,
+                        img.shape[1],
+                        img.shape[2] if len(img.shape) == 3 else 1,
+                    ),
+                    border_color,
+                    dtype=np.uint8,
                 )
                 if len(img.shape) == 2:  # Grayscale
                     top_border = top_border.squeeze(-1)
@@ -430,12 +509,24 @@ class Visualizer:
         # Add only right border to perspectives (left border will be shared with BEV)
         if len(stacked_perspectives.shape) == 3:
             right_border = np.full(
-                (stacked_perspectives.shape[0], border_size, stacked_perspectives.shape[2]), border_color, dtype=np.uint8
+                (
+                    stacked_perspectives.shape[0],
+                    border_size,
+                    stacked_perspectives.shape[2],
+                ),
+                border_color,
+                dtype=np.uint8,
             )
         else:  # Grayscale
-            right_border = np.full((stacked_perspectives.shape[0], border_size), border_color[0], dtype=np.uint8)
+            right_border = np.full(
+                (stacked_perspectives.shape[0], border_size),
+                border_color[0],
+                dtype=np.uint8,
+            )
 
-        stacked_perspectives = np.concatenate((stacked_perspectives, right_border), axis=1)
+        stacked_perspectives = np.concatenate(
+            (stacked_perspectives, right_border), axis=1
+        )
 
         # Resize BEV to match the total height of stacked perspectives
         target_height = stacked_perspectives.shape[0]
@@ -445,57 +536,104 @@ class Visualizer:
         # Add only left border to BEV (right border will be shared with perspectives)
         if len(lidar_resized.shape) == 3:
             bev_left_border = np.full(
-                (lidar_resized.shape[0], border_size, lidar_resized.shape[2]), border_color, dtype=np.uint8
+                (lidar_resized.shape[0], border_size, lidar_resized.shape[2]),
+                border_color,
+                dtype=np.uint8,
             )
         else:  # Grayscale
-            bev_left_border = np.full((lidar_resized.shape[0], border_size), border_color[0], dtype=np.uint8)
+            bev_left_border = np.full(
+                (lidar_resized.shape[0], border_size), border_color[0], dtype=np.uint8
+            )
 
         lidar_bordered = np.concatenate((bev_left_border, lidar_resized), axis=1)
 
         # Add shared border between BEV and perspectives
         if len(lidar_bordered.shape) == 3:
             shared_border = np.full(
-                (lidar_bordered.shape[0], border_size, lidar_bordered.shape[2]), border_color, dtype=np.uint8
+                (lidar_bordered.shape[0], border_size, lidar_bordered.shape[2]),
+                border_color,
+                dtype=np.uint8,
             )
         else:  # Grayscale
-            shared_border = np.full((lidar_bordered.shape[0], border_size), border_color[0], dtype=np.uint8)
+            shared_border = np.full(
+                (lidar_bordered.shape[0], border_size), border_color[0], dtype=np.uint8
+            )
 
         # Concatenate BEV on the left, shared border, then perspectives on the right
-        ret = np.concatenate((lidar_bordered, shared_border, stacked_perspectives), axis=1)
+        ret = np.concatenate(
+            (lidar_bordered, shared_border, stacked_perspectives), axis=1
+        )
 
         # Add third person view if available
         if self.config.load_bev_3rd_person_images:
             third_person_image = self.data.get("bev_3rd_person")
             if third_person_image is not None:
                 third_person_image = third_person_image[0].detach().cpu().numpy()
-                third_person_image = np.ascontiguousarray(third_person_image, dtype=np.uint8)
+                third_person_image = np.ascontiguousarray(
+                    third_person_image, dtype=np.uint8
+                )
 
                 target_height = ret.shape[0]
-                target_width = int(third_person_image.shape[1] * (target_height / third_person_image.shape[0]))
-                third_person_image = cv2.resize(third_person_image, (target_width, target_height))
+                target_width = int(
+                    third_person_image.shape[1]
+                    * (target_height / third_person_image.shape[0])
+                )
+                third_person_image = cv2.resize(
+                    third_person_image, (target_width, target_height)
+                )
 
                 # Add borders to third person view
                 if len(third_person_image.shape) == 3:
                     tp_left_border = np.full(
-                        (third_person_image.shape[0], border_size, third_person_image.shape[2]), border_color, dtype=np.uint8
+                        (
+                            third_person_image.shape[0],
+                            border_size,
+                            third_person_image.shape[2],
+                        ),
+                        border_color,
+                        dtype=np.uint8,
                     )
                     tp_right_border = np.full(
-                        (third_person_image.shape[0], border_size, third_person_image.shape[2]), border_color, dtype=np.uint8
+                        (
+                            third_person_image.shape[0],
+                            border_size,
+                            third_person_image.shape[2],
+                        ),
+                        border_color,
+                        dtype=np.uint8,
                     )
                 else:  # Grayscale
-                    tp_left_border = np.full((third_person_image.shape[0], border_size), border_color[0], dtype=np.uint8)
-                    tp_right_border = np.full((third_person_image.shape[0], border_size), border_color[0], dtype=np.uint8)
+                    tp_left_border = np.full(
+                        (third_person_image.shape[0], border_size),
+                        border_color[0],
+                        dtype=np.uint8,
+                    )
+                    tp_right_border = np.full(
+                        (third_person_image.shape[0], border_size),
+                        border_color[0],
+                        dtype=np.uint8,
+                    )
 
-                third_person_bordered = np.concatenate((tp_left_border, third_person_image, tp_right_border), axis=1)
+                third_person_bordered = np.concatenate(
+                    (tp_left_border, third_person_image, tp_right_border), axis=1
+                )
                 ret = np.concatenate((ret, third_person_bordered), axis=1)
 
         # Add top and bottom borders to the entire composition
         if len(ret.shape) == 3:
-            top_border = np.full((border_size, ret.shape[1], ret.shape[2]), border_color, dtype=np.uint8)
-            bottom_border = np.full((border_size, ret.shape[1], ret.shape[2]), border_color, dtype=np.uint8)
+            top_border = np.full(
+                (border_size, ret.shape[1], ret.shape[2]), border_color, dtype=np.uint8
+            )
+            bottom_border = np.full(
+                (border_size, ret.shape[1], ret.shape[2]), border_color, dtype=np.uint8
+            )
         else:  # Grayscale
-            top_border = np.full((border_size, ret.shape[1]), border_color[0], dtype=np.uint8)
-            bottom_border = np.full((border_size, ret.shape[1]), border_color[0], dtype=np.uint8)
+            top_border = np.full(
+                (border_size, ret.shape[1]), border_color[0], dtype=np.uint8
+            )
+            bottom_border = np.full(
+                (border_size, ret.shape[1]), border_color[0], dtype=np.uint8
+            )
 
         ret = np.concatenate((top_border, ret, bottom_border), axis=0)
 
@@ -508,10 +646,16 @@ class Visualizer:
         # Add border above meta panel
         if len(meta_panel_resized.shape) == 3:
             meta_top_border = np.full(
-                (border_size, meta_panel_resized.shape[1], meta_panel_resized.shape[2]), border_color, dtype=np.uint8
+                (border_size, meta_panel_resized.shape[1], meta_panel_resized.shape[2]),
+                border_color,
+                dtype=np.uint8,
             )
         else:
-            meta_top_border = np.full((border_size, meta_panel_resized.shape[1]), border_color[0], dtype=np.uint8)
+            meta_top_border = np.full(
+                (border_size, meta_panel_resized.shape[1]),
+                border_color[0],
+                dtype=np.uint8,
+            )
 
         ret = np.concatenate((ret, meta_top_border, meta_panel_resized), axis=0)
 
@@ -532,7 +676,9 @@ class Visualizer:
 
         # Visualization
         if bev_semantic is not None:
-            converter = np.array(list(constants.CARLA_TRANSFUSER_BEV_SEMANTIC_COLOR_CONVERTER.values()))
+            converter = np.array(
+                list(constants.CARLA_TRANSFUSER_BEV_SEMANTIC_COLOR_CONVERTER.values())
+            )
             converter[1][0:3] = 40
             bev_semantic_image = converter[bev_semantic, ...].astype("uint8")
             alpha = np.ones_like(bev_semantic) * 0.33
@@ -562,28 +708,49 @@ class Visualizer:
         target_point_previous = self.data.get("target_point_previous")
 
         if target_point_previous is not None:
-            x_tp = target_point_previous[0][0] * self.loc_pixels_per_meter + self.origin[0]
-            y_tp = target_point_previous[0][1] * self.loc_pixels_per_meter + self.origin[1]
+            x_tp = (
+                target_point_previous[0][0] * self.loc_pixels_per_meter + self.origin[0]
+            )
+            y_tp = (
+                target_point_previous[0][1] * self.loc_pixels_per_meter + self.origin[1]
+            )
             viz_utils.draw_circle_with_number(
-                self.bev_image, int(x_tp), int(y_tp), constants.TP_DEFAULT_COLOR, radius=14, number=0
+                self.bev_image,
+                int(x_tp),
+                int(y_tp),
+                constants.TP_DEFAULT_COLOR,
+                radius=14,
+                number=0,
             )
 
         if target_point_next is not None:
             x_tp = target_point_next[0][0] * self.loc_pixels_per_meter + self.origin[0]
             y_tp = target_point_next[0][1] * self.loc_pixels_per_meter + self.origin[1]
             viz_utils.draw_circle_with_number(
-                self.bev_image, int(x_tp), int(y_tp), constants.TP_DEFAULT_COLOR, radius=14, number=2
+                self.bev_image,
+                int(x_tp),
+                int(y_tp),
+                constants.TP_DEFAULT_COLOR,
+                radius=14,
+                number=2,
             )
 
         if target_point is not None:
             x_tp = target_point[0][0] * self.loc_pixels_per_meter + self.origin[0]
             y_tp = target_point[0][1] * self.loc_pixels_per_meter + self.origin[1]
             viz_utils.draw_circle_with_number(
-                self.bev_image, int(x_tp), int(y_tp), constants.TP_DEFAULT_COLOR, radius=18, number=1
+                self.bev_image,
+                int(x_tp),
+                int(y_tp),
+                constants.TP_DEFAULT_COLOR,
+                radius=18,
+                number=1,
             )
 
     @beartype
-    def _draw_points_in_perspective(self, points: NDArray, size: int, connected: bool, color: tuple[int, int, int]):
+    def _draw_points_in_perspective(
+        self, points: NDArray, size: int, connected: bool, color: tuple[int, int, int]
+    ):
         if not (len(points) > 0 and points.shape[0] > 0):
             return
         # Image
@@ -613,7 +780,12 @@ class Visualizer:
         for i in range(3):
             # Project points to current camera
             projected_points, inside_image = common_utils.project_points_to_image(
-                camera_rots[i], camera_poses[i], camera_fovs[i], camera_widths[i], camera_height, points
+                camera_rots[i],
+                camera_poses[i],
+                camera_fovs[i],
+                camera_widths[i],
+                camera_height,
+                points,
             )
 
             if connected:
@@ -648,7 +820,9 @@ class Visualizer:
 
     def _route(self):
         route = self.data.get("route")
-        if route is not None and (self.config.use_planning_decoder or self.config.visualize_dataset):
+        if route is not None and (
+            self.config.use_planning_decoder or self.config.visualize_dataset
+        ):
             wps = route.detach().cpu().numpy()[0]
 
             for i in range(len(wps) - 1):
@@ -657,7 +831,9 @@ class Visualizer:
                 x2 = int(wps[i + 1][0] * self.loc_pixels_per_meter + self.origin[0])
                 y2 = int(wps[i + 1][1] * self.loc_pixels_per_meter + self.origin[1])
 
-                color = viz_utils.lighter_shade(constants.PREDICTION_ROUTE_COLOR, i, len(wps))
+                color = viz_utils.lighter_shade(
+                    constants.PREDICTION_ROUTE_COLOR, i, len(wps)
+                )
                 cv2.line(
                     self.bev_image,
                     (x1, y1),
@@ -681,7 +857,9 @@ class Visualizer:
                     for i, wp in enumerate(wps):
                         wp_x = wp[0] * self.loc_pixels_per_meter + self.origin[0]
                         wp_y = wp[1] * self.loc_pixels_per_meter + self.origin[1]
-                        color = viz_utils.lighter_shade(constants.GROUNDTRUTH_FUTURE_WAYPOINT_COLOR, i, len(wps))
+                        color = viz_utils.lighter_shade(
+                            constants.GROUNDTRUTH_FUTURE_WAYPOINT_COLOR, i, len(wps)
+                        )
                         cv2.circle(
                             self.bev_image,
                             (int(wp_x), int(wp_y)),
@@ -701,7 +879,9 @@ class Visualizer:
                 for i, wp in enumerate(wps):
                     wp_x = wp[0] * self.loc_pixels_per_meter + self.origin[0]
                     wp_y = wp[1] * self.loc_pixels_per_meter + self.origin[1]
-                    color = viz_utils.lighter_shade(constants.GROUND_TRUTH_PAST_WAYPOINT_COLOR, i, len(wps))
+                    color = viz_utils.lighter_shade(
+                        constants.GROUND_TRUTH_PAST_WAYPOINT_COLOR, i, len(wps)
+                    )
                     cv2.circle(
                         self.bev_image,
                         (int(wp_x), int(wp_y)),
@@ -717,7 +897,9 @@ class Visualizer:
             for i in range(len(wps) - 1):
                 x1 = int(wps[i][0] * self.loc_pixels_per_meter + self.origin[0])
                 y1 = int(wps[i][1] * self.loc_pixels_per_meter + self.origin[1])
-                color = viz_utils.lighter_shade(constants.PREDICTION_ROUTE_COLOR, i, len(wps))
+                color = viz_utils.lighter_shade(
+                    constants.PREDICTION_ROUTE_COLOR, i, len(wps)
+                )
                 cv2.circle(
                     self.bev_image,
                     (x1, y1),
@@ -734,7 +916,9 @@ class Visualizer:
             for i, wp in enumerate(wps):
                 wp_x = wp[0] * self.loc_pixels_per_meter + self.origin[0]
                 wp_y = wp[1] * self.loc_pixels_per_meter + self.origin[1]
-                color = viz_utils.lighter_shade(constants.PREDICTION_WAYPOINT_COLOR, i, len(wps))
+                color = viz_utils.lighter_shade(
+                    constants.PREDICTION_WAYPOINT_COLOR, i, len(wps)
+                )
                 cv2.circle(
                     self.bev_image,
                     (int(wp_x), int(wp_y)),
@@ -748,7 +932,13 @@ class Visualizer:
         """Visualize ego bounding box on BEV image."""
         ego_box = np.array(
             [
-                int(self.bev_image.shape[1] * (-self.config.min_x_meter / (self.config.max_x_meter - self.config.min_x_meter))),
+                int(
+                    self.bev_image.shape[1]
+                    * (
+                        -self.config.min_x_meter
+                        / (self.config.max_x_meter - self.config.min_x_meter)
+                    )
+                ),
                 int(self.bev_image.shape[0] / 2),
                 self.config.ego_extent_x * self.loc_pixels_per_meter,
                 self.config.ego_extent_y * self.loc_pixels_per_meter,
@@ -756,39 +946,61 @@ class Visualizer:
                 self.data.get("speed")[0].item(),
             ]
         )
-        self.bev_image = viz_utils.draw_box(self.bev_image, ego_box, color=constants.EGO_BB_COLOR, thickness=4)
+        self.bev_image = viz_utils.draw_box(
+            self.bev_image, ego_box, color=constants.EGO_BB_COLOR, thickness=4
+        )
 
     def _pred_bounding_box(self):
         """Visualize predicted bounding boxes on BEV image."""
         if self.config.detect_boxes:
             if isinstance(self.predictions, OpenLoopPrediction):
-                pred_bounding_boxes: list[PredictedBoundingBox] = self.predictions.pred_bounding_box_image_system
+                pred_bounding_boxes: list[PredictedBoundingBox] = (
+                    self.predictions.pred_bounding_box_image_system
+                )
                 for box in pred_bounding_boxes:
                     if box.score < self.config.bb_confidence_threshold:
                         continue
                     box = deepcopy(box)
                     inv_brake = 1.0 - box.brake
-                    color_box = deepcopy(list(constants.TRANSFUSER_BOUNDING_BOX_COLORS.values())[box.clazz])
+                    color_box = deepcopy(
+                        list(constants.TRANSFUSER_BOUNDING_BOX_COLORS.values())[
+                            box.clazz
+                        ]
+                    )
                     color_box = list(color_box)
                     color_box[1] = color_box[1] * inv_brake
                     box = box.scale(self.scale_factor)
-                    self.bev_image = viz_utils.draw_box(self.bev_image, box, color=color_box)
+                    self.bev_image = viz_utils.draw_box(
+                        self.bev_image, box, color=color_box
+                    )
 
-            elif isinstance(self.predictions, Prediction) and self.predictions.pred_bounding_box is not None:
-                bb = self.predictions.pred_bounding_box.pred_bounding_box_image_system[0]
+            elif (
+                isinstance(self.predictions, Prediction)
+                and self.predictions.pred_bounding_box is not None
+            ):
+                bb = self.predictions.pred_bounding_box.pred_bounding_box_image_system[
+                    0
+                ]
                 if bb is not None:
                     for box in bb:
-                        if box[TransfuserBoundingBoxIndex.SCORE] < self.config.bb_confidence_threshold:
+                        if (
+                            box[TransfuserBoundingBoxIndex.SCORE]
+                            < self.config.bb_confidence_threshold
+                        ):
                             continue
                         box = deepcopy(box)
                         inv_brake = 1.0 - box[6]
                         color_box = deepcopy(
-                            list(constants.TRANSFUSER_BOUNDING_BOX_COLORS.values())[int(box[TransfuserBoundingBoxIndex.CLASS])]
+                            list(constants.TRANSFUSER_BOUNDING_BOX_COLORS.values())[
+                                int(box[TransfuserBoundingBoxIndex.CLASS])
+                            ]
                         )
                         color_box = list(color_box)
                         color_box[1] = color_box[1] * inv_brake
                         box[:4] = box[:4] * self.scale_factor
-                        self.bev_image = viz_utils.draw_box(self.bev_image, box, color=color_box)
+                        self.bev_image = viz_utils.draw_box(
+                            self.bev_image, box, color=color_box
+                        )
 
     def _bounding_boxes(self):
         """Visualize ground truth bounding boxes on BEV image."""
@@ -801,9 +1013,13 @@ class Visualizer:
                 box = deepcopy(box)
                 box[:4] = box[:4] * self.scale_factor
                 color_box = deepcopy(
-                    list(constants.TRANSFUSER_BOUNDING_BOX_COLORS.values())[int(box[TransfuserBoundingBoxIndex.CLASS])]
+                    list(constants.TRANSFUSER_BOUNDING_BOX_COLORS.values())[
+                        int(box[TransfuserBoundingBoxIndex.CLASS])
+                    ]
                 )
-                self.bev_image = viz_utils.draw_box(self.bev_image, box, color=color_box)
+                self.bev_image = viz_utils.draw_box(
+                    self.bev_image, box, color=color_box
+                )
         vehicles_future_waypoints = self.data.get("vehicles_future_waypoints")
         vehicle_future_yaws = self.data.get("vehicles_future_yaws")
 
@@ -813,7 +1029,9 @@ class Visualizer:
                 for i, wp in enumerate(wps):
                     wp_x = wp[0] * self.loc_pixels_per_meter + self.origin[0]
                     wp_y = wp[1] * self.loc_pixels_per_meter + self.origin[1]
-                    color = viz_utils.lighter_shade(constants.GROUNDTRUTH_BB_WP_COLOR, i, len(wps))
+                    color = viz_utils.lighter_shade(
+                        constants.GROUNDTRUTH_BB_WP_COLOR, i, len(wps)
+                    )
                     cv2.circle(
                         self.bev_image,
                         (int(wp_x), int(wp_y)),
@@ -823,13 +1041,22 @@ class Visualizer:
                     )
 
         if vehicles_future_waypoints is not None and vehicle_future_yaws is not None:
-            for future_box_waypoints, future_box_yaws in zip(vehicles_future_waypoints, vehicle_future_yaws, strict=False):
+            for future_box_waypoints, future_box_yaws in zip(
+                vehicles_future_waypoints, vehicle_future_yaws, strict=False
+            ):
                 wps = future_box_waypoints[0]
                 yaws = future_box_yaws[0]
                 for i, wp in enumerate(wps):
-                    color = viz_utils.lighter_shade(constants.GROUNDTRUTH_BB_WP_COLOR, i, len(wps))
+                    color = viz_utils.lighter_shade(
+                        constants.GROUNDTRUTH_BB_WP_COLOR, i, len(wps)
+                    )
                     self._draw_bounding_box_from_waypoint(
-                        wp[0], wp[1], yaws[i], self.config.ego_extent_x, self.config.ego_extent_y, color=color
+                        wp[0],
+                        wp[1],
+                        yaws[i],
+                        self.config.ego_extent_x,
+                        self.config.ego_extent_y,
+                        color=color,
                     )
 
     def _meta(self):
@@ -927,7 +1154,9 @@ class Visualizer:
                     nav_command_value = int(nav_command_value.item())
                 else:
                     nav_command_value = int(nav_command_value)
-                nav_command_text = CARLA_NAVIGATION_COMMAND_STR_MAP.get(nav_command_value)
+                nav_command_text = CARLA_NAVIGATION_COMMAND_STR_MAP.get(
+                    nav_command_value
+                )
                 text_lines.append(f"{nav} {nav_command_text}")
 
         # Collect other values
@@ -1000,7 +1229,9 @@ class Visualizer:
                 attr_data = attr_data[0]
                 if isinstance(attr_data, torch.Tensor):
                     attr_data = attr_data.detach().cpu().numpy()
-                text_lines.append(f"{attr_name} (x={attr_data[0]:.1f}m, y={attr_data[1]:.1f}m)")
+                text_lines.append(
+                    f"{attr_name} (x={attr_data[0]:.1f}m, y={attr_data[1]:.1f}m)"
+                )
 
         # Sort all lines alphabetically
         text_lines = sorted(text_lines)
@@ -1031,7 +1262,9 @@ class Visualizer:
             # Split text into attribute name and value
             if " " in text or ":" in text:
                 split_idx = text.find(" ") if " " in text else text.find(":")
-                if text.find(":") != -1 and (text.find(" ") == -1 or text.find(":") < text.find(" ")):
+                if text.find(":") != -1 and (
+                    text.find(" ") == -1 or text.find(":") < text.find(" ")
+                ):
                     split_idx = text.find(":")
                     attr_name_part = text[: split_idx + 1]
                     value_part = text[split_idx + 1 :].strip()
@@ -1085,16 +1318,26 @@ class Visualizer:
 
                 # Draw value right-aligned within this column's space
                 value_x = x + column_width - item["value_width"] - 20
-                draw.text((value_x, y), item["value"], font=font_regular, fill=(0, 0, 0))
+                draw.text(
+                    (value_x, y), item["value"], font=font_regular, fill=(0, 0, 0)
+                )
                 item_index += 1
 
         # Convert back to cv2
         self.meta_panel = np.array(img_pil)
 
     def _draw_bounding_box_from_waypoint(
-        self, ego_x: float, ego_y: float, ego_yaw: float, extent_x: float, extent_y: float, color
+        self,
+        ego_x: float,
+        ego_y: float,
+        ego_yaw: float,
+        extent_x: float,
+        extent_y: float,
+        color,
     ):
-        bb = np.array([ego_x, ego_y, self.config.ego_extent_x, self.config.ego_extent_y, ego_yaw])
+        bb = np.array(
+            [ego_x, ego_y, self.config.ego_extent_x, self.config.ego_extent_y, ego_yaw]
+        )
         bb = carla_dataset_utils.bb_vehicle_to_image_system(
             bb[None],
             pixels_per_meter=self.config.pixels_per_meter,
@@ -1163,7 +1406,9 @@ def visualize_sample(
             prediction_resized.save(f"{save_path}/prediction_{postfix}.png")
 
         # Visualize ground truth labels
-        visualizer = Visualizer(config, data=data, prediction=predictions, training=True)
+        visualizer = Visualizer(
+            config, data=data, prediction=predictions, training=True
+        )
         ground_truth = visualizer.visualize_training_labels()
         ground_truth_pil = Image.fromarray(ground_truth)  # Convert to PIL image
         new_size = (
@@ -1196,15 +1441,43 @@ def visualize_feature_maps(
     _, axs = plt.subplots(n_rows, n_cols, figsize=(24, 12))
     images = [
         (data["rasterized_lidar"][0, 0].detach().cpu().numpy(), "BEV LiDAR", "hot"),
-        (data["center_net_heatmap"][0, 0].detach().cpu().numpy(), "Heatmap Label", "hot"),
+        (
+            data["center_net_heatmap"][0, 0].detach().cpu().numpy(),
+            "Heatmap Label",
+            "hot",
+        ),
         (data["center_net_wh"][0, 0].detach().cpu().numpy(), "WH Label", "hot"),
-        (data["center_net_yaw_class"][0].detach().cpu().numpy(), "Yaw Class Label", "hot"),
-        (data["center_net_yaw_res"][0, 0].detach().cpu().numpy(), "Yaw Res Label", "hot"),
+        (
+            data["center_net_yaw_class"][0].detach().cpu().numpy(),
+            "Yaw Class Label",
+            "hot",
+        ),
+        (
+            data["center_net_yaw_res"][0, 0].detach().cpu().numpy(),
+            "Yaw Res Label",
+            "hot",
+        ),
         (data["center_net_offset"][0, 0].detach().cpu().numpy(), "Offset Label", "hot"),
-        (data["center_net_velocity"][0, 0].detach().cpu().numpy(), "Velocity Label", "hot"),
+        (
+            data["center_net_velocity"][0, 0].detach().cpu().numpy(),
+            "Velocity Label",
+            "hot",
+        ),
         (data["bev_semantic"][0].detach().cpu().numpy(), "BEV Semantic Label", "hot"),
-        (predictions.pred_bounding_box.center_heatmap_pred[0].detach().argmax(0).cpu().numpy(), "Heatmap Prediction", "hot"),
-        (predictions.pred_bev_semantic[0].detach().argmax(0).cpu().numpy(), "BEV Semantic Prediction", "hot"),
+        (
+            predictions.pred_bounding_box.center_heatmap_pred[0]
+            .detach()
+            .argmax(0)
+            .cpu()
+            .numpy(),
+            "Heatmap Prediction",
+            "hot",
+        ),
+        (
+            predictions.pred_bev_semantic[0].detach().argmax(0).cpu().numpy(),
+            "BEV Semantic Prediction",
+            "hot",
+        ),
         (
             predictions.pred_future_waypoints[0].detach().cpu().numpy()
             if predictions.pred_future_waypoints is not None
@@ -1212,7 +1485,13 @@ def visualize_feature_maps(
             "Waypoints",
             "hot",
         ),
-        (predictions.pred_route[0].detach().cpu().numpy() if predictions.pred_route is not None else None, "Route", "hot"),
+        (
+            predictions.pred_route[0].detach().cpu().numpy()
+            if predictions.pred_route is not None
+            else None,
+            "Route",
+            "hot",
+        ),
         (data.get("radar")[0].cpu().numpy(), "Radar Input", "hot"),
         (data.get("radar_detections"), "Radar Detection Label", "hot"),
         (predictions.pred_radar_predictions, "Radar Detection Prediction", "hot"),
@@ -1288,7 +1567,9 @@ def visualize_feature_maps(
         buf = io.BytesIO()
         plt.savefig(buf, format="png", dpi=150)
         buf.seek(0)
-        wandb.log({"train_viz/feature_maps": wandb.Image(Image.open(buf))}, commit=False)
+        wandb.log(
+            {"train_viz/feature_maps": wandb.Image(Image.open(buf))}, commit=False
+        )
         buf.close()
 
     plt.close()

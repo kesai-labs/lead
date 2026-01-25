@@ -11,12 +11,16 @@ from slurm.evaluation.evaluate_utils import did_route_crash, is_on_slurm, load_j
 
 
 class WandBLogger:
-    def __init__(self, closed_loop_config: ClosedLoopConfig, num_routes, project_name="lead_eval"):
+    def __init__(
+        self, closed_loop_config: ClosedLoopConfig, num_routes, project_name="lead_eval"
+    ):
         """
         Initialize the WandBLogger, set up a run with the project name and optional job name.
         """
         self.num_routes = num_routes  # Total routes to log
-        self.metrics = defaultdict(lambda: [0] * num_routes)  # Initialize default values for metrics
+        self.metrics = defaultdict(
+            lambda: [0] * num_routes
+        )  # Initialize default values for metrics
         self.config_slurm = ConfigSlurm()
         if is_on_slurm():
             self.run = wandb.init(
@@ -32,10 +36,20 @@ class WandBLogger:
 
     def __del__(self):
         if is_on_slurm() and not self.finished:
-            self.run.alert(title="Evaluation crashed", text="Experiment crashed before finishing.")
+            self.run.alert(
+                title="Evaluation crashed", text="Experiment crashed before finishing."
+            )
             self.run.finish(exit_code=1)
 
-    def log_job(self, json_log_file, route_idx, num_parallel_jobs, num_attempts, job_failed, carla_route_id) -> bool:
+    def log_job(
+        self,
+        json_log_file,
+        route_idx,
+        num_parallel_jobs,
+        num_attempts,
+        job_failed,
+        carla_route_id,
+    ) -> bool:
         """
         Log everything related to a job.
         """
@@ -46,10 +60,16 @@ class WandBLogger:
                     self.metrics["meta/crashed"][route_idx] = 1
                 else:
                     try:
-                        self._update_metrics(data["_checkpoint"]["records"][0], route_idx)
-                        self.metrics["meta/crashed"][route_idx] = int(did_route_crash(data))
+                        self._update_metrics(
+                            data["_checkpoint"]["records"][0], route_idx
+                        )
+                        self.metrics["meta/crashed"][route_idx] = int(
+                            did_route_crash(data)
+                        )
                     except Exception as e:
-                        print(f"Error updating metrics for record {carla_route_id}: {e}")
+                        print(
+                            f"Error updating metrics for record {carla_route_id}: {e}"
+                        )
                         print(traceback.format_exc())
                         self.metrics["meta/crashed"][route_idx] = 1
             elif job_failed:
@@ -60,17 +80,29 @@ class WandBLogger:
             if carla_route_id.count("_") > 1:
                 print(f"Route ID contains more than one underscore: {carla_route_id}")
             if self.config_slurm.evaluation_dataset in ["bench2drive220"]:
-                self.run.log({"ids/route_id": float(carla_route_id.replace("_", "."))}, commit=False)
+                self.run.log(
+                    {"ids/route_id": float(carla_route_id.replace("_", "."))},
+                    commit=False,
+                )
             elif self.config_slurm.evaluation_dataset in ["fail2drive210"]:
-                self.run.log({"ids/route_id": int(carla_route_id.split("_")[-1])}, commit=False)
+                self.run.log(
+                    {"ids/route_id": int(carla_route_id.split("_")[-1])}, commit=False
+                )
             elif self.config_slurm.evaluation_dataset in ["longest6"]:
-                self.run.log({"ids/route_id": float(carla_route_id.replace("_", "."))}, commit=False)
+                self.run.log(
+                    {"ids/route_id": float(carla_route_id.replace("_", "."))},
+                    commit=False,
+                )
             elif self.config_slurm.evaluation_dataset in ["Town13"]:
                 self.run.log({"ids/route_id": int(carla_route_id)}, commit=False)
             else:
-                raise ValueError(f"Unknown EVALUATION_DATASET: {self.config_slurm.evaluation_dataset}")
+                raise ValueError(
+                    f"Unknown EVALUATION_DATASET: {self.config_slurm.evaluation_dataset}"
+                )
             for i, (metric_name, values) in enumerate(iterable=self.metrics.items()):
-                self.run.log({metric_name: values[route_idx]}, commit=i == len(self.metrics) - 1)
+                self.run.log(
+                    {metric_name: values[route_idx]}, commit=i == len(self.metrics) - 1
+                )
             print(f"Logged evaluation results for record {carla_route_id} to wandb")
             return bool(self.metrics["scores/success"][route_idx])
 
@@ -83,9 +115,27 @@ class WandBLogger:
             try:
                 with open(self.config_slurm.merged_results_path) as f:
                     metrics = json.load(f)
-                    self.run.log({f"{self.config_slurm.evaluation_dataset}/driving_score": metrics["driving score"]})
-                    self.run.log({f"{self.config_slurm.evaluation_dataset}/success_rate": metrics["success rate"]})
-                    self.run.log({f"{self.config_slurm.evaluation_dataset}/eval_num": metrics["eval num"]})
+                    self.run.log(
+                        {
+                            f"{self.config_slurm.evaluation_dataset}/driving_score": metrics[
+                                "driving score"
+                            ]
+                        }
+                    )
+                    self.run.log(
+                        {
+                            f"{self.config_slurm.evaluation_dataset}/success_rate": metrics[
+                                "success rate"
+                            ]
+                        }
+                    )
+                    self.run.log(
+                        {
+                            f"{self.config_slurm.evaluation_dataset}/eval_num": metrics[
+                                "eval num"
+                            ]
+                        }
+                    )
             except Exception as e:
                 print(f"Error loading metrics from merged.json: {e}")
 
@@ -109,12 +159,17 @@ class WandBLogger:
         for key, value in scores.items():
             self.metrics[f"scores/{key}"][route_idx] = value
         self.metrics["scores/success"][route_idx] = int(
-            (scores.get("score_penalty", 0.0) == 1.0) and (scores.get("score_composed", 0.0) == 100.0)
+            (scores.get("score_penalty", 0.0) == 1.0)
+            and (scores.get("score_composed", 0.0) == 100.0)
         )  # success = perfect score
 
         for key, value in meta.items():
             self.metrics[f"meta/{key}"][route_idx] = value
 
-        self.metrics["ids/town"][route_idx] = int(record.get("town_name", "Town999").replace("Town", "").replace("HD", ""))
+        self.metrics["ids/town"][route_idx] = int(
+            record.get("town_name", "Town999").replace("Town", "").replace("HD", "")
+        )
         self.logged_ds.append(self.metrics["scores/score_composed"][route_idx])
-        self.metrics["scores/running_avg"][route_idx] = sum(self.logged_ds) / len(self.logged_ds)
+        self.metrics["scores/running_avg"][route_idx] = sum(self.logged_ds) / len(
+            self.logged_ds
+        )

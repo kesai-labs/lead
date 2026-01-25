@@ -12,7 +12,13 @@ class RunStopSign:
     Criteria to test if a stop sign affects a vehicle.
     """
 
-    def __init__(self, carla_world, proximity_threshold=50.0, speed_threshold=0.1, waypoint_step=1.0):
+    def __init__(
+        self,
+        carla_world,
+        proximity_threshold=50.0,
+        speed_threshold=0.1,
+        waypoint_step=1.0,
+    ):
         self._map = carla_world.get_map()
         self._proximity_threshold = proximity_threshold
         self._speed_threshold = speed_threshold
@@ -43,7 +49,9 @@ class RunStopSign:
 
             if not self.affected_by_stop:
                 stop_t = self.target_stop_sign.get_transform()
-                transformed_tv = stop_t.transform(self.target_stop_sign.trigger_volume.location)
+                transformed_tv = stop_t.transform(
+                    self.target_stop_sign.trigger_volume.location
+                )
                 stop_extent = self.target_stop_sign.trigger_volume.extent
                 if self.point_inside_boundingbox(ev_loc, transformed_tv, stop_extent):
                     self.affected_by_stop = True
@@ -101,7 +109,9 @@ class RunStopSign:
                 list_locations.append(waypoint.transform.location)
 
         for actor_location in list_locations:
-            if self.point_inside_boundingbox(actor_location, transformed_tv, stop.trigger_volume.extent):
+            if self.point_inside_boundingbox(
+                actor_location, transformed_tv, stop.trigger_volume.extent
+            ):
                 affected = True
 
         return affected

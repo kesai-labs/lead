@@ -28,7 +28,9 @@ LOG = logging.getLogger(__name__)
 
 @beartype
 def rasterize_lidar(
-    config: TrainingConfig, lidar: jt.Float[npt.NDArray, "N 3"], remove_ground_plane: bool = False
+    config: TrainingConfig,
+    lidar: jt.Float[npt.NDArray, "N 3"],
+    remove_ground_plane: bool = False,
 ) -> jt.Float[npt.NDArray, "H W"]:
     """
     Convert LiDAR point cloud into pseudo-image.
@@ -46,12 +48,14 @@ def rasterize_lidar(
         xbins = np.linspace(
             config.min_x_meter,
             config.max_x_meter,
-            (config.max_x_meter - config.min_x_meter) * int(config.pixels_per_meter) + 1,
+            (config.max_x_meter - config.min_x_meter) * int(config.pixels_per_meter)
+            + 1,
         )
         ybins = np.linspace(
             config.min_y_meter,
             config.max_y_meter,
-            (config.max_y_meter - config.min_y_meter) * int(config.pixels_per_meter) + 1,
+            (config.max_y_meter - config.min_y_meter) * int(config.pixels_per_meter)
+            + 1,
         )
         hist = np.histogramdd(point_cloud[:, :2], bins=(xbins, ybins))[0]
         hist[hist > config.hist_max_per_pixel] = config.hist_max_per_pixel
@@ -63,7 +67,10 @@ def rasterize_lidar(
 
     # Remove points above the vehicle
     features = splat_points(lidar)
-    lidar = lidar[(lidar[..., 2] <= config.max_height_lidar) & (config.min_height_lidar <= lidar[..., 2])]
+    lidar = lidar[
+        (lidar[..., 2] <= config.max_height_lidar)
+        & (config.min_height_lidar <= lidar[..., 2])
+    ]
     if remove_ground_plane:
         is_ground_mask = ransac.remove_ground(
             lidar, config, parallel=True
@@ -106,7 +113,9 @@ def image_augmenter(config: TrainingConfig, prob: float = 0.2):
 
 @beartype
 def perturbate_route(
-    route: jt.Float[npt.NDArray, "N 2"], y_perturbation: float = 0.0, yaw_perturbation: float = 0.0
+    route: jt.Float[npt.NDArray, "N 2"],
+    y_perturbation: float = 0.0,
+    yaw_perturbation: float = 0.0,
 ) -> jt.Float[npt.NDArray, "N 2"]:
     """Apply data perturbation to a route by rotating and translating waypoints.
 
@@ -133,7 +142,9 @@ def perturbate_route(
 
 @beartype
 def perturbate_target_point(
-    target_point: jt.Float[npt.NDArray, " 2"], y_perturbation: float = 0.0, yaw_perturbation: float = 0.0
+    target_point: jt.Float[npt.NDArray, " 2"],
+    y_perturbation: float = 0.0,
+    yaw_perturbation: float = 0.0,
 ) -> jt.Float[npt.NDArray, " 2"]:
     """Apply data perturbation to a target point by rotating and translating it.
 
@@ -220,7 +231,10 @@ def perturbate_yaws(
 
 @beartype
 def bbox_json2array(
-    bbox_dict: dict, perturbation_translation: float, perturbation_rotation: float, config: TrainingConfig
+    bbox_dict: dict,
+    perturbation_translation: float,
+    perturbation_rotation: float,
+    config: TrainingConfig,
 ) -> tuple[jt.Float[npt.NDArray, " 9"], jt.Float[npt.NDArray, " timesteps 2"], int]:
     """Extract and augment bounding box label from CARLA bounding box dictionary.
 
@@ -254,10 +268,22 @@ def bbox_json2array(
 
     # center_x, center_y, w, h, yaw
     bbox = np.array(
-        [x, y, bbox_dict["extent"][0], bbox_dict["extent"][1], 0, 0, 0, 0, num_radar_points],
+        [
+            x,
+            y,
+            bbox_dict["extent"][0],
+            bbox_dict["extent"][1],
+            0,
+            0,
+            0,
+            0,
+            num_radar_points,
+        ],
         dtype=np.float32,
     )
-    bbox[TransfuserBoundingBoxIndex.YAW] = common_utils.normalize_angle(bbox_dict["yaw"] - aug_yaw_rad)
+    bbox[TransfuserBoundingBoxIndex.YAW] = common_utils.normalize_angle(
+        bbox_dict["yaw"] - aug_yaw_rad
+    )
 
     if bbox_dict["class"] == "car":  # static class = parking vehicle = an implicit car
         bbox[TransfuserBoundingBoxIndex.VELOCITY] = bbox_dict["speed"]
@@ -274,29 +300,39 @@ def bbox_json2array(
             if config.carla_leaderboard_mode:
                 # this is an emergency vehicle that we need to yield to (or dodge in the RunningRedLight scenario)
                 # so we give it a different label
-                bbox[TransfuserBoundingBoxIndex.CLASS] = TransfuserBoundingBoxClass.SPECIAL
+                bbox[TransfuserBoundingBoxIndex.CLASS] = (
+                    TransfuserBoundingBoxClass.SPECIAL
+                )
             else:
-                bbox[TransfuserBoundingBoxIndex.CLASS] = TransfuserBoundingBoxClass.VEHICLE
+                bbox[TransfuserBoundingBoxIndex.CLASS] = (
+                    TransfuserBoundingBoxClass.VEHICLE
+                )
         else:
             bbox[TransfuserBoundingBoxIndex.CLASS] = TransfuserBoundingBoxClass.VEHICLE
     elif bbox_dict["class"] == "walker":
         bbox[TransfuserBoundingBoxIndex.VELOCITY] = bbox_dict["speed"]
         bbox[TransfuserBoundingBoxIndex.CLASS] = TransfuserBoundingBoxClass.WALKER
     elif bbox_dict["class"] == "traffic_light":
-        bbox[TransfuserBoundingBoxIndex.CLASS] = TransfuserBoundingBoxClass.TRAFFIC_LIGHT
+        bbox[TransfuserBoundingBoxIndex.CLASS] = (
+            TransfuserBoundingBoxClass.TRAFFIC_LIGHT
+        )
     elif bbox_dict["class"] == "stop_sign":
         bbox[TransfuserBoundingBoxIndex.CLASS] = TransfuserBoundingBoxClass.STOP_SIGN
     elif bbox_dict["class"] == "static" and config.carla_leaderboard_mode:
         bbox[TransfuserBoundingBoxIndex.CLASS] = TransfuserBoundingBoxClass.PARKING
 
     waypoints = np.array(
-        [(bbox_dict["position"][0], bbox_dict["position"][1])] * config.num_way_points_prediction, dtype=np.float32
+        [(bbox_dict["position"][0], bbox_dict["position"][1])]
+        * config.num_way_points_prediction,
+        dtype=np.float32,
     )
     num_waypoints = 0
     if bbox_dict.get("future_positions") is not None:
         future_waypoint_indices = [config.waypoints_spacing]
         for _ in range(config.num_way_points_prediction - 1):
-            future_waypoint_indices.append(future_waypoint_indices[-1] + config.waypoints_spacing)
+            future_waypoint_indices.append(
+                future_waypoint_indices[-1] + config.waypoints_spacing
+            )
 
         # In CARLA, often vehicles disappear. But they are not removed but rather teleported far away.
         # To mitigate this, we check the distance between the last known position and the future waypoints.
@@ -310,7 +346,9 @@ def bbox_json2array(
         last_valid_speed = bbox_dict.get("speed", 0.0)
         for i, future_waypoint_index in enumerate(future_waypoint_indices):
             if future_waypoint_index < len(bbox_dict["future_positions"]):
-                dist = np.linalg.norm(last_pos - bbox_dict["future_positions"][future_waypoint_index])
+                dist = np.linalg.norm(
+                    last_pos - bbox_dict["future_positions"][future_waypoint_index]
+                )
                 if dist > config.max_distance_future_waypoint:
                     break
                 waypoints[i] = bbox_dict["future_positions"][future_waypoint_index]
@@ -318,7 +356,9 @@ def bbox_json2array(
                 last_pos = bbox_dict["future_positions"][future_waypoint_index]
                 last_valid_yaw = bbox_dict["future_yaws"][future_waypoint_index]
                 last_valid_speed = (
-                    bbox_dict["future_speeds"][future_waypoint_index] if "future_speeds" in bbox_dict else last_valid_speed
+                    bbox_dict["future_speeds"][future_waypoint_index]
+                    if "future_speeds" in bbox_dict
+                    else last_valid_speed
                 )
 
         # Extrapolate last valid waypoint to mitigate disappearing boxes
@@ -375,7 +415,9 @@ def get_bbox_labels(
     bboxes, waypoints, num_waypoints = [], [], []
 
     for _, current_box in enumerate(boxes):
-        bbox, waypoint, num_waypoint = bbox_json2array(current_box, perturbation_translation, perturbation_rotation, config)
+        bbox, waypoint, num_waypoint = bbox_json2array(
+            current_box, perturbation_translation, perturbation_rotation, config
+        )
         if current_box["class"] in ["ego_car"]:
             continue
 
@@ -387,20 +429,23 @@ def get_bbox_labels(
                 visible_pixels = current_box["visible_pixels"]
 
             if (
-                current_box["transfuser_semantics_id"] == TransfuserSemanticSegmentationClass.PEDESTRIAN
+                current_box["transfuser_semantics_id"]
+                == TransfuserSemanticSegmentationClass.PEDESTRIAN
                 and 0 <= num_points < config.pedestrian_min_num_lidar_points
                 and 0 <= visible_pixels < config.pedestrian_min_num_visible_pixels
             ):
                 continue
             if (
-                current_box["transfuser_semantics_id"] == TransfuserSemanticSegmentationClass.VEHICLE
+                current_box["transfuser_semantics_id"]
+                == TransfuserSemanticSegmentationClass.VEHICLE
                 and current_box["class"] == "static"
                 and 0 <= num_points < config.parking_vehicle_min_num_lidar_points
                 and 0 <= visible_pixels < config.parking_vehicle_min_num_visible_pixels
             ):
                 continue
             if (
-                current_box["transfuser_semantics_id"] == TransfuserSemanticSegmentationClass.VEHICLE
+                current_box["transfuser_semantics_id"]
+                == TransfuserSemanticSegmentationClass.VEHICLE
                 and 0 <= num_points < config.vehicle_min_num_lidar_points
                 and 0 <= visible_pixels < config.vehicle_min_num_visible_pixels
             ):
@@ -433,7 +478,9 @@ def get_bbox_labels(
             and current_box.get("mesh_path") is not None
             and "ParkedVehicles" in current_box["mesh_path"]
         )
-        is_parking_vehicle = is_parking_vehicle or current_box["class"] == "static_prop_car"
+        is_parking_vehicle = (
+            is_parking_vehicle or current_box["class"] == "static_prop_car"
+        )
         if (
             current_box["class"] == "static"
             and "type_id" in current_box
@@ -444,30 +491,50 @@ def get_bbox_labels(
 
         if "type_id" in current_box:
             if current_box["type_id"] == "static.prop.trafficwarning":
-                bbox[TransfuserBoundingBoxIndex.W], bbox[TransfuserBoundingBoxIndex.H] = (
+                (
+                    bbox[TransfuserBoundingBoxIndex.W],
+                    bbox[TransfuserBoundingBoxIndex.H],
+                ) = (
                     TRAFFIC_WARNING_BB_SIZE[0],
                     TRAFFIC_WARNING_BB_SIZE[1],
                 )
-                bbox[TransfuserBoundingBoxIndex.CLASS] = TransfuserBoundingBoxClass.OBSTACLE
+                bbox[TransfuserBoundingBoxIndex.CLASS] = (
+                    TransfuserBoundingBoxClass.OBSTACLE
+                )
             elif current_box["type_id"] == "static.prop.constructioncone":
-                bbox[TransfuserBoundingBoxIndex.W], bbox[TransfuserBoundingBoxIndex.H] = (
+                (
+                    bbox[TransfuserBoundingBoxIndex.W],
+                    bbox[TransfuserBoundingBoxIndex.H],
+                ) = (
                     CONSTRUCTION_CONE_BB_SIZE[0],
                     CONSTRUCTION_CONE_BB_SIZE[1],
                 )
-                bbox[TransfuserBoundingBoxIndex.CLASS] = TransfuserBoundingBoxClass.OBSTACLE
+                bbox[TransfuserBoundingBoxIndex.CLASS] = (
+                    TransfuserBoundingBoxClass.OBSTACLE
+                )
 
         if "mesh_path" in current_box:
             if current_box["mesh_path"] in constants.LOOKUP_TABLE:
-                bbox[TransfuserBoundingBoxIndex.W] = constants.LOOKUP_TABLE[current_box["mesh_path"]][0]
-                bbox[TransfuserBoundingBoxIndex.H] = constants.LOOKUP_TABLE[current_box["mesh_path"]][1]
+                bbox[TransfuserBoundingBoxIndex.W] = constants.LOOKUP_TABLE[
+                    current_box["mesh_path"]
+                ][0]
+                bbox[TransfuserBoundingBoxIndex.H] = constants.LOOKUP_TABLE[
+                    current_box["mesh_path"]
+                ][1]
             if is_parking_vehicle and config.carla_leaderboard_mode:
-                bbox[TransfuserBoundingBoxIndex.CLASS] = TransfuserBoundingBoxClass.PARKING
+                bbox[TransfuserBoundingBoxIndex.CLASS] = (
+                    TransfuserBoundingBoxClass.PARKING
+                )
 
         if current_box["class"] == "static_prop_car":
             if config.carla_leaderboard_mode:
-                bbox[TransfuserBoundingBoxIndex.CLASS] = TransfuserBoundingBoxClass.PARKING
+                bbox[TransfuserBoundingBoxIndex.CLASS] = (
+                    TransfuserBoundingBoxClass.PARKING
+                )
             else:
-                bbox[TransfuserBoundingBoxIndex.CLASS] = TransfuserBoundingBoxClass.VEHICLE
+                bbox[TransfuserBoundingBoxIndex.CLASS] = (
+                    TransfuserBoundingBoxClass.VEHICLE
+                )
 
         # In some CARLA's scenarios, special vehicles have sometimes wrong labels.
         # We relabel those labels to be consistent with the scene
@@ -483,48 +550,92 @@ def get_bbox_labels(
             ):
                 # If the car open door, we extend the bounding box's width to consider the door
                 if current_measurement["vehicle_opened_door"]:
-                    bbox[TransfuserBoundingBoxIndex.H] += config.car_open_door_extra_width / 2
+                    bbox[TransfuserBoundingBoxIndex.H] += (
+                        config.car_open_door_extra_width / 2
+                    )
                     if current_measurement["vehicle_door_side"] == "left":
-                        bbox[TransfuserBoundingBoxIndex.Y] += config.car_open_door_extra_width / 2
+                        bbox[TransfuserBoundingBoxIndex.Y] += (
+                            config.car_open_door_extra_width / 2
+                        )
                     else:
-                        bbox[TransfuserBoundingBoxIndex.Y] -= config.car_open_door_extra_width / 2
+                        bbox[TransfuserBoundingBoxIndex.Y] -= (
+                            config.car_open_door_extra_width / 2
+                        )
 
-                if bbox[TransfuserBoundingBoxIndex.CLASS] != TransfuserBoundingBoxClass.SPECIAL:
+                if (
+                    bbox[TransfuserBoundingBoxIndex.CLASS]
+                    != TransfuserBoundingBoxClass.SPECIAL
+                ):
                     if config.carla_leaderboard_mode:
                         if current_measurement["vehicle_opened_door"]:
-                            bbox[TransfuserBoundingBoxIndex.CLASS] = TransfuserBoundingBoxClass.OBSTACLE
+                            bbox[TransfuserBoundingBoxIndex.CLASS] = (
+                                TransfuserBoundingBoxClass.OBSTACLE
+                            )
                         else:
-                            bbox[TransfuserBoundingBoxIndex.CLASS] = TransfuserBoundingBoxClass.PARKING
+                            bbox[TransfuserBoundingBoxIndex.CLASS] = (
+                                TransfuserBoundingBoxClass.PARKING
+                            )
                     else:
-                        bbox[TransfuserBoundingBoxIndex.CLASS] = TransfuserBoundingBoxClass.VEHICLE
-            elif bbox[TransfuserBoundingBoxIndex.CLASS] != TransfuserBoundingBoxClass.SPECIAL:
+                        bbox[TransfuserBoundingBoxIndex.CLASS] = (
+                            TransfuserBoundingBoxClass.VEHICLE
+                        )
+            elif (
+                bbox[TransfuserBoundingBoxIndex.CLASS]
+                != TransfuserBoundingBoxClass.SPECIAL
+            ):
                 if config.carla_leaderboard_mode:
                     if (
                         data["scenario_type"]
-                        in ["Accident", "AccidentTwoWays", "BlockedIntersection", "ParkedObstacle", "ParkedObstacleTwoWays"]
-                        and current_box["id"] in current_measurement["scenario_obstacles_ids"]
+                        in [
+                            "Accident",
+                            "AccidentTwoWays",
+                            "BlockedIntersection",
+                            "ParkedObstacle",
+                            "ParkedObstacleTwoWays",
+                        ]
+                        and current_box["id"]
+                        in current_measurement["scenario_obstacles_ids"]
                     ):
-                        bbox[TransfuserBoundingBoxIndex.CLASS] = TransfuserBoundingBoxClass.OBSTACLE
+                        bbox[TransfuserBoundingBoxIndex.CLASS] = (
+                            TransfuserBoundingBoxClass.OBSTACLE
+                        )
                     elif (
                         data["scenario_type"]
-                        in ["ParkingCrossingPedestrian", "ParkingCutIn", "StaticCutIn", "PedestrianCrossing", "ParkingExit"]
+                        in [
+                            "ParkingCrossingPedestrian",
+                            "ParkingCutIn",
+                            "StaticCutIn",
+                            "PedestrianCrossing",
+                            "ParkingExit",
+                        ]
                         and current_box["lane_type_str"] == "Parking"
                     ) and config.carla_leaderboard_mode:
-                        bbox[TransfuserBoundingBoxIndex.CLASS] = TransfuserBoundingBoxClass.PARKING
+                        bbox[TransfuserBoundingBoxIndex.CLASS] = (
+                            TransfuserBoundingBoxClass.PARKING
+                        )
                 else:
-                    bbox[TransfuserBoundingBoxIndex.CLASS] = TransfuserBoundingBoxClass.VEHICLE
+                    bbox[TransfuserBoundingBoxIndex.CLASS] = (
+                        TransfuserBoundingBoxClass.VEHICLE
+                    )
 
         if current_box.get("type_id") in constants.BIKER_MESHES:
             bbox[TransfuserBoundingBoxIndex.CLASS] = TransfuserBoundingBoxClass.BIKER
 
         bbox = bb_vehicle_to_image_system(
-            bbox.reshape(1, -1), config.pixels_per_meter, config.min_x_meter, config.min_y_meter
+            bbox.reshape(1, -1),
+            config.pixels_per_meter,
+            config.min_x_meter,
+            config.min_y_meter,
         ).squeeze()
         if not (0 <= bbox[TransfuserBoundingBoxIndex.X] < config.lidar_width_pixel):
-            LOG.warning(f"{bbox[TransfuserBoundingBoxIndex.X]=} is larger than {config.lidar_width_pixel=}")
+            LOG.warning(
+                f"{bbox[TransfuserBoundingBoxIndex.X]=} is larger than {config.lidar_width_pixel=}"
+            )
             continue
         if not (0 <= bbox[TransfuserBoundingBoxIndex.Y] < config.lidar_height_pixel):
-            LOG.warning(f"{bbox[TransfuserBoundingBoxIndex.Y]=} is larger than {config.lidar_height_pixel=}")
+            LOG.warning(
+                f"{bbox[TransfuserBoundingBoxIndex.Y]=} is larger than {config.lidar_height_pixel=}"
+            )
             continue
         bboxes.append(bbox)
         waypoints.append(waypoint)
@@ -536,20 +647,38 @@ def get_bbox_labels(
 
     # Pad bounding boxes to a fixed number
     padded_bounding_boxes_array = np.zeros((config.max_num_bbs, 9), dtype=np.float32)
-    padded_waypoints_array = np.zeros((config.max_num_bbs, config.num_way_points_prediction, 2), dtype=np.float32)
+    padded_waypoints_array = np.zeros(
+        (config.max_num_bbs, config.num_way_points_prediction, 2), dtype=np.float32
+    )
     padded_num_waypoints_array = np.zeros((config.max_num_bbs,), dtype=np.int32)
 
     if bounding_boxes_array.shape[0] > 0:
         if bounding_boxes_array.shape[0] <= config.max_num_bbs:
-            padded_bounding_boxes_array[: bounding_boxes_array.shape[0], :] = bounding_boxes_array
-            padded_waypoints_array[: bounding_boxes_array.shape[0], :, :] = waypoints_array
-            padded_num_waypoints_array[: bounding_boxes_array.shape[0]] = num_waypoints_array
+            padded_bounding_boxes_array[: bounding_boxes_array.shape[0], :] = (
+                bounding_boxes_array
+            )
+            padded_waypoints_array[: bounding_boxes_array.shape[0], :, :] = (
+                waypoints_array
+            )
+            padded_num_waypoints_array[: bounding_boxes_array.shape[0]] = (
+                num_waypoints_array
+            )
         else:
-            padded_bounding_boxes_array[: config.max_num_bbs, :] = bounding_boxes_array[: config.max_num_bbs]
-            padded_waypoints_array[: config.max_num_bbs, :, :] = waypoints_array[: config.max_num_bbs, :, :]
-            padded_num_waypoints_array[: config.max_num_bbs] = num_waypoints_array[: config.max_num_bbs]
+            padded_bounding_boxes_array[: config.max_num_bbs, :] = bounding_boxes_array[
+                : config.max_num_bbs
+            ]
+            padded_waypoints_array[: config.max_num_bbs, :, :] = waypoints_array[
+                : config.max_num_bbs, :, :
+            ]
+            padded_num_waypoints_array[: config.max_num_bbs] = num_waypoints_array[
+                : config.max_num_bbs
+            ]
 
-    return padded_bounding_boxes_array, padded_waypoints_array, padded_num_waypoints_array
+    return (
+        padded_bounding_boxes_array,
+        padded_waypoints_array,
+        padded_num_waypoints_array,
+    )
 
 
 @beartype
@@ -576,7 +705,9 @@ def get_centernet_labels(
     yaw_res_target = np.zeros([1, feat_h, feat_w], dtype=np.float32)
     velocity_target = np.zeros([1, feat_h, feat_w], dtype=np.float32)
     brake_target = np.zeros([1, feat_h, feat_w], dtype=np.int32)
-    pixel_weight = np.zeros([2, feat_h, feat_w], dtype=np.float32)  # 2 is the max of the channels above here.
+    pixel_weight = np.zeros(
+        [2, feat_h, feat_w], dtype=np.float32
+    )  # 2 is the max of the channels above here.
 
     if not gt_bboxes.shape[0] > 0:
         return {
@@ -592,8 +723,12 @@ def get_centernet_labels(
             "center_net_avg_factor": np.array([1]),
         }
 
-    center_x = gt_bboxes[:, [TransfuserBoundingBoxIndex.X]] / config.bev_down_sample_factor
-    center_y = gt_bboxes[:, [TransfuserBoundingBoxIndex.Y]] / config.bev_down_sample_factor
+    center_x = (
+        gt_bboxes[:, [TransfuserBoundingBoxIndex.X]] / config.bev_down_sample_factor
+    )
+    center_y = (
+        gt_bboxes[:, [TransfuserBoundingBoxIndex.Y]] / config.bev_down_sample_factor
+    )
     gt_centers = np.concatenate((center_x, center_y), axis=1)
 
     for j, ct in enumerate(gt_centers):
@@ -601,12 +736,17 @@ def get_centernet_labels(
         ctx, cty = ct
         if ctx_int < 0 or ctx_int >= feat_w or cty_int < 0 or cty_int >= feat_h:
             LOG.warning(
-                f"Be cautious! Bounding box center {ct} is out of bounds for image size ({feat_h}, {feat_w}).", flush=True
+                f"Be cautious! Bounding box center {ct} is out of bounds for image size ({feat_h}, {feat_w}).",
+                flush=True,
             )
             continue
 
-        extent_x = gt_bboxes[j, TransfuserBoundingBoxIndex.W] / config.bev_down_sample_factor
-        extent_y = gt_bboxes[j, TransfuserBoundingBoxIndex.H] / config.bev_down_sample_factor
+        extent_x = (
+            gt_bboxes[j, TransfuserBoundingBoxIndex.W] / config.bev_down_sample_factor
+        )
+        extent_y = (
+            gt_bboxes[j, TransfuserBoundingBoxIndex.H] / config.bev_down_sample_factor
+        )
 
         radius = g_t.gaussian_radius([extent_y, extent_x], min_overlap=0.1)
         radius = max(2, int(radius))
@@ -619,15 +759,21 @@ def get_centernet_labels(
         wh_target[0, cty_int, ctx_int] = extent_x
         wh_target[1, cty_int, ctx_int] = extent_y
 
-        yaw_class, yaw_res = common_utils.angle2class(gt_bboxes[j, TransfuserBoundingBoxIndex.YAW], config.num_dir_bins)
+        yaw_class, yaw_res = common_utils.angle2class(
+            gt_bboxes[j, TransfuserBoundingBoxIndex.YAW], config.num_dir_bins
+        )
 
         yaw_class_target[0, cty_int, ctx_int] = yaw_class
         yaw_res_target[0, cty_int, ctx_int] = yaw_res
 
-        velocity_target[0, cty_int, ctx_int] = gt_bboxes[j, TransfuserBoundingBoxIndex.VELOCITY]
+        velocity_target[0, cty_int, ctx_int] = gt_bboxes[
+            j, TransfuserBoundingBoxIndex.VELOCITY
+        ]
         # Brakes can potentially be continous but we classify them now.
         # Using mathematical rounding the split is applied at 0.5
-        brake_target[0, cty_int, ctx_int] = int(round(gt_bboxes[j, TransfuserBoundingBoxIndex.BRAKE]))
+        brake_target[0, cty_int, ctx_int] = int(
+            round(gt_bboxes[j, TransfuserBoundingBoxIndex.BRAKE])
+        )
 
         offset_target[0, cty_int, ctx_int] = ctx - ctx_int
         offset_target[1, cty_int, ctx_int] = cty - cty_int
@@ -701,7 +847,10 @@ def build_bev_occupancy(
             continue
         extra_scale = 1.0
         min_extent = 0.0
-        if cls in ["walker"] or ("type_id" in current_box and current_box["type_id"] in constants.BIKER_MESHES):
+        if cls in ["walker"] or (
+            "type_id" in current_box
+            and current_box["type_id"] in constants.BIKER_MESHES
+        ):
             extra_scale = config.scale_pedestrian_bev_semantic_size
             min_extent = config.pedestrian_bev_min_extent
         # Apply perturbation to position
@@ -742,21 +891,41 @@ def build_bev_occupancy(
                 extent_y = constants.LOOKUP_TABLE[current_box["mesh_path"]][1]
         elif "type_id" in current_box:
             if current_box["type_id"] == "static.prop.trafficwarning":
-                extent_x, extent_y = TRAFFIC_WARNING_BB_SIZE[0], TRAFFIC_WARNING_BB_SIZE[1]
+                extent_x, extent_y = (
+                    TRAFFIC_WARNING_BB_SIZE[0],
+                    TRAFFIC_WARNING_BB_SIZE[1],
+                )
             elif current_box["type_id"] == "static.prop.constructioncone":
-                extent_x, extent_y = CONSTRUCTION_CONE_BB_SIZE[0], CONSTRUCTION_CONE_BB_SIZE[1]
-        rect = ((cx, cy), (extent_x * 2 * scale * extra_scale, extent_y * 2 * scale * extra_scale), np.rad2deg(yaw))
+                extent_x, extent_y = (
+                    CONSTRUCTION_CONE_BB_SIZE[0],
+                    CONSTRUCTION_CONE_BB_SIZE[1],
+                )
+        rect = (
+            (cx, cy),
+            (extent_x * 2 * scale * extra_scale, extent_y * 2 * scale * extra_scale),
+            np.rad2deg(yaw),
+        )
         box_pts = cv2.boxPoints(rect).astype(np.int32)
 
         # Assign label
         is_parking_car = False
         label = TransfuserBEVOccupancyClass.VEHICLE
         if cls in ["car"]:
-            if current_box.get("type_id", "") in constants.EMERGENCY_MESHES and config.carla_leaderboard_mode:
+            if (
+                current_box.get("type_id", "") in constants.EMERGENCY_MESHES
+                and config.carla_leaderboard_mode
+            ):
                 if (
                     data["scenario_type"]
-                    in ["Accident", "AccidentTwoWays", "BlockedIntersection", "ParkedObstacle", "ParkedObstacleTwoWays"]
-                    and current_box["id"] in current_measurement["scenario_obstacles_ids"]
+                    in [
+                        "Accident",
+                        "AccidentTwoWays",
+                        "BlockedIntersection",
+                        "ParkedObstacle",
+                        "ParkedObstacleTwoWays",
+                    ]
+                    and current_box["id"]
+                    in current_measurement["scenario_obstacles_ids"]
                 ):
                     label = TransfuserBEVOccupancyClass.OBSTACLE
                     obstacle_scenario_corners.extend(box_pts.tolist())
@@ -772,14 +941,22 @@ def build_bev_occupancy(
             ):
                 if (
                     data["scenario_type"]
-                    in ["Accident", "AccidentTwoWays", "BlockedIntersection", "ParkedObstacle", "ParkedObstacleTwoWays"]
-                    and current_box["id"] in current_measurement["scenario_obstacles_ids"]
+                    in [
+                        "Accident",
+                        "AccidentTwoWays",
+                        "BlockedIntersection",
+                        "ParkedObstacle",
+                        "ParkedObstacleTwoWays",
+                    ]
+                    and current_box["id"]
+                    in current_measurement["scenario_obstacles_ids"]
                 ):
                     obstacle_scenario_corners.extend(box_pts.tolist())
                     label = TransfuserBEVOccupancyClass.OBSTACLE
                 elif (
                     data["scenario_type"] in ["VehicleOpensDoorTwoWays"]
-                    and current_box["id"] in current_measurement["scenario_obstacles_ids"]
+                    and current_box["id"]
+                    in current_measurement["scenario_obstacles_ids"]
                 ):
                     if current_measurement["vehicle_opened_door"]:
                         label = TransfuserBEVOccupancyClass.OBSTACLE
@@ -788,7 +965,13 @@ def build_bev_occupancy(
                         label = TransfuserBEVOccupancyClass.PARKING_VEHICLE
                 elif (
                     data["scenario_type"]
-                    in ["ParkingCrossingPedestrian", "ParkingCutIn", "StaticCutIn", "PedestrianCrossing", "ParkingExit"]
+                    in [
+                        "ParkingCrossingPedestrian",
+                        "ParkingCutIn",
+                        "StaticCutIn",
+                        "PedestrianCrossing",
+                        "ParkingExit",
+                    ]
                     and current_box["lane_type_str"] == "Parking"
                 ):
                     label = TransfuserBEVOccupancyClass.PARKING_VEHICLE
@@ -798,14 +981,19 @@ def build_bev_occupancy(
             label = TransfuserBEVOccupancyClass.PARKING_VEHICLE
         elif cls == "static":
             type_id = current_box.get("type_id", "")
-            is_parking_car = current_box.get("mesh_path") is not None and "ParkedVehicles" in current_box["mesh_path"]
+            is_parking_car = (
+                current_box.get("mesh_path") is not None
+                and "ParkedVehicles" in current_box["mesh_path"]
+            )
             if type_id in config.data_bb_static_types_white_list:
                 label = TransfuserBEVOccupancyClass.OBSTACLE
                 if type_id == "static.prop.constructioncone":
                     cone_corners.extend(box_pts.tolist())
                 elif type_id == "static.prop.trafficwarning":
                     warning_corners.extend(box_pts.tolist())
-            elif type_id in constants.EMERGENCY_MESHES and config.carla_leaderboard_mode:
+            elif (
+                type_id in constants.EMERGENCY_MESHES and config.carla_leaderboard_mode
+            ):
                 label = TransfuserBEVOccupancyClass.SPECIAL_VEHICLE
                 obstacle_scenario_corners.extend(box_pts.tolist())
             elif is_parking_car and config.carla_leaderboard_mode:
@@ -814,7 +1002,10 @@ def build_bev_occupancy(
                 continue
         elif cls == "traffic_light":
             if current_box["affects_ego"] and current_box["state"] in ["Red", "Yellow"]:
-                if not current_measurement["over_head_traffic_light"] and not current_measurement["europe_traffic_light"]:
+                if (
+                    not current_measurement["over_head_traffic_light"]
+                    and not current_measurement["europe_traffic_light"]
+                ):
                     label = TransfuserBEVOccupancyClass.TRAFFIC_RED_NORMAL
                     normal_red_light_corners.extend(box_pts.tolist())
                 else:
@@ -829,32 +1020,62 @@ def build_bev_occupancy(
         # Occlusion check
         if (
             cls == "walker"
-            and (0 <= current_box["num_points"] < config.pedestrian_min_num_lidar_points)
-            and (0 <= current_box["visible_pixels"] < config.pedestrian_min_num_visible_pixels)
+            and (
+                0 <= current_box["num_points"] < config.pedestrian_min_num_lidar_points
+            )
+            and (
+                0
+                <= current_box["visible_pixels"]
+                < config.pedestrian_min_num_visible_pixels
+            )
         ):
             continue
         if (
             cls == "car"
             and (0 <= current_box["num_points"] < config.vehicle_min_num_lidar_points)
-            and (0 <= current_box["visible_pixels"] < config.vehicle_min_num_visible_pixels)
+            and (
+                0
+                <= current_box["visible_pixels"]
+                < config.vehicle_min_num_visible_pixels
+            )
         ):
             continue
         if (
             cls == "static"
-            and (0 <= current_box["num_points"] < config.parking_vehicle_min_num_lidar_points)
-            and (0 <= current_box["visible_pixels"] < config.parking_vehicle_min_num_visible_pixels)
+            and (
+                0
+                <= current_box["num_points"]
+                < config.parking_vehicle_min_num_lidar_points
+            )
+            and (
+                0
+                <= current_box["visible_pixels"]
+                < config.parking_vehicle_min_num_visible_pixels
+            )
         ):
             continue
         if (
             cls == "static_prop_car"
-            and (0 <= current_box["num_points"] < config.parking_vehicle_min_num_lidar_points)
-            and (0 <= current_box["visible_pixels"] < config.parking_vehicle_min_num_visible_pixels)
+            and (
+                0
+                <= current_box["num_points"]
+                < config.parking_vehicle_min_num_lidar_points
+            )
+            and (
+                0
+                <= current_box["visible_pixels"]
+                < config.parking_vehicle_min_num_visible_pixels
+            )
         ):
             continue
         cv2.fillPoly(bev, [box_pts], label)
 
     # Construction site detection
-    if len(warning_corners) >= 3 and len(cone_corners) >= 24 and config.carla_leaderboard_mode:
+    if (
+        len(warning_corners) >= 3
+        and len(cone_corners) >= 24
+        and config.carla_leaderboard_mode
+    ):
         all_pts = np.array(cone_corners + warning_corners)
         mean = np.mean(all_pts, axis=0)
         dists = np.linalg.norm(all_pts - mean, axis=1)
@@ -930,7 +1151,9 @@ def bb_image_to_vehicle_system(
 
 
 @beartype
-def preprocess_radar_input(config: TrainingConfig, radar_data_dict: dict) -> list[jt.Float[npt.NDArray, "N 5"]]:
+def preprocess_radar_input(
+    config: TrainingConfig, radar_data_dict: dict
+) -> list[jt.Float[npt.NDArray, "N 5"]]:
     """Preprocess radar input data for model inference.
 
     Args:
@@ -955,7 +1178,10 @@ def preprocess_radar_input(config: TrainingConfig, radar_data_dict: dict) -> lis
         n = filtered_arr.shape[0]
         if n >= config.num_radar_points_per_sensor:
             return filtered_arr[: config.num_radar_points_per_sensor]
-        out = np.zeros((config.num_radar_points_per_sensor, filtered_arr.shape[1]), dtype=np.float32)
+        out = np.zeros(
+            (config.num_radar_points_per_sensor, filtered_arr.shape[1]),
+            dtype=np.float32,
+        )
         out[:n] = filtered_arr.astype(np.float32)
         return out
 
@@ -1000,9 +1226,15 @@ def parse_radar_detection_labels(
         Unused slots are zero-padded. Features are in vehicle coordinate system.
     """
     # Initialize default values (all zeros)
-    radar_detections = np.zeros((config.num_radar_queries, len(RadarLabels)), dtype=np.float32)
+    radar_detections = np.zeros(
+        (config.num_radar_queries, len(RadarLabels)), dtype=np.float32
+    )
 
-    if config.use_radars and sensor_data.boxes is not None and sensor_data.boxes.shape[0] > 0:
+    if (
+        config.use_radars
+        and sensor_data.boxes is not None
+        and sensor_data.boxes.shape[0] > 0
+    ):
         priority_classes = [
             TransfuserBoundingBoxClass.SPECIAL,
             TransfuserBoundingBoxClass.VEHICLE,
@@ -1016,19 +1248,25 @@ def parse_radar_detection_labels(
         loaded_waypoints = sensor_data.boxes_waypoints.copy()
         loaded_num_waypoints = sensor_data.boxes_num_waypoints.copy()
         loaded_boxes_vehicle_system = bb_image_to_vehicle_system(
-            loaded_boxes_image_system, config.pixels_per_meter, config.min_x_meter, config.min_y_meter
+            loaded_boxes_image_system,
+            config.pixels_per_meter,
+            config.min_x_meter,
+            config.min_y_meter,
         )
 
         # Remove zero-padded data
-        non_zero_mask = (loaded_boxes_vehicle_system[:, TransfuserBoundingBoxIndex.X] != 0.0) | (
-            loaded_boxes_vehicle_system[:, TransfuserBoundingBoxIndex.Y] != 0.0
-        )
+        non_zero_mask = (
+            loaded_boxes_vehicle_system[:, TransfuserBoundingBoxIndex.X] != 0.0
+        ) | (loaded_boxes_vehicle_system[:, TransfuserBoundingBoxIndex.Y] != 0.0)
         loaded_boxes_vehicle_system = loaded_boxes_vehicle_system[non_zero_mask]
         loaded_waypoints = loaded_waypoints[non_zero_mask]
         loaded_num_waypoints = loaded_num_waypoints[non_zero_mask]
 
         # Filter data with minimally one radar point
-        radar_mask = loaded_boxes_vehicle_system[:, TransfuserBoundingBoxIndex.NUM_RADAR_POINTS] > 0
+        radar_mask = (
+            loaded_boxes_vehicle_system[:, TransfuserBoundingBoxIndex.NUM_RADAR_POINTS]
+            > 0
+        )
         loaded_boxes_vehicle_system = loaded_boxes_vehicle_system[radar_mask]
         loaded_waypoints = loaded_waypoints[radar_mask]
         loaded_num_waypoints = loaded_num_waypoints[radar_mask]
@@ -1041,16 +1279,22 @@ def parse_radar_detection_labels(
             class_priority = np.array(
                 [
                     class_priorities.get(int(c), len(priority_classes))
-                    for c in loaded_boxes_vehicle_system[:, TransfuserBoundingBoxIndex.CLASS]
+                    for c in loaded_boxes_vehicle_system[
+                        :, TransfuserBoundingBoxIndex.CLASS
+                    ]
                 ]
             )
 
             # Stack into sortable array: (-velocity, class_priority, -num_radar_points)
             sortable = np.stack(
                 [
-                    -loaded_boxes_vehicle_system[:, TransfuserBoundingBoxIndex.VELOCITY],
+                    -loaded_boxes_vehicle_system[
+                        :, TransfuserBoundingBoxIndex.VELOCITY
+                    ],
                     class_priority,
-                    -loaded_boxes_vehicle_system[:, TransfuserBoundingBoxIndex.NUM_RADAR_POINTS],
+                    -loaded_boxes_vehicle_system[
+                        :, TransfuserBoundingBoxIndex.NUM_RADAR_POINTS
+                    ],
                 ],
                 axis=1,
             )
@@ -1067,9 +1311,15 @@ def parse_radar_detection_labels(
         if len(selected_boxes) > 0:
             # Extract [x, y, velocity]
             n_boxes = selected_boxes.shape[0]
-            radar_detections[:n_boxes, RadarLabels.X] = selected_boxes[:, TransfuserBoundingBoxIndex.X]
-            radar_detections[:n_boxes, RadarLabels.Y] = selected_boxes[:, TransfuserBoundingBoxIndex.Y]
-            radar_detections[:n_boxes, RadarLabels.V] = selected_boxes[:, TransfuserBoundingBoxIndex.VELOCITY]
+            radar_detections[:n_boxes, RadarLabels.X] = selected_boxes[
+                :, TransfuserBoundingBoxIndex.X
+            ]
+            radar_detections[:n_boxes, RadarLabels.Y] = selected_boxes[
+                :, TransfuserBoundingBoxIndex.Y
+            ]
+            radar_detections[:n_boxes, RadarLabels.V] = selected_boxes[
+                :, TransfuserBoundingBoxIndex.VELOCITY
+            ]
             radar_detections[:n_boxes, RadarLabels.VALID] = 1.0  # Valid box indicator
 
     return radar_detections
@@ -1077,7 +1327,9 @@ def parse_radar_detection_labels(
 
 @beartype
 def smooth_path(
-    config: TrainingConfig, route: jt.Float[npt.NDArray, "N 2"], target_first_distance: float
+    config: TrainingConfig,
+    route: jt.Float[npt.NDArray, "N 2"],
+    target_first_distance: float,
 ) -> jt.Float[npt.NDArray, "N 2"]:
     """Smooth a route by removing duplicates and creating evenly-spaced interpolated waypoints.
 
@@ -1108,7 +1360,9 @@ def smooth_path(
     indices = np.sort(indices)
     indices = np.array(indices).astype(int)
     route = route[indices]
-    interpolated_route_points = iterative_line_interpolation(config, route, target_first_distance)
+    interpolated_route_points = iterative_line_interpolation(
+        config, route, target_first_distance
+    )
 
     return interpolated_route_points
 
@@ -1166,14 +1420,23 @@ def circle_line_segment_intersection(
         # This makes sure the order along the segment is correct
         intersections = [
             (
-                cx + (big_d * dy + sign * (-1 if dy < 0 else 1) * dx * discriminant**0.5) / dr**2,
+                cx
+                + (big_d * dy + sign * (-1 if dy < 0 else 1) * dx * discriminant**0.5)
+                / dr**2,
                 cy + (-big_d * dx + sign * abs(dy) * discriminant**0.5) / dr**2,
             )
             for sign in ((1, -1) if dy < 0 else (-1, 1))
         ]
         if not full_line:  # If only considering the segment, filter out intersections that do not fall within the segment
-            fraction_along_segment = [(xi - p1x) / dx if abs(dx) > abs(dy) else (yi - p1y) / dy for xi, yi in intersections]
-            intersections = [pt for pt, frac in zip(intersections, fraction_along_segment, strict=False) if 0 <= frac <= 1]
+            fraction_along_segment = [
+                (xi - p1x) / dx if abs(dx) > abs(dy) else (yi - p1y) / dy
+                for xi, yi in intersections
+            ]
+            intersections = [
+                pt
+                for pt, frac in zip(intersections, fraction_along_segment, strict=False)
+                if 0 <= frac <= 1
+            ]
         # If line is tangent to circle, return just one point (as both intersections have same location)
         if len(intersections) == 2 and abs(discriminant) <= tangent_tol:
             return [intersections[0]]
@@ -1183,7 +1446,9 @@ def circle_line_segment_intersection(
 
 @beartype
 def iterative_line_interpolation(
-    config: TrainingConfig, route: jt.Float[npt.NDArray, "n 2"], target_first_distance: float
+    config: TrainingConfig,
+    route: jt.Float[npt.NDArray, "n 2"],
+    target_first_distance: float,
 ) -> jt.Float[npt.NDArray, "n 2"]:
     """Generate evenly-spaced interpolated points along a route using circle-line intersection.
 
@@ -1233,7 +1498,9 @@ def iterative_line_interpolation(
             current_point = route[current_route_index]
             intersection = circle_line_segment_intersection(
                 circle_center=last_interpolated_point,
-                circle_radius=(min_distance if not first_iteration else target_first_distance),
+                circle_radius=(
+                    min_distance if not first_iteration else target_first_distance
+                ),
                 pt1=last_interpolated_point,
                 pt2=current_point,
                 full_line=True,

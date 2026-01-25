@@ -42,5 +42,11 @@ class Town13HeldoutPosttrainBucketCollection(AbstractBucketCollection):
         )
 
     def buckets_mixture_per_epoch(self, _):
-        total_samples = len(self.buckets[Buckets.TOWN13]) + len(self.buckets[Buckets.OTHER_TOWNS])
-        return {Buckets.TOWN13: 0.0, Buckets.OTHER_TOWNS: total_samples / max(1, len(self.buckets[Buckets.OTHER_TOWNS]))}
+        total_samples = len(self.buckets[Buckets.TOWN13]) + len(
+            self.buckets[Buckets.OTHER_TOWNS]
+        )
+        return {
+            Buckets.TOWN13: 0.0,
+            Buckets.OTHER_TOWNS: total_samples
+            / max(1, len(self.buckets[Buckets.OTHER_TOWNS])),
+        }

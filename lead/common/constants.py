@@ -652,7 +652,11 @@ SIM2REAL_BEV_OCCUPANCY_CLASS_CONVERTER = {
     TransfuserBEVOccupancyClass.TRAFFIC_RED_NOT_NORMAL: TransfuserBEVOccupancyClass.TRAFFIC_RED_NORMAL,
 }
 
-CARLA_REAR_AXLE = [-1.389, 0.0, 0.360]  # Rear axle position relative to the vehicle center
+CARLA_REAR_AXLE = [
+    -1.389,
+    0.0,
+    0.360,
+]  # Rear axle position relative to the vehicle center
 
 # Waymo E2E 2025 camera intrinsics
 WAYMO_E2E_INTRINSIC = [
@@ -713,4 +717,6 @@ class CarlaImageCroppingType(IntEnum):
 
 
 WAYMO_DOWN_SAMPLE_FACTOR = 3  # Down-sample factor for Waymo E2E 2025 images
-WAYMO_E2E_REAL_DATA_JPEG_LEVEL = 50  # JPEG compression level for Waymo E2E 2025 real data
+WAYMO_E2E_REAL_DATA_JPEG_LEVEL = (
+    50  # JPEG compression level for Waymo E2E 2025 real data
+)

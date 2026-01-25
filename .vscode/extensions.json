@@ -4,6 +4,8 @@
         "charliermarsh.ruff",
         "naumovs.color-highlight",
         "percy.vscode-pydata-viewer",
-        "njpwerner.autodocstring"
+        "njpwerner.autodocstring",
+        "ms-python.python",
+        "ms-python.vscode-pylance"
     ]
 }

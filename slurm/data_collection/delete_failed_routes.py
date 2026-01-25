@@ -25,7 +25,9 @@ for scenario in os.listdir(BASE_DIR):
             failed_counts += 1
         total_counts += 1
 
-print(f"Total routes: {total_counts}, Failed routes: {failed_counts}, Failed ratio: {failed_counts / total_counts:.2%}")
+print(
+    f"Total routes: {total_counts}, Failed routes: {failed_counts}, Failed ratio: {failed_counts / total_counts:.2%}"
+)
 
 if not DRY_RUN and to_be_deleted:
 

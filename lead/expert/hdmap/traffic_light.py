@@ -19,7 +19,9 @@ def _get_traffic_light_waypoints(traffic_light, carla_map):
     tv_ext = traffic_light.trigger_volume.extent
 
     # Discretize the trigger box into points
-    x_values = np.arange(-0.9 * tv_ext.x, 0.9 * tv_ext.x, 1.0)  # 0.9 to avoid crossing to adjacent lanes
+    x_values = np.arange(
+        -0.9 * tv_ext.x, 0.9 * tv_ext.x, 1.0
+    )  # 0.9 to avoid crossing to adjacent lanes
     area = []
     for x in x_values:
         point_location = base_transform.transform(tv_loc + carla.Location(x=x))
@@ -30,7 +32,11 @@ def _get_traffic_light_waypoints(traffic_light, carla_map):
     for pt in area:
         wpx = carla_map.get_waypoint(pt)
         # As x_values are arranged in order, only the last one has to be checked
-        if not ini_wps or ini_wps[-1].road_id != wpx.road_id or ini_wps[-1].lane_id != wpx.lane_id:
+        if (
+            not ini_wps
+            or ini_wps[-1].road_id != wpx.road_id
+            or ini_wps[-1].lane_id != wpx.lane_id
+        ):
             ini_wps.append(wpx)
 
     # Leaderboard: Advance them until the intersection
@@ -78,7 +84,12 @@ def _get_traffic_light_waypoints(traffic_light, carla_map):
                 junction_paths.append(path_wps)
                 path_wps = []
 
-    return carla.Location(base_transform.transform(tv_loc)), stopline_wps, stopline_vertices, junction_paths
+    return (
+        carla.Location(base_transform.transform(tv_loc)),
+        stopline_wps,
+        stopline_vertices,
+        junction_paths,
+    )
 
 
 class TrafficLightHandler:
@@ -108,8 +119,8 @@ class TrafficLightHandler:
         all_actors = world.get_actors()
         for actor in all_actors:
             if "traffic_light" in actor.type_id:
-                tv_loc, stopline_wps, stopline_vtx, junction_paths = _get_traffic_light_waypoints(
-                    actor, TrafficLightHandler.carla_map
+                tv_loc, stopline_wps, stopline_vtx, junction_paths = (
+                    _get_traffic_light_waypoints(actor, TrafficLightHandler.carla_map)
                 )
 
                 TrafficLightHandler.list_tl_actor.append(actor)

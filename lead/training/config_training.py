@@ -22,7 +22,9 @@ LOG = logging.getLogger(__name__)
 
 
 class TrainingConfig(BaseConfig):
-    def __init__(self, loaded_config: dict = None, raise_error_on_missing_key: bool = False):
+    def __init__(
+        self, loaded_config: dict = None, raise_error_on_missing_key: bool = False
+    ):
         """Constructor for training config."""
         super().__init__()
         self.load_from_environment(
@@ -49,7 +51,9 @@ class TrainingConfig(BaseConfig):
             return TargetDataset.WAYMO_E2E_2025_3CAMERAS
         elif self.use_navsim_data and not self.use_carla_data:
             return TargetDataset.NAVSIM_4CAMERAS
-        raise ValueError(f"Unknown CARLA root path: {self.carla_root}. Please register it in the config.")
+        raise ValueError(
+            f"Unknown CARLA root path: {self.carla_root}. Please register it in the config."
+        )
 
     @property
     def num_available_cameras(self):
@@ -257,7 +261,9 @@ class TrainingConfig(BaseConfig):
             return 61
         if self.target_dataset == TargetDataset.WAYMO_E2E_2025_3CAMERAS:
             return 20
-        raise ValueError("Unknown target dataset. Not sure how many epochs to train for.")
+        raise ValueError(
+            "Unknown target dataset. Not sure how many epochs to train for."
+        )
 
     @overridable_property
     def batch_size(self):
@@ -281,7 +287,9 @@ class TrainingConfig(BaseConfig):
     @property
     def need_grad_scaler(self):
         """If true gradient scaling is needed for mixed precision training."""
-        return self.use_mixed_precision_training and self.torch_float_type == torch.float16
+        return (
+            self.use_mixed_precision_training and self.torch_float_type == torch.float16
+        )
 
     # If true use ZeRO redundancy optimizer for distributed training.
     use_zero_redundancy = False
@@ -338,7 +346,9 @@ class TrainingConfig(BaseConfig):
             TargetDataset.NAVSIM_4CAMERAS,
         ]:
             return self.num_way_points_prediction * 2
-        raise ValueError("Unknown target dataset. Not sure how many frames to skip at the end of sequences.")
+        raise ValueError(
+            "Unknown target dataset. Not sure how many frames to skip at the end of sequences."
+        )
 
     # --- RaDAR ---
     @property
@@ -410,13 +420,22 @@ class TrainingConfig(BaseConfig):
             and not self.force_rebuild_data_cache
         ):
             return WaymoBucketCollection
-        if self.use_carla_data and self.use_navsim_data and not self.force_rebuild_bucket and not self.force_rebuild_data_cache:
+        if (
+            self.use_carla_data
+            and self.use_navsim_data
+            and not self.force_rebuild_bucket
+            and not self.force_rebuild_data_cache
+        ):
             return NavSimBucketCollection
         if self.visualize_failed_scenarios:
             return FailedBucketCollection
         if self.is_pretraining and self.hold_out_town13_routes:
             return Town13HeldOutPretrainBucketCollection
-        if self.is_pretraining or self.visualize_dataset or self.force_rebuild_data_cache:
+        if (
+            self.is_pretraining
+            or self.visualize_dataset
+            or self.force_rebuild_data_cache
+        ):
             return FullPretrainBucketCollection
         if not self.is_pretraining and self.hold_out_town13_routes:
             return Town13HeldoutPosttrainBucketCollection
@@ -539,7 +558,9 @@ class TrainingConfig(BaseConfig):
             TargetDataset.WAYMO_E2E_2025_3CAMERAS,
         ]:
             return 4
-        raise ValueError("Unknown target dataset. Not sure how many discrete commands there are.")
+        raise ValueError(
+            "Unknown target dataset. Not sure how many discrete commands there are."
+        )
 
     # If true train model with noisy target points. The level of noise depends on use_kalman_filter_for_gps.
     use_noisy_tp = False
@@ -566,7 +587,9 @@ class TrainingConfig(BaseConfig):
     @property
     def use_acceleration(self):
         """If true use the acceleration as input to the network."""
-        return not self.carla_leaderboard_mode and self.target_dataset not in [TargetDataset.WAYMO_E2E_2025_3CAMERAS]
+        return not self.carla_leaderboard_mode and self.target_dataset not in [
+            TargetDataset.WAYMO_E2E_2025_3CAMERAS
+        ]
 
     @property
     def max_acceleration(self):
@@ -612,12 +635,16 @@ class TrainingConfig(BaseConfig):
     @overridable_property
     def use_past_positions(self):
         """If true use past positions as input to the network."""
-        return not self.carla_leaderboard_mode and self.target_dataset in [TargetDataset.WAYMO_E2E_2025_3CAMERAS]
+        return not self.carla_leaderboard_mode and self.target_dataset in [
+            TargetDataset.WAYMO_E2E_2025_3CAMERAS
+        ]
 
     @overridable_property
     def use_past_speeds(self):
         """If true use past speeds as input to the network."""
-        return not self.carla_leaderboard_mode and self.target_dataset in [TargetDataset.WAYMO_E2E_2025_3CAMERAS]
+        return not self.carla_leaderboard_mode and self.target_dataset in [
+            TargetDataset.WAYMO_E2E_2025_3CAMERAS
+        ]
 
     @overridable_property
     def num_past_samples_used(self):
@@ -694,7 +721,9 @@ class TrainingConfig(BaseConfig):
             return 8  # 2Hz and 4 seconds
         elif self.target_dataset in [TargetDataset.WAYMO_E2E_2025_3CAMERAS]:
             return 10  # 2Hz and 5 seconds
-        raise ValueError("Unknown target dataset. Not sure how long is the planning horizon.")
+        raise ValueError(
+            "Unknown target dataset. Not sure how long is the planning horizon."
+        )
 
     @property
     def waypoints_spacing(self):
@@ -707,7 +736,9 @@ class TrainingConfig(BaseConfig):
             return 10  # 2Hz
         elif self.target_dataset in [TargetDataset.WAYMO_E2E_2025_3CAMERAS]:
             return 10  # 2Hz
-        raise ValueError("Unknown target dataset. Not sure which planning frequency to use.")
+        raise ValueError(
+            "Unknown target dataset. Not sure which planning frequency to use."
+        )
 
     # --- Image config ---
     # Horizontal FOV reduction: number of pixels to crop from each side (left and right)
@@ -716,7 +747,10 @@ class TrainingConfig(BaseConfig):
     @property
     def crop_height(self):
         """The amount of pixels cropped from the bottom of the image."""
-        return self.camera_calibration[1]["height"] - self.camera_calibration[1]["cropped_height"]
+        return (
+            self.camera_calibration[1]["height"]
+            - self.camera_calibration[1]["cropped_height"]
+        )
 
     @property
     def carla_crop_height_type(self):
@@ -838,11 +872,17 @@ class TrainingConfig(BaseConfig):
     # Number of Waymo E2E data from training split
     waymo_e2e_num_training_samples = -1
     # Waymo E2E training data root directory.
-    waymo_e2e_training_data_root = "data/waymo_open_dataset_end_to_end_camera_v_1_0_0_training"
+    waymo_e2e_training_data_root = (
+        "data/waymo_open_dataset_end_to_end_camera_v_1_0_0_training"
+    )
     # Waymo E2E validation data root directory.
-    waymo_e2e_val_data_root = "data/waymo_open_dataset_end_to_end_camera_v_1_0_0_val_rfm"
+    waymo_e2e_val_data_root = (
+        "data/waymo_open_dataset_end_to_end_camera_v_1_0_0_val_rfm"
+    )
     # Waymo E2E test data root directory.
-    waymo_e2e_test_data_root = "data/waymo_open_dataset_end_to_end_camera_v_1_0_0_test_submission"
+    waymo_e2e_test_data_root = (
+        "data/waymo_open_dataset_end_to_end_camera_v_1_0_0_test_submission"
+    )
     # Waymo E2E subsample factor for training data.
     waymo_e2e_subsample_factor = 5
 
@@ -859,7 +899,12 @@ class TrainingConfig(BaseConfig):
     @property
     def mixed_data_training(self):
         """If true use mixed data for training."""
-        return int(self.use_navsim_data) + int(self.use_carla_data) + int(self.use_waymo_e2e_data) > 1
+        return (
+            int(self.use_navsim_data)
+            + int(self.use_carla_data)
+            + int(self.use_waymo_e2e_data)
+            > 1
+        )
 
     @property
     def carla_leaderboard_mode(self):
@@ -1005,7 +1050,9 @@ class TrainingConfig(BaseConfig):
             elif "rtx 3080" in name:
                 return "rtx3080"
             else:
-                raise Exception(f"Unknown GPU name: {name}. Please register it in the config.")
+                raise Exception(
+                    f"Unknown GPU name: {name}. Please register it in the config."
+                )
         except RuntimeError:
             return ""
 
@@ -1027,7 +1074,9 @@ class TrainingConfig(BaseConfig):
     @property
     def device(self):
         """PyTorch device to use for training."""
-        return torch.device(f"cuda:{self.local_rank}" if torch.cuda.is_available() else "cpu")
+        return torch.device(
+            f"cuda:{self.local_rank}" if torch.cuda.is_available() else "cpu"
+        )
 
     @property
     def assigned_cpu_cores(self):

@@ -11,7 +11,9 @@ from flask import Flask, jsonify, render_template, request, send_from_directory
 app = Flask(__name__)
 
 # Default evaluation output directory
-DEFAULT_OUTPUT_DIR = Path(__file__).parent.parent.parent / "outputs" / "local_evaluation"
+DEFAULT_OUTPUT_DIR = (
+    Path(__file__).parent.parent.parent / "outputs" / "local_evaluation"
+)
 
 # Read-only mode (disable file operations like open folder, cut video)
 READ_ONLY_MODE = False
@@ -60,7 +62,9 @@ def list_output_directories():
     base_path = Path(__file__).parent.parent.parent / "outputs" / "evaluation"
 
     if not base_path.exists():
-        return jsonify({"error": "Evaluation directory not found", "directories": []}), 404
+        return jsonify(
+            {"error": "Evaluation directory not found", "directories": []}
+        ), 404
 
     directories = []
 
@@ -82,7 +86,9 @@ def list_output_directories():
                     continue
 
                 timestamp = timestamp_dir.name
-                relative_path = f"outputs/evaluation/{experiment_name}/{benchmark_seed}/{timestamp}"
+                relative_path = (
+                    f"outputs/evaluation/{experiment_name}/{benchmark_seed}/{timestamp}"
+                )
 
                 # Count total infractions in all routes within this directory
                 total_infractions = 0
@@ -102,7 +108,8 @@ def list_output_directories():
                                 inf
                                 for inf in infractions
                                 if "minspeed" not in inf.get("infraction", "").lower()
-                                and "completion" not in inf.get("infraction", "").lower()
+                                and "completion"
+                                not in inf.get("infraction", "").lower()
                             ]
                             total_infractions += len(filtered_infractions)
                         except Exception:
@@ -157,7 +164,9 @@ def list_routes():
                 # Load infraction count (excluding min speed and completion)
                 if has_infractions:
                     try:
-                        infraction_data = load_infractions_data(route_dir / "infractions.json")
+                        infraction_data = load_infractions_data(
+                            route_dir / "infractions.json"
+                        )
                         infractions = infraction_data["infractions"]
                         # Filter out min speed and completion infractions
                         filtered_infractions = [
@@ -185,7 +194,13 @@ def get_infractions(route_name):
     infractions_file = route_path / "infractions.json"
 
     if not infractions_file.exists():
-        return jsonify({"error": "Infractions file not found", "infractions": [], "video_fps": None}), 404
+        return jsonify(
+            {
+                "error": "Infractions file not found",
+                "infractions": [],
+                "video_fps": None,
+            }
+        ), 404
 
     try:
         infraction_data = load_infractions_data(infractions_file)
@@ -282,7 +297,9 @@ def serve_video(route_name, video_type):
             data = f.read(length)
 
         response = Response(data, 206, mimetype="video/mp4", direct_passthrough=True)
-        response.headers.add("Content-Range", f"bytes {byte_start}-{byte_end}/{file_size}")
+        response.headers.add(
+            "Content-Range", f"bytes {byte_start}-{byte_end}/{file_size}"
+        )
         response.headers.add("Accept-Ranges", "bytes")
         response.headers.add("Content-Length", str(length))
         return response
@@ -364,7 +381,9 @@ def cut_video():
     input_video = route_path / video_files[video_type]
 
     if not input_video.exists():
-        return jsonify({"error": f"Video file {video_files[video_type]} not found"}), 404
+        return jsonify(
+            {"error": f"Video file {video_files[video_type]} not found"}
+        ), 404
 
     # Calculate start and duration
     start_time = max(0, timestamp - buffer_seconds)
@@ -511,12 +530,23 @@ def cut_custom_video():
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Infraction Dashboard - CARLA Evaluation Viewer")
-    parser.add_argument(
-        "--read-only", action="store_true", help="Enable read-only mode (disable file operations like open folder, cut video)"
+    parser = argparse.ArgumentParser(
+        description="Infraction Dashboard - CARLA Evaluation Viewer"
     )
-    parser.add_argument("--port", type=int, default=5000, help="Port to run the server on (default: 5000)")
-    parser.add_argument("--host", default="0.0.0.0", help="Host to run the server on (default: 0.0.0.0)")
+    parser.add_argument(
+        "--read-only",
+        action="store_true",
+        help="Enable read-only mode (disable file operations like open folder, cut video)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=5000,
+        help="Port to run the server on (default: 5000)",
+    )
+    parser.add_argument(
+        "--host", default="0.0.0.0", help="Host to run the server on (default: 0.0.0.0)"
+    )
     args = parser.parse_args()
 
     READ_ONLY_MODE = args.read_only

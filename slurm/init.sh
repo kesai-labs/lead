@@ -178,3 +178,43 @@ function evaluate_warmup() {
 function evaluate_navhard() {
 	sbatch --job-name $EXPERIMENT_RUN_ID --output $EVALUATION_OUTPUT_DIR/stdout.txt --error $EVALUATION_OUTPUT_DIR/stderr.txt $@ slurm/evaluate_navhard_two_stage.sh
 }
+
+# Evaluate expert agent
+# Usage: evaluate_expert
+function evaluate_expert() {
+	if [[ -z "$EVALUATION_DATASET" ]]; then
+		echo "Error: EVALUATION_DATASET is not set."
+		exit 1
+	fi
+	mkdir -p "$EVALUATION_OUTPUT_DIR"
+	echo "Starting expert evaluation $EXPERIMENT_RUN_ID"
+	echo "Evaluating expert on $EVALUATION_DATASET"
+	export EVALUATION_STDOUT=$EVALUATION_OUTPUT_DIR/stdout_${SLURM_JOB_DATE}.txt
+	export EVALUATION_STDERR=$EVALUATION_OUTPUT_DIR/stderr_${SLURM_JOB_DATE}.txt
+	echo "$EVALUATION_STDOUT"
+	echo "$EVALUATION_STDERR"
+	screen -dmS "$EXPERIMENT_RUN_ID" bash -c "slurm/evaluate_expert.sh > $EVALUATION_STDOUT 2> $EVALUATION_STDERR"
+}
+
+# Evaluate expert on shorter routes of bench2drive220
+# Usage: evaluate_expert_bench2drive220
+function evaluate_expert_bench2drive220() {
+	export EVALUATION_DATASET=bench2drive220
+	evaluate_expert "$@"
+}
+
+# Evaluate expert on longer routes of Town13
+# Usage: evaluate_expert_town13
+function evaluate_expert_town13() {
+	export EVALUATION_DATASET=Town13
+	export SCRIPT_GENERATOR_PARAMETERS="$SCRIPT_GENERATOR_PARAMETERS --slurm_timeout 3-00:00:00"
+	evaluate_expert "$@"
+}
+
+# Evaluate expert on medium routes of longest6
+# Usage: evaluate_expert_longest6
+function evaluate_expert_longest6() {
+	export EVALUATION_DATASET=longest6
+	export SCRIPT_GENERATOR_PARAMETERS="$SCRIPT_GENERATOR_PARAMETERS --slurm_timeout 0-10:00:00"
+	evaluate_expert "$@"
+}

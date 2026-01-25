@@ -60,13 +60,21 @@ def load_json_file(json_file):
 
 
 def get_max_num_attempts():
-    return int(open(f"slurm/configs/max_num_attempts_{os.getenv('EVALUATION_DATASET')}.txt").read())
+    return int(
+        open(
+            f"slurm/configs/max_num_attempts_{os.getenv('EVALUATION_DATASET')}.txt"
+        ).read()
+    )
 
 
 def get_max_parallel_jobs():
     if not is_on_slurm():
         return 1
-    return int(open(f"slurm/configs/max_num_parallel_jobs_{os.getenv('EVALUATION_DATASET')}.txt").read())
+    return int(
+        open(
+            f"slurm/configs/max_num_parallel_jobs_{os.getenv('EVALUATION_DATASET')}.txt"
+        ).read()
+    )
 
 
 def get_num_running_jobs(job_name, username=None):
@@ -112,9 +120,13 @@ def submit_job(job_name, script_path, num_attempt):
     route_id = Path(script_path).stem
 
     # Define names and outputs
-    job_route_name = f"eval_{job_name}_{route_id}"
-    std_err_file = f"{slurm_print_output_path}/stderr/stderr_{route_id}_{num_attempt}.txt"
-    std_out_file = f"{slurm_print_output_path}/stdout/stdout_{route_id}_{num_attempt}.txt"
+    job_route_name = f"{job_name}_{route_id}"
+    std_err_file = (
+        f"{slurm_print_output_path}/stderr/stderr_{route_id}_{num_attempt}.txt"
+    )
+    std_out_file = (
+        f"{slurm_print_output_path}/stdout/stdout_{route_id}_{num_attempt}.txt"
+    )
     os.makedirs(f"{slurm_print_output_path}/stderr", exist_ok=True)
     os.makedirs(f"{slurm_print_output_path}/stdout", exist_ok=True)
     print(std_err_file)
@@ -125,14 +137,12 @@ def submit_job(job_name, script_path, num_attempt):
         submit_command = f"bash {script_path} > {std_out_file} 2> {std_err_file}"
     else:
         partition = ""
-        if num_attempt > 10:  # set to 10 to avoid memory issues. we dont really need this anymore but i don t want to remove it
-            partition = (
-                "--partition=a100-preemptable-galvani"  # Use A100 GPUs for more than 2 attempts due to potential memory issues
-            )
+        if (
+            num_attempt > 10
+        ):  # set to 10 to avoid memory issues. we dont really need this anymore but i don t want to remove it
+            partition = "--partition=a100-preemptable-galvani"  # Use A100 GPUs for more than 2 attempts due to potential memory issues
 
-        submit_command = (
-            f"sbatch --job-name {job_route_name} --output {std_out_file} --error {std_err_file} {partition} {script_path}"
-        )
+        submit_command = f"sbatch --job-name {job_route_name} --output {std_out_file} --error {std_err_file} {partition} {script_path}"
 
     # Submit jobs and return job ID
     try:
@@ -142,7 +152,9 @@ def submit_job(job_name, script_path, num_attempt):
             output = subprocess.check_output(submit_command, shell=True)
             pid = output.decode("utf-8").strip().split()[-1]
         else:
-            process = subprocess.Popen(submit_command, shell=True, start_new_session=True)
+            process = subprocess.Popen(
+                submit_command, shell=True, start_new_session=True
+            )
             pid = process.pid
         return pid, process
     except subprocess.CalledProcessError as e:
@@ -183,7 +195,9 @@ def aggregate_metrics():
     eval_output_dir = os.getenv("EVALUATION_OUTPUT_DIR")
     eval_dataset = os.getenv("EVALUATION_DATASET")
     merge_route_json(eval_output_dir + "/eval")
-    shutil.copyfile(eval_output_dir + "/eval/merged.json", eval_output_dir + "/merged.json")
+    shutil.copyfile(
+        eval_output_dir + "/eval/merged.json", eval_output_dir + "/merged.json"
+    )
     try:
         if "bench2drive" not in eval_dataset:
             os.system(

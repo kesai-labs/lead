@@ -48,7 +48,7 @@ sensors_to_icons = {
 
 def get_weather_id(weather_conditions):
     from xml.etree import ElementTree as ET
-    tree = ET.parse('3rd_party/Bench2Drive/leaderboard/data/weather.xml')
+    tree = ET.parse(f'{os.environ["LEAD_PROJECT_ROOT"]}/3rd_party/Bench2Drive/leaderboard/data/weather.xml')
     root = tree.getroot()
     def conditions_match(weather, conditions):
         for (key, value) in weather:

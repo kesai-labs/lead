@@ -12,14 +12,15 @@ local buffers to avoid blocking calls to CARLA
 
 from __future__ import print_function
 
-from collections import defaultdict
 import math
 import re
 import threading
-from numpy import random
-from six import iteritems
+from collections import defaultdict
+
 import carla
 from agents.navigation.global_route_planner import GlobalRoutePlanner
+from numpy import random
+from six import iteritems
 
 
 def calculate_velocity(actor):
@@ -80,6 +81,41 @@ def DEFAULT_MEMORY():
     })
     return ret
 
+
+class ActiveScenario:
+    """
+    Represents an active scenario with its associated data.
+    
+    Attributes:
+        name: The scenario type name (e.g., "VehicleOpensDoorTwoWays")
+        first_actor: The primary actor in the scenario (e.g., parked vehicle, traffic warning, obstacle)
+        last_actor: The secondary actor in the scenario (e.g., last cone, None for single-actor scenarios)
+        metadata: Additional scenario-specific metadata (e.g., direction, offset)
+        changed_route: Boolean flag indicating if the route was changed
+        from_index: Index used for route changes
+        to_index: Index used for route changes
+        path_clear: Boolean flag indicating if the path is clear
+        scenario_id: Unique identifier for the scenario instance (typically id(self))
+        trigger_location: The trigger point location of the scenario (for sorting)
+    """
+    
+    def __init__(self, name, first_actor=None, last_actor=None, metadata=None, 
+                 changed_route=False, from_index=1e9, to_index=1e9, path_clear=False, scenario_id=None, trigger_location=None):
+        self.name = name
+        self.first_actor = first_actor
+        self.last_actor = last_actor
+        self.metadata = metadata
+        self.changed_route = changed_route
+        self.from_index = from_index
+        self.to_index = to_index
+        self.path_clear = path_clear
+        self.scenario_id = scenario_id
+        self.trigger_location = trigger_location
+    
+    def __repr__(self):
+        return f"ActiveScenario(name='{self.name}', first_actor={self.first_actor}, last_actor={self.last_actor}, scenario_id={self.scenario_id})"
+
+
 class CarlaDataProvider(object):  # pylint: disable=too-many-public-methods
 
     """
@@ -98,7 +134,7 @@ class CarlaDataProvider(object):  # pylint: disable=too-many-public-methods
     """
     # Saves, which type of scenario is currently runninng. That's necessary since some scenarios can't be detected / distinguished.
     # the key saves the scenario type and the value all relevant data
-    active_scenarios = []
+    active_scenarios: list[ActiveScenario]= []
     previous_active_scenario = None 
     memory = DEFAULT_MEMORY()
     previous_memory = DEFAULT_MEMORY()
@@ -127,15 +163,16 @@ class CarlaDataProvider(object):  # pylint: disable=too-many-public-methods
     @staticmethod
     def current_active_scenario_type():
         if len(CarlaDataProvider.active_scenarios) > 0:
-            return CarlaDataProvider.active_scenarios[0][0]
+            return CarlaDataProvider.active_scenarios[0].name
         return None
 
     @staticmethod
     def clean_current_active_scenario():
         if len(CarlaDataProvider.active_scenarios) > 0:
-            CarlaDataProvider.previous_memory[CarlaDataProvider.active_scenarios[0][0]] = CarlaDataProvider.memory[CarlaDataProvider.active_scenarios[0][0]]
-            CarlaDataProvider.memory[CarlaDataProvider.active_scenarios[0][0]] = DEFAULT_MEMORY().get(CarlaDataProvider.active_scenarios[0][0], {})
-            CarlaDataProvider.previous_active_scenario = CarlaDataProvider.active_scenarios[0][0]
+            scenario_name = CarlaDataProvider.active_scenarios[0].name
+            CarlaDataProvider.previous_memory[scenario_name] = CarlaDataProvider.memory[scenario_name]
+            CarlaDataProvider.memory[scenario_name] = DEFAULT_MEMORY().get(scenario_name, {})
+            CarlaDataProvider.previous_active_scenario = scenario_name
             CarlaDataProvider.active_scenarios = CarlaDataProvider.active_scenarios[1:]
             print(f"[CarlaDataProvider] Memory after cleaning {CarlaDataProvider.previous_active_scenario}: {CarlaDataProvider.memory[CarlaDataProvider.previous_active_scenario]}")
             print(f"[CarlaDataProvider] Queue after cleaning {CarlaDataProvider.previous_active_scenario}: {CarlaDataProvider.active_scenarios}")

@@ -191,7 +191,8 @@ class Accident(BasicScenario):
 
         # add actors that are relevant for the Expert to CarlaDataProvider.active_scenarios
         if add_scenario_type:
-            CarlaDataProvider.active_scenarios.append((type(self).__name__, [police_car, second_actor, self._direction, False, 1e9, 1e9, False], id(self)))
+            from srunner.scenariomanager.carla_data_provider import ActiveScenario
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=police_car, last_actor=second_actor, metadata=self._direction, scenario_id=id(self), trigger_location=config.trigger_points[0].location))
             CarlaDataProvider.memory[
                 type(self).__name__].update({
                         "first_actor": police_car,
@@ -311,7 +312,8 @@ class AccidentTwoWays(Accident):
 
         # add actors that are relevant for the Expert to CarlaDataProvider.active_scenarios
         if add_scenario_type:
-            CarlaDataProvider.active_scenarios.append((type(self).__name__, [self.police_car, self.second_actor, self._direction, False, 1e9, 1e9, False], id(self)))
+            from srunner.scenariomanager.carla_data_provider import ActiveScenario
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=self.police_car, last_actor=self.second_actor, metadata=self._direction, scenario_id=id(self), trigger_location=config.trigger_points[0].location))
             CarlaDataProvider.memory[
                 type(self).__name__]["obstacles"] = [
                     self.police_car, self.first_actor, self.second_actor
@@ -444,7 +446,8 @@ class ParkedObstacle(BasicScenario):
         self.parked_actor = parked_actor
 
         if add_scenario_type:
-            CarlaDataProvider.active_scenarios.append((type(self).__name__, [parked_actor, None, self._direction, False, 1e9, 1e9, False], id(self)))
+            from srunner.scenariomanager.carla_data_provider import ActiveScenario
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=parked_actor, metadata=self._direction, scenario_id=id(self), trigger_location=config.trigger_points[0].location))
             CarlaDataProvider.memory[
                 type(self).__name__]["obstacles"] = [
                     parked_actor
@@ -565,7 +568,8 @@ class ParkedObstacleTwoWays(ParkedObstacle):
         """
         super()._initialize_actors(config, add_scenario_type=False)
         if add_scenario_type:
-            CarlaDataProvider.active_scenarios.append((type(self).__name__, [self.parked_actor, None, self._direction, False, 1e9, 1e9, False], id(self)))
+            from srunner.scenariomanager.carla_data_provider import ActiveScenario
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=self.parked_actor, metadata=self._direction, scenario_id=id(self), trigger_location=config.trigger_points[0].location))
             CarlaDataProvider.memory[
                 type(self).__name__]["obstacles"] = [
                     self.parked_actor
@@ -689,7 +693,8 @@ class HazardAtSideLane(BasicScenario):
 
         # add actors that are relevant for the Expert to CarlaDataProvider.active_scenarios
         if add_scenario_type:
-            CarlaDataProvider.active_scenarios.append((type(self).__name__, [bicycle_1, bicycle_2, False, 1e9, 1e9, False], id(self))) # added
+            from srunner.scenariomanager.carla_data_provider import ActiveScenario
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=bicycle_1, last_actor=bicycle_2, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
             CarlaDataProvider.memory[type(self).__name__]["bicycle_1"] = self.bicycle_1
             CarlaDataProvider.memory[
                 type(self).__name__
@@ -788,7 +793,8 @@ class HazardAtSideLaneTwoWays(HazardAtSideLane):
         Override this method in child class to provide custom initialization.
         """
         super()._initialize_actors(config, add_scenario_type=False)
-        CarlaDataProvider.active_scenarios.append((type(self).__name__, [self.bicycle_1, self.bicycle_2, False, 1e9, 1e9, False], id(self))) # added
+        from srunner.scenariomanager.carla_data_provider import ActiveScenario
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=self.bicycle_1, last_actor=self.bicycle_2, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
         CarlaDataProvider.memory[
             type(self).__name__
         ].update({

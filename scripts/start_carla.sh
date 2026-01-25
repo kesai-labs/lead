@@ -7,7 +7,7 @@ if [ "$1" != "" ]; then
 fi
 
 $CARLA_ROOT/CarlaUE4.sh \
-    -quality-level=Epic \
+    -quality-level=Poor \
     -world-port=$port \
     -resx=800 \
     -resy=600 \

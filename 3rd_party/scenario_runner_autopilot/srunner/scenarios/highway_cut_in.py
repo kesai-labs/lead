@@ -12,20 +12,17 @@ priority, e.g. by running a red traffic light.
 
 from __future__ import print_function
 
-import py_trees
 import carla
-
+import py_trees
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (ActorDestroy,
-                                                                      ActorTransformSetter,
-                                                                      SyncArrivalWithAgent,
-                                                                      CutIn)
-from srunner.scenariomanager.scenarioatomics.atomic_criteria import CollisionTest
+from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
+    ActorDestroy, ActorTransformSetter, CutIn, SyncArrivalWithAgent)
+from srunner.scenariomanager.scenarioatomics.atomic_criteria import \
+    CollisionTest
 from srunner.scenarios.basic_scenario import BasicScenario
-
 from srunner.tools.background_manager import HandleJunctionScenario
-
 from srunner.tools.scenario_helper import generate_target_waypoint
+
 
 def convert_dict_to_location(actor_dict):
     """
@@ -88,7 +85,8 @@ class HighwayCutIn(BasicScenario):
         self._cut_in_vehicle.set_location(self._other_transform.location - carla.Location(z=100))
         self._cut_in_vehicle.set_simulate_physics(False)
 
-        CarlaDataProvider.active_scenarios.append((type(self).__name__, [None, None, None, False, 1e9, 1e9, False], id(self))) # added
+        from srunner.scenariomanager.carla_data_provider import ActiveScenario
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
         CarlaDataProvider.memory[
             type(self).__name__
         ]["cut_in_vehicle"] = self._cut_in_vehicle
