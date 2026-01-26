@@ -12,28 +12,25 @@ priority, e.g. by running a red traffic light.
 
 from __future__ import print_function
 
-import py_trees
 import carla
-
-from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (ActorTransformSetter,
-                                                                      ActorDestroy,
-                                                                      TrafficLightFreezer,
-                                                                      ConstantVelocityAgentBehavior,
-                                                                      Idle)
-from srunner.scenariomanager.scenarioatomics.atomic_criteria import CollisionTest
-from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (InTriggerDistanceToLocation,
-                                                                               InTimeToArrivalToLocation,
-                                                                               WaitEndIntersection)
+import py_trees
+from srunner.scenariomanager.carla_data_provider import (CarlaDataProvider,
+                                                         get_memory_entry)
+from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
+    ActorDestroy, ActorTransformSetter, ConstantVelocityAgentBehavior, Idle,
+    TrafficLightFreezer)
+from srunner.scenariomanager.scenarioatomics.atomic_criteria import \
+    CollisionTest
+from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (
+    InTimeToArrivalToLocation, InTriggerDistanceToLocation,
+    WaitEndIntersection)
 from srunner.scenarios.basic_scenario import BasicScenario
-from srunner.tools.scenario_helper import (get_geometric_linear_intersection,
-                                           generate_target_waypoint,
-                                           get_junction_topology,
-                                           filter_junction_wp_direction,
-                                           get_closest_traffic_light)
-
 from srunner.tools.background_manager import HandleJunctionScenario
-
+from srunner.tools.scenario_helper import (filter_junction_wp_direction,
+                                           generate_target_waypoint,
+                                           get_closest_traffic_light,
+                                           get_geometric_linear_intersection,
+                                           get_junction_topology)
 
 
 class OppositeVehicleJunction(BasicScenario):
@@ -202,8 +199,10 @@ class OppositeVehicleRunningRedLight(OppositeVehicleJunction):
             else:
                 self._tl_dict[tl] = carla.TrafficLightState.Red
         from srunner.scenariomanager.carla_data_provider import ActiveScenario
-        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=self.opposite_actor, metadata=self._direction, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
-        CarlaDataProvider.memory[type(self).__name__]["adversarial_actors"].append(self.opposite_actor)
+        scenario_id = id(self)
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=self.opposite_actor, metadata=self._direction, scenario_id=scenario_id, trigger_location=config.trigger_points[0].location)) # added
+        memory = get_memory_entry(type(self).__name__, scenario_id)
+        memory["adversarial_actors"].append(self.opposite_actor)
 
     def _create_behavior(self):
         """
@@ -335,5 +334,7 @@ class OppositeVehicleTakingPriority(OppositeVehicleJunction):
         """
         super()._initialize_actors(config)
         from srunner.scenariomanager.carla_data_provider import ActiveScenario
-        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=self.opposite_actor, metadata=self._direction, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
-        CarlaDataProvider.memory[type(self).__name__]["adversarial_actors"].append(self.opposite_actor)
+        scenario_id = id(self)
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=self.opposite_actor, metadata=self._direction, scenario_id=scenario_id, trigger_location=config.trigger_points[0].location)) # added
+        memory = get_memory_entry(type(self).__name__, scenario_id)
+        memory["adversarial_actors"].append(self.opposite_actor)

@@ -296,9 +296,11 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
             "NonSignalizedJunctionLeftTurnEnterFlow",
             "InterurbanActorFlow",
         ]:
-            intersection_index_ego = CarlaDataProvider.memory[
-                self.current_active_scenario_type
-            ].get("intersection_index_ego", None)
+            intersection_index_ego = (
+                CarlaDataProvider.get_current_scenario_memory().get(
+                    "intersection_index_ego", None
+                )
+            )
             if intersection_index_ego is not None:
                 return (
                     intersection_index_ego - self.privileged_route_planner.route_index
@@ -336,7 +338,7 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
             "ParkedObstacle",
         ]:
             obstacle, direction = [
-                CarlaDataProvider.memory[self.current_active_scenario_type][key]
+                CarlaDataProvider.get_current_scenario_memory()[key]
                 for key in ["first_actor", "direction"]
             ]
             source_lane = self.carla_world_map.get_waypoint(
@@ -350,40 +352,37 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                 else source_lane.get_left_lane()
             )
             if source_lane and target_lane:
-                CarlaDataProvider.memory[self.current_active_scenario_type][
-                    "source_lane"
-                ] = source_lane
-                CarlaDataProvider.memory[self.current_active_scenario_type][
-                    "target_lane"
-                ] = target_lane
+                CarlaDataProvider.get_current_scenario_memory()["source_lane"] = (
+                    source_lane
+                )
+                CarlaDataProvider.get_current_scenario_memory()["target_lane"] = (
+                    target_lane
+                )
 
         if self.current_active_scenario_type in ["HazardAtSideLane"]:
-            if (
-                CarlaDataProvider.memory[self.current_active_scenario_type]["bicycle_1"]
-                is not None
-            ):
-                target_lane = CarlaDataProvider.memory[
-                    self.current_active_scenario_type
-                ]["target_lane"]
-                source_lane = CarlaDataProvider.memory[
-                    self.current_active_scenario_type
-                ]["source_lane"]
+            if CarlaDataProvider.get_current_scenario_memory()["bicycle_1"] is not None:
+                target_lane = CarlaDataProvider.get_current_scenario_memory()[
+                    "target_lane"
+                ]
+                source_lane = CarlaDataProvider.get_current_scenario_memory()[
+                    "source_lane"
+                ]
                 if target_lane is None or source_lane is None:
-                    bicycle_1 = CarlaDataProvider.memory[
-                        self.current_active_scenario_type
-                    ]["bicycle_1"]
+                    bicycle_1 = CarlaDataProvider.get_current_scenario_memory()[
+                        "bicycle_1"
+                    ]
                     source_lane = self.carla_world_map.get_waypoint(
                         bicycle_1.get_location(),
                         project_to_road=True,
                         lane_type=carla.LaneType.Driving,
                     )
                     target_lane = source_lane.get_left_lane()
-                    CarlaDataProvider.memory[self.current_active_scenario_type][
-                        "target_lane"
-                    ] = target_lane
-                    CarlaDataProvider.memory[self.current_active_scenario_type][
-                        "soure_lane"
-                    ] = source_lane
+                    CarlaDataProvider.get_current_scenario_memory()["target_lane"] = (
+                        target_lane
+                    )
+                    CarlaDataProvider.get_current_scenario_memory()["soure_lane"] = (
+                        source_lane
+                    )
 
         # One way obstacle scenarios: adversarial actors are those on the target lane
         if (
@@ -408,11 +407,20 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                 ignored_adversarial_actors_ids = []
                 if self.current_active_scenario_type != scenario:
                     continue
+
+                # Get memory for the current active scenario
+                current_memory = CarlaDataProvider.get_current_scenario_memory()
+                if current_memory is None:
+                    continue
+
                 if (
-                    CarlaDataProvider.memory[scenario]["source_lane"] is not None
-                    and CarlaDataProvider.memory[scenario]["target_lane"] is not None
+                    current_memory
+                    and "source_lane" in current_memory
+                    and "target_lane" in current_memory
+                    and current_memory["source_lane"] is not None
+                    and current_memory["target_lane"] is not None
                 ):
-                    target_lane = CarlaDataProvider.memory[scenario]["target_lane"]
+                    target_lane = current_memory["target_lane"]
                     for actor in self.vehicles_inside_bev:
                         if actor.id == self.ego_vehicle.id:
                             continue
@@ -433,13 +441,13 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                                     safe_adversarial_actors_ids.append(actor.id)
                                 else:  # Normal speed, be more careful
                                     dangerous_adversarial_actors_ids.append(actor.id)
-                CarlaDataProvider.memory[scenario][
-                    "dangerous_adversarial_actors_ids"
-                ] = dangerous_adversarial_actors_ids
-                CarlaDataProvider.memory[scenario]["safe_adversarial_actors_ids"] = (
+                current_memory["dangerous_adversarial_actors_ids"] = (
+                    dangerous_adversarial_actors_ids
+                )
+                current_memory["safe_adversarial_actors_ids"] = (
                     safe_adversarial_actors_ids
                 )
-                CarlaDataProvider.memory[scenario]["ignored_adversarial_actors_ids"] = (
+                current_memory["ignored_adversarial_actors_ids"] = (
                     ignored_adversarial_actors_ids
                 )
 
@@ -454,7 +462,7 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
             safe_adversarial_actors_ids = []
             ignored_adversarial_actors_ids = []
             dangerous_adversarial_actors_ids = []
-            for adversarial_actor in CarlaDataProvider.memory[scenario][
+            for adversarial_actor in CarlaDataProvider.get_current_scenario_memory()[
                 "adversarial_actors"
             ]:
                 try:
@@ -471,15 +479,15 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                 except:
                     pass
 
-            CarlaDataProvider.memory[scenario]["dangerous_adversarial_actors_ids"] = (
-                dangerous_adversarial_actors_ids
-            )
-            CarlaDataProvider.memory[scenario]["safe_adversarial_actors_ids"] = (
-                safe_adversarial_actors_ids
-            )
-            CarlaDataProvider.memory[scenario]["ignored_adversarial_actors_ids"] = (
-                ignored_adversarial_actors_ids
-            )
+            CarlaDataProvider.get_current_scenario_memory()[
+                "dangerous_adversarial_actors_ids"
+            ] = dangerous_adversarial_actors_ids
+            CarlaDataProvider.get_current_scenario_memory()[
+                "safe_adversarial_actors_ids"
+            ] = safe_adversarial_actors_ids
+            CarlaDataProvider.get_current_scenario_memory()[
+                "ignored_adversarial_actors_ids"
+            ] = ignored_adversarial_actors_ids
 
         # Priority scenarios
         for scenario in [
@@ -491,7 +499,7 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
             safe_adversarial_actors_ids = []
             ignored_adversarial_actors_ids = []
             dangerous_adversarial_actors_ids = []
-            for adversarial_actor in CarlaDataProvider.memory[scenario][
+            for adversarial_actor in CarlaDataProvider.get_current_scenario_memory()[
                 "adversarial_actors"
             ]:
                 try:
@@ -514,15 +522,15 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                 except:
                     pass
 
-            CarlaDataProvider.memory[scenario]["dangerous_adversarial_actors_ids"] = (
-                dangerous_adversarial_actors_ids
-            )
-            CarlaDataProvider.memory[scenario]["safe_adversarial_actors_ids"] = (
-                safe_adversarial_actors_ids
-            )
-            CarlaDataProvider.memory[scenario]["ignored_adversarial_actors_ids"] = (
-                ignored_adversarial_actors_ids
-            )
+            CarlaDataProvider.get_current_scenario_memory()[
+                "dangerous_adversarial_actors_ids"
+            ] = dangerous_adversarial_actors_ids
+            CarlaDataProvider.get_current_scenario_memory()[
+                "safe_adversarial_actors_ids"
+            ] = safe_adversarial_actors_ids
+            CarlaDataProvider.get_current_scenario_memory()[
+                "ignored_adversarial_actors_ids"
+            ] = ignored_adversarial_actors_ids
 
         # Unprotected left and right turns scenarios
         for scenario in [
@@ -537,30 +545,29 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
             if self.current_active_scenario_type != scenario:
                 continue
 
+            # Get memory for the current active scenario
+            current_memory = CarlaDataProvider.get_current_scenario_memory()
+            if current_memory is None:
+                continue
+
             # Computer intersection point of ego route and adversarial route
-            source_wp: carla.Waypoint = CarlaDataProvider.memory[scenario]["source_wp"]
-            sink_wp: carla.Waypoint = CarlaDataProvider.memory[scenario]["sink_wp"]
+            source_wp: carla.Waypoint = current_memory["source_wp"]
+            sink_wp: carla.Waypoint = current_memory["sink_wp"]
 
             # Skip if waypoints are None (invalid spawn locations)
             if source_wp is None or sink_wp is None:
                 continue
 
-            opponent_traffic_route = CarlaDataProvider.memory[scenario][
-                "opponent_traffic_route"
-            ]
+            opponent_traffic_route = current_memory["opponent_traffic_route"]
             if opponent_traffic_route is None:
                 opponent_traffic_route = expert_utils.compute_global_route(
                     world=self.carla_world,
                     source_location=source_wp.transform.location,
                     sink_location=sink_wp.transform.location,
                 )
-                CarlaDataProvider.memory[scenario]["opponent_traffic_route"] = (
-                    opponent_traffic_route
-                )
+                current_memory["opponent_traffic_route"] = opponent_traffic_route
 
-            intersection_point = CarlaDataProvider.memory[scenario][
-                "intersection_point"
-            ]
+            intersection_point = current_memory["intersection_point"]
             if opponent_traffic_route is not None and intersection_point is None:
                 intersection_point, intersection_index_ego = (
                     expert_utils.intersection_of_routes(
@@ -572,28 +579,18 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                 )
                 if intersection_index_ego is not None:
                     intersection_index_ego += self.privileged_route_planner.route_index
-                CarlaDataProvider.memory[scenario]["intersection_index_ego"] = (
-                    intersection_index_ego
-                )
-                CarlaDataProvider.memory[scenario]["intersection_point"] = (
-                    intersection_point
-                )
+                current_memory["intersection_index_ego"] = intersection_index_ego
+                current_memory["intersection_point"] = intersection_point
 
             # Filter adversarial actors for unprotected left turns
-            intersection_point = CarlaDataProvider.memory[scenario][
-                "intersection_point"
-            ]
+            intersection_point = current_memory["intersection_point"]
             if intersection_point is not None:
-                safe_adversarial_actors_ids = CarlaDataProvider.memory[
-                    scenario
-                ][
+                safe_adversarial_actors_ids = current_memory[
                     "safe_adversarial_actors_ids"
                 ]  # We keep track safe adversarial actors over time, once they are safe, they won't be dangerous anymore
                 ignored_adversarial_actors_ids = []
                 dangerous_adversarial_actors_ids = []
-                for adversarial_actor in CarlaDataProvider.memory[scenario][
-                    "adversarial_actors"
-                ]:
+                for adversarial_actor in current_memory["adversarial_actors"]:
                     if adversarial_actor.id == self.ego_vehicle.id:
                         continue
                     if adversarial_actor.id in safe_adversarial_actors_ids:
@@ -722,9 +719,7 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                                 )
                                 if (
                                     expert_utils.distance_location_to_route(
-                                        route=CarlaDataProvider.memory[scenario][
-                                            "opponent_traffic_route"
-                                        ],
+                                        route=current_memory["opponent_traffic_route"],
                                         location=np.array(
                                             [
                                                 adversarial_actor_location.x,
@@ -749,9 +744,9 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                         else:
                             ignored_adversarial_actors_ids = [
                                 actor.id
-                                for actor in CarlaDataProvider.memory[
-                                    self.current_active_scenario_type
-                                ]["adversarial_actors"]
+                                for actor in CarlaDataProvider.get_current_scenario_memory()[
+                                    "adversarial_actors"
+                                ]
                             ]
 
                     except RuntimeError as e:
@@ -761,31 +756,25 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                         else:
                             raise e
 
-                CarlaDataProvider.memory[scenario][
-                    "dangerous_adversarial_actors_ids"
-                ] = dangerous_adversarial_actors_ids
-                CarlaDataProvider.memory[scenario]["safe_adversarial_actors_ids"] = (
+                current_memory["dangerous_adversarial_actors_ids"] = (
+                    dangerous_adversarial_actors_ids
+                )
+                current_memory["safe_adversarial_actors_ids"] = (
                     safe_adversarial_actors_ids
                 )
-                CarlaDataProvider.memory[scenario]["ignored_adversarial_actors_ids"] = (
+                current_memory["ignored_adversarial_actors_ids"] = (
                     ignored_adversarial_actors_ids
                 )
 
+        current_scenario_memory = CarlaDataProvider.get_current_scenario_memory()
         if (
-            self.current_active_scenario_type in CarlaDataProvider.memory
-            and "dangerous_adversarial_actors_ids"
-            in CarlaDataProvider.memory[self.current_active_scenario_type]
+            current_scenario_memory is not None
+            and "dangerous_adversarial_actors_ids" in current_scenario_memory
         ):
             return (
-                CarlaDataProvider.memory[self.current_active_scenario_type][
-                    "dangerous_adversarial_actors_ids"
-                ],
-                CarlaDataProvider.memory[self.current_active_scenario_type][
-                    "safe_adversarial_actors_ids"
-                ],
-                CarlaDataProvider.memory[self.current_active_scenario_type][
-                    "ignored_adversarial_actors_ids"
-                ],
+                current_scenario_memory["dangerous_adversarial_actors_ids"],
+                current_scenario_memory["safe_adversarial_actors_ids"],
+                current_scenario_memory["ignored_adversarial_actors_ids"],
             )
         return [], [], []
 
@@ -887,9 +876,7 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
             "ParkedObstacle",
             "HazardAtSideLane",
         ]:
-            target_lane = CarlaDataProvider.memory[self.current_active_scenario_type][
-                "target_lane"
-            ]
+            target_lane = CarlaDataProvider.get_current_scenario_memory()["target_lane"]
             if target_lane is not None:
                 return target_lane.lane_width
 
@@ -902,9 +889,7 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
             "NonSignalizedJunctionLeftTurnEnterFlow",
             "InterurbanActorFlow",
         ]:
-            sink_wp = CarlaDataProvider.memory[self.current_active_scenario_type][
-                "sink_wp"
-            ]
+            sink_wp = CarlaDataProvider.get_current_scenario_memory()["sink_wp"]
             if sink_wp is not None:
                 return sink_wp.lane_width
 
@@ -1424,13 +1409,11 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
             "BlockedIntersection",
         ]
         if self.current_active_scenario_type in scenarios:
-            ret = CarlaDataProvider.memory[self.current_active_scenario_type][
-                "obstacles"
-            ]
+            ret = CarlaDataProvider.get_current_scenario_memory()["obstacles"]
         elif self.previous_active_scenario_type in scenarios:
             obstacles = CarlaDataProvider.previous_memory[
                 self.previous_active_scenario_type
-            ]["obstacles"]
+            ][0]["obstacles"]
             try:
                 obstacles = [
                     actor for actor in obstacles if self.is_actor_inside_bev(actor)
@@ -1509,15 +1492,15 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
         This is used to determine if the agent should react to a vehicle opening its door.
         """
         if self.current_active_scenario_type == "VehicleOpensDoorTwoWays":
-            return CarlaDataProvider.memory["VehicleOpensDoorTwoWays"][
+            return CarlaDataProvider.get_current_scenario_memory()[
                 "vehicle_opened_door"
             ]
         elif self.previous_active_scenario_type == "VehicleOpensDoorTwoWays":
             try:
-                CarlaDataProvider.previous_memory["VehicleOpensDoorTwoWays"][
+                CarlaDataProvider.previous_memory["VehicleOpensDoorTwoWays"][0][
                     "obstacles"
                 ][0].get_location()
-                return CarlaDataProvider.previous_memory["VehicleOpensDoorTwoWays"][
+                return CarlaDataProvider.previous_memory["VehicleOpensDoorTwoWays"][0][
                     "vehicle_opened_door"
                 ]
             except RuntimeError as e:
@@ -1534,11 +1517,9 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
         This is used to determine if the agent should react to a vehicle opening its door.
         """
         if self.current_active_scenario_type == "VehicleOpensDoorTwoWays":
-            return CarlaDataProvider.memory["VehicleOpensDoorTwoWays"][
-                "vehicle_door_side"
-            ]
+            return CarlaDataProvider.get_current_scenario_memory()["vehicle_door_side"]
         elif self.previous_active_scenario_type == "VehicleOpensDoorTwoWays":
-            return CarlaDataProvider.previous_memory["VehicleOpensDoorTwoWays"][
+            return CarlaDataProvider.previous_memory["VehicleOpensDoorTwoWays"][0][
                 "vehicle_door_side"
             ]
         return None
@@ -1550,11 +1531,7 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
             "StaticCutIn",
             "HighwayCutIn",
         ]:
-            return [
-                CarlaDataProvider.memory[self.current_active_scenario_type][
-                    "cut_in_vehicle"
-                ]
-            ]
+            return [CarlaDataProvider.get_current_scenario_memory()["cut_in_vehicle"]]
         return []
 
     @step_cached_property

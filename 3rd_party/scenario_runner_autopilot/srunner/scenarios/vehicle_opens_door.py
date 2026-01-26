@@ -12,25 +12,23 @@ priority, e.g. by running a red traffic light.
 
 from __future__ import print_function
 
-import py_trees
 import carla
-
-from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
-from srunner.scenariomanager.scenarioatomics.atomic_criteria import CollisionTest, ScenarioTimeoutTest
-
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (ActorDestroy,
-                                                                      OpenVehicleDoor,
-                                                                      SwitchWrongDirectionTest,
-                                                                      ScenarioTimeout,
-                                                                      Idle,
-                                                                      OppositeActorFlow)
-from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (InTriggerDistanceToLocation,
-                                                                               InTimeToArrivalToLocation,
-                                                                               DriveDistance,
-                                                                               WaitUntilInFrontPosition)
+import py_trees
+from srunner.scenariomanager.carla_data_provider import (CarlaDataProvider,
+                                                         get_memory_entry)
+from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
+    ActorDestroy, Idle, OpenVehicleDoor, OppositeActorFlow, ScenarioTimeout,
+    SwitchWrongDirectionTest)
+from srunner.scenariomanager.scenarioatomics.atomic_criteria import (
+    CollisionTest, ScenarioTimeoutTest)
+from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (
+    DriveDistance, InTimeToArrivalToLocation, InTriggerDistanceToLocation,
+    WaitUntilInFrontPosition)
 from srunner.scenarios.basic_scenario import BasicScenario
-
-from srunner.tools.background_manager import LeaveSpaceInFront, ChangeOppositeBehavior, StopBackVehicles, StartBackVehicles
+from srunner.tools.background_manager import (ChangeOppositeBehavior,
+                                              LeaveSpaceInFront,
+                                              StartBackVehicles,
+                                              StopBackVehicles)
 
 
 def get_value_parameter(config, name, p_type, default):
@@ -148,19 +146,17 @@ class VehicleOpensDoorTwoWays(BasicScenario):
 
         # add actors that are relevant for the Expert to CarlaDataProvider.active_scenarios
         if add_scenario_type:
-            from srunner.scenariomanager.carla_data_provider import ActiveScenario
+            from srunner.scenariomanager.carla_data_provider import \
+                ActiveScenario
             CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=self._parked_actor, metadata=self._direction, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
-            CarlaDataProvider.memory[
-                type(self).__name__]["obstacles"] = [
-                    self._parked_actor
+            memory = get_memory_entry(type(self).__name__, id(self))
+            memory["obstacles"] = [
+                self._parked_actor
             ]
-            CarlaDataProvider.memory[
-                type(self).__name__]["vehicle_door_side"] = [
-                    "left" if self._direction == 'right' else "right"
+            memory["vehicle_door_side"] = [
+                "left" if self._direction == 'right' else "right"
             ]
-            CarlaDataProvider.memory[
-                type(self).__name__
-            ].update({
+            memory.update({
                 "first_actor": self._parked_actor,
                 "last_actor": None,
                 "direction": self._direction,
@@ -203,7 +199,10 @@ class VehicleOpensDoorTwoWays(BasicScenario):
 
         door = carla.VehicleDoor.FR if self._direction == 'left' else carla.VehicleDoor.FL
         def callback_open_door():
-            CarlaDataProvider.memory[type(self).__name__]["vehicle_opened_door"] = True
+            # Access the current VehicleOpensDoorTwoWays scenario memory
+            memory = CarlaDataProvider.get_current_scenario_memory()
+            if memory:
+                memory["vehicle_opened_door"] = True
         behavior.add_child(OpenVehicleDoor(self._parked_actor, door, callback=callback_open_door))
         behavior.add_child(StopBackVehicles())
         behavior.add_child(Idle(self._opposite_wait_duration))
@@ -220,7 +219,10 @@ class VehicleOpensDoorTwoWays(BasicScenario):
             root.add_child(ChangeOppositeBehavior(active=True))
         for actor in self.other_actors:
             def callback_close_door ():
-                CarlaDataProvider.memory[type(self).__name__]["vehicle_opened_door"] = False
+                # Access the current VehicleOpensDoorTwoWays scenario memory
+                memory = CarlaDataProvider.get_current_scenario_memory()
+                if memory:
+                    memory["vehicle_opened_door"] = False
             root.add_child(ActorDestroy(actor,  callback=callback_close_door))
             root.add_child(StartBackVehicles())
 

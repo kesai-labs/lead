@@ -13,7 +13,8 @@ from __future__ import print_function
 
 import carla
 import py_trees
-from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
+from srunner.scenariomanager.carla_data_provider import (CarlaDataProvider,
+                                                         get_memory_entry)
 from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
     ActorFlow, ScenarioTimeout, TrafficLightFreezer)
 from srunner.scenariomanager.scenarioatomics.atomic_criteria import (
@@ -237,9 +238,8 @@ class CrossJunctionDefectTrafficLight(CrossJunctionDefectTrafficLightBase):
                 memory_data[f"sink_wp_{i}"] = flow['sink_wp']
                 memory_data[f"direction_{i}"] = flow['direction']
             
-            CarlaDataProvider.memory[
-                type(self).__name__
-            ].update(memory_data)
+            memory = get_memory_entry(type(self).__name__, id(self))
+            memory.update(memory_data)
 
     def _create_behavior(self):
         """

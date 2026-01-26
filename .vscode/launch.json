@@ -10,7 +10,7 @@
             "justMyCode": false,
             "args": [
                 "--checkpoint", "outputs/checkpoints/tfv6_resnet34",
-                "--routes", "data/benchmark_routes/bench2drive220routes/23687.xml",
+                "--routes", "data/benchmark_routes/bench2drive/23687.xml",
                 "--bench2drive"
             ],
             "env": {

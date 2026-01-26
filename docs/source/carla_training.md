@@ -119,7 +119,7 @@ Rebuild the cache after modifying the data pipeline (e.g., adding new semantic c
 Following standard TransFuser-like training procedures, training occurs in two phases: first, train only the perception backbone, then train the complete model end-to-end.
 
 ```bash
-bash scripts/pretrain.sh
+python3 lead/training/train.py logdir=outputs/local_training/pretrain
 ```
 
 Training takes approximately 1-2 minutes if trained with only one route and produces:
@@ -158,7 +158,7 @@ During post-training, the epoch count resets to 0. The optimizer state is reinit
 After pre-training completes, continue with post-training to add the planner and train the complete model end-to-end:
 
 ```bash
-bash scripts/posttrain.sh
+python3 lead/training/train.py logdir=outputs/local_training/posttrain load_file=outputs/local_training/pretrain/model_0030.pth use_planning_decoder=true
 ```
 
 ## Resume Failed Training

@@ -19,29 +19,25 @@ import copy
 import math
 import operator
 import os
-import time
 import subprocess
-
-import numpy as np
-from numpy import random
-import py_trees
-from py_trees.blackboard import Blackboard
-import networkx
+import time
 
 import carla
+import networkx
+import numpy as np
+import py_trees
+import srunner.tools as sr_tools
 from agents.navigation.basic_agent import BasicAgent
 from agents.navigation.constant_velocity_agent import ConstantVelocityAgent
-from agents.navigation.local_planner import RoadOption, LocalPlanner
-from agents.tools.misc import is_within_distance, get_speed
-
-from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
+from agents.navigation.local_planner import LocalPlanner, RoadOption
+from agents.tools.misc import get_speed, is_within_distance
+from numpy import random
+from py_trees.blackboard import Blackboard
 from srunner.scenariomanager.actorcontrols.actor_control import ActorControl
+from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
 from srunner.scenariomanager.timer import GameTime
-from srunner.tools.scenario_helper import detect_lane_obstacle
-from srunner.tools.scenario_helper import generate_target_waypoint_list_multilane
-
-
-import srunner.tools as sr_tools
+from srunner.tools.scenario_helper import (
+    detect_lane_obstacle, generate_target_waypoint_list_multilane)
 
 EPSILON = 0.001
 
@@ -2942,7 +2938,7 @@ class ActorFlow(AtomicBehavior):
         self._actor_list.append(actor)
 
         if self.parent_scenario_type is not None:
-            CarlaDataProvider.memory[self.parent_scenario_type]["adversarial_actors"] = self._actor_list
+            CarlaDataProvider.get_current_scenario_memory()["adversarial_actors"] = self._actor_list
 
     def update(self):
         """Controls the created actors and creaes / removes other when needed"""

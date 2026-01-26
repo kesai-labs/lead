@@ -39,7 +39,7 @@ export TEAM_AGENT={args.team_agent}
 export TEAM_CONFIG={args.team_config}
 export ROUTES={route_file}
 export DEBUG_CHALLENGE=0
-if [[ $EVALUATION_DATASET == "bench2drive220" ]]; then
+if [[ $EVALUATION_DATASET == "bench2drive" ]]; then
     export IS_BENCH2DRIVE=1
     export SCENARIO_RUNNER_ROOT=3rd_party/Bench2Drive/scenario_runner
     export LEADERBOARD_ROOT=3rd_party/Bench2Drive/leaderboard
@@ -95,7 +95,7 @@ fi
 # Run evaluation
 set +e
 
-if [[ $EVALUATION_DATASET == "bench2drive220" ]]; then
+if [[ $EVALUATION_DATASET == "bench2drive" ]]; then
     CUDA_VISIBLE_DEVICES=0 python3 3rd_party/Bench2Drive/leaderboard/leaderboard/leaderboard_evaluator.py \
     --routes=$ROUTES \
     --track={args.track} \

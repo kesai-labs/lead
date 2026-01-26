@@ -12,32 +12,31 @@ Provisional code to evaluate Autonomous Agents for the CARLA Autonomous Driving 
 """
 from __future__ import print_function
 
-import time
-import traceback
 import argparse
-from argparse import RawTextHelpFormatter
-from datetime import datetime
 import importlib
 import os
-import sys
+import pathlib
 import signal
 import socket
+import sys
+import time
+import traceback
+from argparse import RawTextHelpFormatter
+from datetime import datetime
+
 import numpy as np
 import torch
-
+from leaderboard.autoagents.agent_wrapper_local import (
+    AgentError, validate_sensor_configuration)
+from leaderboard.envs.sensor_interface import SensorConfigurationInvalid
+from leaderboard.scenarios.route_scenario import RouteScenario
+from leaderboard.scenarios.scenario_manager_local import ScenarioManager
+from leaderboard.utils.route_indexer import RouteIndexer
+from leaderboard.utils.statistics_manager_local import (FAILURE_MESSAGES,
+                                                        StatisticsManager)
 from srunner.scenariomanager.carla_data_provider import *
 from srunner.scenariomanager.timer import GameTime
 from srunner.scenariomanager.watchdog import Watchdog
-
-from leaderboard.scenarios.scenario_manager_local import ScenarioManager
-from leaderboard.scenarios.route_scenario import RouteScenario
-from leaderboard.envs.sensor_interface import SensorConfigurationInvalid
-from leaderboard.autoagents.agent_wrapper_local import AgentError, validate_sensor_configuration
-from leaderboard.utils.statistics_manager_local import StatisticsManager, FAILURE_MESSAGES
-from leaderboard.utils.route_indexer import RouteIndexer
-
-import pathlib
-
 
 sensors_to_icons = {
     'sensor.camera.rgb':        'carla_camera',
@@ -424,6 +423,9 @@ class LeaderboardEvaluator(object):
         Run the challenge mode
         """
         route_indexer = RouteIndexer(args.routes, args.repetitions, args.routes_subset)
+
+        # Store the route XML path in CarlaDataProvider for use by other components
+        CarlaDataProvider.set_route_xml_path(args.routes)
 
         if args.resume:
             resume = route_indexer.validate_and_resume(args.checkpoint)

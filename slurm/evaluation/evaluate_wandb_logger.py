@@ -79,14 +79,10 @@ class WandBLogger:
             self.metrics["meta/num_parallel_jobs"][route_idx] = num_parallel_jobs
             if carla_route_id.count("_") > 1:
                 print(f"Route ID contains more than one underscore: {carla_route_id}")
-            if self.config_slurm.evaluation_dataset in ["bench2drive220"]:
+            if self.config_slurm.evaluation_dataset in ["bench2drive"]:
                 self.run.log(
                     {"ids/route_id": float(carla_route_id.replace("_", "."))},
                     commit=False,
-                )
-            elif self.config_slurm.evaluation_dataset in ["fail2drive210"]:
-                self.run.log(
-                    {"ids/route_id": int(carla_route_id.split("_")[-1])}, commit=False
                 )
             elif self.config_slurm.evaluation_dataset in ["longest6"]:
                 self.run.log(

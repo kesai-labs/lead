@@ -37,7 +37,6 @@ https://github.com/user-attachments/assets/9f316ad2-e629-4bb4-bffb-9bb55e225738
   - [3. Download checkpoints](#3-download-checkpoints)
   - [4. Setup VSCode/PyCharm](#4-setup-vscodepycharm)
   - [5. Evaluate model](#5-evaluate-model)
-  - [6. Verify autopilot](#6-verify-autopilot)
 - [Training](#training)
 - [Data Collection](#data-collection)
 - [Benchmarking](#benchmarking)
@@ -105,17 +104,17 @@ conda install -c conda-forge ffmpeg parallel tree gcc zip unzip
 pre-commit install
 ```
 
-While waiting for dependencies installation, we recommend CARLA setup on parallel be:
+While waiting for dependencies installation, we recommend setting up CARLA and downloading checkpoints on parallel:
 
 ```bash
-bash scripts/setup_carla.sh # Download and setup CARLA at 3rd_party/CARLA_0915
+# Download and setup CARLA at 3rd_party/CARLA_0915
+bash scripts/setup_carla.sh
 ```
 
 ### 3. Download checkpoints
 
 Pre-trained checkpoints are hosted on [HuggingFace](https://huggingface.co/ln2697/tfv6) for reproducibility. These checkpoints follow the TFv6 architecture, but differ in their sensor configurations, vision backbones or dataset composition.
 
-<br>
 <div align="center">
 
 | Description                           | Bench2Drive | Longest6 v2 |  Town13  |                                 Checkpoint                                  |
@@ -128,7 +127,6 @@ Pre-trained checkpoints are hosted on [HuggingFace](https://huggingface.co/ln269
 | Removed Town13 from training set      |    93.1     |     52      |   3.52   | [Link](https://huggingface.co/ln2697/tfv6/tree/main/town13heldout_resnet34) |
 
 </div>
-<br>
 
 To download checkpoints:
 
@@ -164,7 +162,7 @@ bash scripts/start_carla.sh
 # Start policy on one route
 python lead/leaderboard_wrapper.py \
 --checkpoint outputs/checkpoints/tfv6_resnet34 \
---routes data/benchmark_routes/bench2drive220routes/23687.xml \
+--routes data/benchmark_routes/bench2drive/23687.xml \
 --bench2drive
 ```
 
@@ -190,64 +188,18 @@ Launch the interactive infraction dashboard to analyze driving failures more con
 python lead/infraction_webapp/app.py
 ```
 
-Navigate to [http://localhost:5000](http://localhost:5000) to access the dashboard
-
-<br>
+Navigate to [http://localhost:5000](http://localhost:5000/?dir=outputs%2Flocal_evaluation), fill the input field with `outputs/local_evaluation` to access the infraction dashboard, useful for analyzing large-scale evaluations
 
 <div align="center">
 
 https://github.com/user-attachments/assets/81954b7c-4153-45d1-90a8-80cb426ccb70
 
 </div>
-<br>
 
 > [!TIP]
 > 1. Disable video recording in [config_closed_loop](lead/inference/config_closed_loop.py) by turning off `produce_demo_video` and `produce_debug_video`.
 > 2. If memory is limited, modify the file prefixes to load only the first checkpoint seed. By default, the pipeline loads all three seeds as an ensemble.
 > 3. To save time, decrease video FPS in [config_closed_loop](lead/inference/config_closed_loop.py) by increasing `produce_frame_frequency`.
-
-### 6. Verify autopilot
-
-Verify the expert policy and data acquisition pipeline by executing a test run on a sample route:
-
-```bash
-# Start CARLA if not done already
-bash scripts/start_carla.sh
-
-# Run expert on one route
-python lead/leaderboard_wrapper.py \
---expert \
---routes data/benchmark_routes/Town13/1.xml
-```
-
-Data collected will be stored at <code>data/expert_debug</code> and should have following structure:
-
-```html
-data/expert_debug/
-├── data
-│   └── debug_routes
-│       └── Town15_Rep-1_1_town15_construction_route0_01_15_12_48_52
-│           ├── bboxes
-│           ├── camera_pc
-│           ├── camera_pc_perturbated
-│           ├── depth
-│           ├── depth_perturbated
-│           ├── hdmap
-│           ├── hdmap_perturbated
-│           ├── instance
-│           ├── instance_perturbated
-│           ├── lidar
-│           ├── metas
-│           ├── radar
-│           ├── radar_perturbated
-│           ├── results.json
-│           ├── rgb
-│           ├── rgb_perturbated
-│           ├── semantics
-│           └── semantics_perturbated
-└── results
-    └── 1_town15_construction_result.json
-```
 
 ## Training
 
@@ -273,7 +225,7 @@ Start pretraining:
 
 ```bash
 # Train on a single GPU
-bash scripts/pretrain.sh
+python3 lead/training/train.py logdir=outputs/local_training/pretrain
 
 # Or Torch DDP
 bash scripts/pretrain_ddp.sh
@@ -283,22 +235,16 @@ Training logs and checkpoints will be saved to `outputs/local_training/pretrain`
 
 ```bash
 # Single GPU
-bash scripts/posttrain.sh
+python3 lead/training/train.py \
+logdir=outputs/local_training/posttrain \
+load_file=outputs/local_training/pretrain/model_0030.pth \
+use_planning_decoder=true
 
 # Distributed Torch DDP
 bash scripts/posttrain_ddp.sh
 ```
 
-Post-training checkpoints will be saved to `outputs/local_training/posttrain`. We also include TensorBoard and WandB logging
-
-<br>
-<div align="center">
-  <picture>
-    <img src="docs/assets/eval_wandb.png" />
-  </picture>
-
-</div>
-<br>
+Post-training checkpoints will be saved to `outputs/local_training/posttrain`.
 
 For distributed training on SLURM, see this [documentation page](https://ln2697.github.io/lead/docs/slurm_training.html). For a complete SLURM workflow of pre-training, post-training, evaluation, see this [example](slurm/experiments/001_example).
 
@@ -315,7 +261,7 @@ python lead/leaderboard_wrapper.py \
 --expert \
 --routes data/data_routes/lead/noScenarios/short_route.xml
 ```
-Collected data will be saved to `data/expert_debug/` with the following sensor outputs:
+Collected data will be saved to `outputs/expert_evaluation/` with the following sensor outputs:
 
 
 ```html
@@ -335,11 +281,8 @@ Collected data will be saved to `data/expert_debug/` with the following sensor o
 └── results.json             # Route-level summary and evaluation metadata
 ```
 
-For large-scale data collection on SLURM clusters, see the [data collection documentation](https://ln2697.github.io/lead/docs/data_collection.html).
+For large-scale data collection on SLURM clusters, see the [data collection documentation](https://ln2697.github.io/lead/docs/data_collection.html). The [Jupyter notebooks](notebooks) provide some example scripts to visualize the collected data:
 
-The [Jupyter notebooks](notebooks) provide some example scripts to visualize the collected data:
-
-<br>
 <div align="center">
   <picture>
     <img src="docs/assets/visualization.webp" width="49%" />
@@ -349,7 +292,6 @@ The [Jupyter notebooks](notebooks) provide some example scripts to visualize the
   </picture>
 
 </div>
-<br>
 
 ## Benchmarking
 
@@ -363,7 +305,7 @@ bash scripts/start_carla.sh
 # Bench2Drive
 python lead/leaderboard_wrapper.py \
 --checkpoint outputs/checkpoints/tfv6_resnet34 \
---routes data/benchmark_routes/bench2drive220routes/23687.xml \
+--routes data/benchmark_routes/bench2drive/23687.xml \
 --bench2drive
 
 # Longest6 v2
@@ -400,10 +342,9 @@ For a detailed breakdown of the codebase organization, see the [project structur
 
 Most issues can be solved by:
 - Delete and rebuild training cache / buckets.
-- Redownload data.
-- Restart CARLA.
+- Restart CARLA simulator.
 
-When debugging policy / expert, the script `scripts/reset_carla_world.py` can be handy to reset the map without restart the simulator, which can take some time.
+When debugging policy / expert, the script `scripts/reset_carla_world.py` can be handy to reset the current map without restarting the simulator. The latter can time-costly, especially on larger maps.
 
 ## Beyond CARLA: Cross-Benchmark Deployment
 

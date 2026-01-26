@@ -48,7 +48,7 @@ python lead/leaderboard_wrapper.py \
 ```bash
 python lead/leaderboard_wrapper.py \
     --checkpoint outputs/checkpoints/tfv6_resnet34 \
-    --routes data/benchmark_routes/bench2drive220routes/23687.xml \
+    --routes data/benchmark_routes/bench2drive/23687.xml \
     --bench2drive
 ```
 

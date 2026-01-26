@@ -337,7 +337,7 @@ class BasicScenario(object):
 
     def __del__(self):
         if len(CarlaDataProvider.active_scenarios) > 0:
-            _, _, scenario_instance_id = CarlaDataProvider.active_scenarios[0]
+            scenario_instance_id = CarlaDataProvider.active_scenarios[0].scenario_id
             if scenario_instance_id == id(self):
                 print("Popping active scenario: {} automatically after ending.".format(self.name))
                 CarlaDataProvider.clean_current_active_scenario()

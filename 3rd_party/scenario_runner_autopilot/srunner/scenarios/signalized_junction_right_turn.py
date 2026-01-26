@@ -11,22 +11,25 @@ is making a right turn
 
 from __future__ import print_function
 
-import py_trees
-
 import carla
-
-from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import ActorFlow, TrafficLightFreezer, ScenarioTimeout
-from srunner.scenariomanager.scenarioatomics.atomic_criteria import CollisionTest, ScenarioTimeoutTest
-from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import WaitEndIntersection, DriveDistance
+import py_trees
+from srunner.scenariomanager.carla_data_provider import (CarlaDataProvider,
+                                                         get_memory_entry)
+from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
+    ActorFlow, ScenarioTimeout, TrafficLightFreezer)
+from srunner.scenariomanager.scenarioatomics.atomic_criteria import (
+    CollisionTest, ScenarioTimeoutTest)
+from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (
+    DriveDistance, WaitEndIntersection)
 from srunner.scenarios.basic_scenario import BasicScenario
-from srunner.tools.scenario_helper import (generate_target_waypoint,
+from srunner.tools.background_manager import (AllowActorGeneration,
+                                              DisallowActorGeneration,
+                                              HandleJunctionScenario)
+from srunner.tools.scenario_helper import (filter_junction_wp_direction,
+                                           generate_target_waypoint,
+                                           get_closest_traffic_light,
                                            get_junction_topology,
-                                           filter_junction_wp_direction,
-                                           get_same_dir_lanes,
-                                           get_closest_traffic_light)
-
-from srunner.tools.background_manager import AllowActorGeneration, DisallowActorGeneration, HandleJunctionScenario
+                                           get_same_dir_lanes)
 
 
 def get_value_parameter(config, name, p_type, default):
@@ -189,11 +192,11 @@ class SignalizedJunctionRightTurn(JunctionRightTurn):
                 self._init_tl_dict[tl] = carla.TrafficLightState.Red
 
         if add_scenario_type:
-            from srunner.scenariomanager.carla_data_provider import ActiveScenario
+            from srunner.scenariomanager.carla_data_provider import \
+                ActiveScenario
             CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
-            CarlaDataProvider.memory[
-                type(self).__name__
-            ].update({
+            memory = get_memory_entry(type(self).__name__, id(self))
+            memory.update({
                 "source_wp": self._source_wp,
                 "sink_wp": self._sink_wp,
             })
@@ -253,11 +256,11 @@ class NonSignalizedJunctionRightTurn(JunctionRightTurn):
         """
         super()._initialize_actors(config)
         if add_scenario_type:
-            from srunner.scenariomanager.carla_data_provider import ActiveScenario
+            from srunner.scenariomanager.carla_data_provider import \
+                ActiveScenario
             CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
-            CarlaDataProvider.memory[
-                type(self).__name__
-            ].update({
+            memory = get_memory_entry(type(self).__name__, id(self))
+            memory.update({
                 "source_wp": self._source_wp,
                 "sink_wp": self._sink_wp,
             })

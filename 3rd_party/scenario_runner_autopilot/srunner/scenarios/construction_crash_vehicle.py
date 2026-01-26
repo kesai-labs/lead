@@ -10,24 +10,21 @@ moving along the road and encountering a construction setup.
 
 from __future__ import print_function
 
-import py_trees
 import carla
-
-from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (ActorDestroy,
-                                                                      ActorTransformSetter,
-                                                                      SwitchWrongDirectionTest,
-                                                                      ScenarioTimeout,
-                                                                      Idle, WaitForever,
-                                                                      OppositeActorFlow)
-from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (InTriggerDistanceToLocation,
-                                                                               WaitUntilInFrontPosition)
-from srunner.scenariomanager.scenarioatomics.atomic_criteria import CollisionTest, ScenarioTimeoutTest
+import py_trees
+from srunner.scenariomanager.carla_data_provider import (CarlaDataProvider,
+                                                         get_memory_entry)
+from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
+    ActorDestroy, ActorTransformSetter, Idle, OppositeActorFlow,
+    ScenarioTimeout, SwitchWrongDirectionTest, WaitForever)
+from srunner.scenariomanager.scenarioatomics.atomic_criteria import (
+    CollisionTest, ScenarioTimeoutTest)
+from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (
+    InTriggerDistanceToLocation, WaitUntilInFrontPosition)
 from srunner.scenarios.basic_scenario import BasicScenario
-from srunner.tools.background_manager import (RemoveRoadLane,
-                                              ReAddRoadLane,
-                                              SetMaxSpeed,
-                                              ChangeOppositeBehavior)
+from srunner.tools.background_manager import (ChangeOppositeBehavior,
+                                              ReAddRoadLane, RemoveRoadLane,
+                                              SetMaxSpeed)
 
 
 def get_value_parameter(config, name, p_type, default):
@@ -104,10 +101,13 @@ class ConstructionObstacle(BasicScenario):
         self.traffic_warning = traffic_warning
         self.last_cone = last_cone
         if add_scenario_type:
-            from srunner.scenariomanager.carla_data_provider import ActiveScenario
-            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=traffic_warning, last_actor=last_cone, metadata=self._direction, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
-            CarlaDataProvider.memory[type(self).__name__]["obstacles"] = self.other_actors
-            CarlaDataProvider.memory[type(self).__name__].update(
+            from srunner.scenariomanager.carla_data_provider import \
+                ActiveScenario
+            scenario_id = id(self)
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=traffic_warning, last_actor=last_cone, metadata=self._direction, scenario_id=scenario_id, trigger_location=config.trigger_points[0].location)) # added
+            memory = get_memory_entry(type(self).__name__, scenario_id)
+            memory["obstacles"] = self.other_actors
+            memory.update(
                 {
                     "first_actor": traffic_warning,
                     "last_actor": last_cone,
@@ -357,10 +357,13 @@ class ConstructionObstacleTwoWays(ConstructionObstacle):
         """
         super()._initialize_actors(config,add_scenario_type=False)
         if add_scenario_type:
-            from srunner.scenariomanager.carla_data_provider import ActiveScenario
-            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=self.traffic_warning, last_actor=self.last_cone, metadata=self._direction, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
-            CarlaDataProvider.memory[type(self).__name__]["obstacles"] = self.other_actors
-            CarlaDataProvider.memory[type(self).__name__].update(
+            from srunner.scenariomanager.carla_data_provider import \
+                ActiveScenario
+            scenario_id = id(self)
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=self.traffic_warning, last_actor=self.last_cone, metadata=self._direction, scenario_id=scenario_id, trigger_location=config.trigger_points[0].location)) # added
+            memory = get_memory_entry(type(self).__name__, scenario_id)
+            memory["obstacles"] = self.other_actors
+            memory.update(
                 {
                     "first_actor": self.traffic_warning,
                     "last_actor": self.last_cone,

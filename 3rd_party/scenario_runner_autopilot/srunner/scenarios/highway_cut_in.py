@@ -14,7 +14,8 @@ from __future__ import print_function
 
 import carla
 import py_trees
-from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
+from srunner.scenariomanager.carla_data_provider import (CarlaDataProvider,
+                                                         get_memory_entry)
 from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
     ActorDestroy, ActorTransformSetter, CutIn, SyncArrivalWithAgent)
 from srunner.scenariomanager.scenarioatomics.atomic_criteria import \
@@ -86,10 +87,10 @@ class HighwayCutIn(BasicScenario):
         self._cut_in_vehicle.set_simulate_physics(False)
 
         from srunner.scenariomanager.carla_data_provider import ActiveScenario
-        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
-        CarlaDataProvider.memory[
-            type(self).__name__
-        ]["cut_in_vehicle"] = self._cut_in_vehicle
+        scenario_id = id(self)
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=scenario_id, trigger_location=config.trigger_points[0].location)) # added
+        memory = get_memory_entry(type(self).__name__, scenario_id)
+        memory["cut_in_vehicle"] = self._cut_in_vehicle
 
 
     def _create_behavior(self):

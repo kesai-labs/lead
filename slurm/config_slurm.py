@@ -25,7 +25,7 @@ class ConfigSlurm(BaseConfig):
 
     @property
     def evaluation_dataset(self) -> str:
-        """Dataset being evaluated (e.g., 'Town13', 'longest6', 'bench2drive220', 'fail2drive210')."""
+        """Dataset being evaluated (e.g., 'Town13', 'longest6', 'bench2drive')."""
         return os.environ["EVALUATION_DATASET"]
 
     @property
@@ -90,13 +90,9 @@ class ConfigSlurm(BaseConfig):
             "longest6": os.path.join(
                 self.lead_project_root, "3rd_party/leaderboard/data/longest6.xml"
             ),
-            "bench2drive220": os.path.join(
+            "bench2drive": os.path.join(
                 self.lead_project_root,
                 "3rd_party/Bench2Drive/leaderboard/data/bench2drive_220.xml",
-            ),
-            "fail2drive210": os.path.join(
-                self.lead_project_root,
-                "3rd_party/Bench2Drive/leaderboard/data/fail2drive_210.xml",
             ),
         }
 

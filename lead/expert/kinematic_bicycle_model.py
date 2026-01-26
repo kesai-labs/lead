@@ -52,11 +52,9 @@ class KinematicBicycleModel:
         Returns:
             A tuple containing the forecasted locations, headings, and speeds for other vehicles.
         """
-        steers, throttles, brakes = (
-            actions[:, 0],
-            actions[:, 1],
-            actions[:, 2].astype(np.uint8),
-        )
+        steers, throttles = actions[:, 0], actions[:, 1]
+        with np.errstate(invalid="ignore"):
+            brakes = actions[:, 2].astype(np.uint8)
         wheel_angles = self.steering_gain * steers
         slip_angles = np.arctan(
             self.rear_wheel_base

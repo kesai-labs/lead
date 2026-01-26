@@ -55,19 +55,11 @@ def merge_route_json(folder_path):
             "eval num": len(driving_score),
             "current_driving_score": np.mean(driving_score),
         }
-    elif os.getenv("EVALUATION_DATASET") == "bench2drive220":
+    elif os.getenv("EVALUATION_DATASET") == "bench2drive":
         merged_data = {
             "_checkpoint": _checkpoint,
             "driving score": sum(driving_score) / 220,
             "success rate": success_num / 220,
-            "eval num": len(driving_score),
-            "current_driving_score": np.mean(driving_score),
-        }
-    elif os.getenv("EVALUATION_DATASET") == "fail2drive210":
-        merged_data = {
-            "_checkpoint": _checkpoint,
-            "driving score": sum(driving_score) / 210,
-            "success rate": success_num / 210,
             "eval num": len(driving_score),
             "current_driving_score": np.mean(driving_score),
         }

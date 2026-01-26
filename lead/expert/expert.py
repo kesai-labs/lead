@@ -24,6 +24,7 @@ from lead.common.constants import WeatherVisibility
 from lead.common.logging_config import setup_logging
 from lead.common.pid_controller import ExpertLateralPIDController
 from lead.expert.expert_data import ExpertData
+from lead.expert.scenario_sorter import ScenarioSorter
 
 matplotlib.use("Agg")  # non-GUI backend for headless servers
 
@@ -57,6 +58,9 @@ class Expert(ExpertData):
         self._turn_controller = ExpertLateralPIDController(self.config_expert)
         self.cleared_stop_sign = False
 
+        # Initialize scenario sorter (will be configured with route in _init)
+        self.scenario_sorter = ScenarioSorter()
+
         if self.config_expert.profile_expert:
             self.profiler = cProfile.Profile()
             self.profiler.enable()
@@ -85,53 +89,6 @@ class Expert(ExpertData):
         LOG.info("Init")
         self.expert_init(hd_map)
 
-    def sort_active_scenarios(self):
-        """Sort active scenarios based on their distance along the route to the ego vehicle. Remove scenarios that have ended.
-        This function should be called every step to keep the active scenarios list updated."""
-
-        distances = []
-        for scenario in CarlaDataProvider.active_scenarios:
-            # Try to get distance from first_actor location if available
-            if scenario.first_actor is not None and scenario.first_actor.is_alive:
-                try:
-                    actor_location = scenario.first_actor.get_location()
-                    distance = self.ego_location.distance(actor_location)
-                except:
-                    # Fallback to trigger location if actor location fails
-                    if scenario.trigger_location is not None:
-                        distance = self.ego_location.distance(scenario.trigger_location)
-                    else:
-                        distance = float("inf")  # Put at end if no location available
-            # Fallback to trigger_location for scenarios without first_actor (like EnterActorFlow)
-            elif scenario.trigger_location is not None:
-                distance = self.ego_location.distance(scenario.trigger_location)
-            else:
-                # No location available, put at end
-                distance = float("inf")
-
-            distances.append(distance)
-
-        # Sort the scenarios based on the calculated distances
-        indices = np.argsort(distances)
-        CarlaDataProvider.active_scenarios = [
-            CarlaDataProvider.active_scenarios[i] for i in indices
-        ]
-
-        # Remove scenarios that ended with a scenario timeout
-        active_scenarios = CarlaDataProvider.active_scenarios.copy()
-        for i, scenario in enumerate(active_scenarios):
-            first_actor = scenario.first_actor
-            last_actor = scenario.last_actor
-            # Only check actor liveness if actors exist
-            should_remove = False
-            if first_actor is not None and not first_actor.is_alive:
-                should_remove = True
-            elif last_actor is not None and not last_actor.is_alive:
-                should_remove = True
-
-            if should_remove:
-                CarlaDataProvider.active_scenarios.remove(active_scenarios[i])
-
     @beartype
     def run_step(
         self, input_data: dict, _: float, __: list[list[str | typing.Any]] | None
@@ -157,7 +114,7 @@ class Expert(ExpertData):
             self._init(None)
 
         self.step += 1
-        self.sort_active_scenarios()
+        self.scenario_sorter.sort_scenarios()
 
         # Track scenario changes
         current_scenario = self.current_active_scenario_type
@@ -182,6 +139,12 @@ class Expert(ExpertData):
 
         # Get the control commands and driving data for the current step
         target_speed, control, speed_reduced_by_obj = self._get_control()
+
+        # Visualize routes if enabled
+        if self.config_expert.visualize_route:
+            self._visualize_route()
+        if self.config_expert.visualize_original_route:
+            self._visualize_original_route()
 
         if not self.config_expert.eval_expert:
             if input_data is not None and "bounding_boxes" in input_data:
@@ -275,7 +238,7 @@ class Expert(ExpertData):
                 actor_velocity = actor.get_velocity().length()
                 if (
                     actor_velocity < 0.25
-                    and not CarlaDataProvider.memory[self.current_active_scenario_type][
+                    and not CarlaDataProvider.get_current_scenario_memory()[
                         "pedestrian_moved"
                     ][actor.id]
                 ):
@@ -283,9 +246,9 @@ class Expert(ExpertData):
                 elif (
                     actor_velocity >= 0.25
                 ):  # Actor is moving, we mark it as moving and continue with the scenario
-                    CarlaDataProvider.memory[self.current_active_scenario_type][
-                        "pedestrian_moved"
-                    ][actor.id] = True
+                    CarlaDataProvider.get_current_scenario_memory()["pedestrian_moved"][
+                        actor.id
+                    ] = True
 
                 bb_location = np.array(actor.get_transform().get_matrix())[:3, 3]
                 rel_vector = bb_location - ego_location
@@ -570,9 +533,7 @@ class Expert(ExpertData):
             cut_in_vehicle = self.cutin_actors[0]
             if (
                 1 < cut_in_vehicle.get_velocity().length() < 4.25
-                and not CarlaDataProvider.memory[self.current_active_scenario_type][
-                    "stopped"
-                ]
+                and not CarlaDataProvider.get_current_scenario_memory()["stopped"]
             ):
                 LOG.info(
                     f"[Control] ParkingCutIn: Emergency braking for cut-in vehicle (speed={cut_in_vehicle.get_velocity().length() * 3.6:.1f} km/h)"
@@ -581,25 +542,19 @@ class Expert(ExpertData):
                 brake = True
                 target_speed = 0.0
             elif (
-                not CarlaDataProvider.memory[self.current_active_scenario_type][
-                    "stopped"
-                ]
+                not CarlaDataProvider.get_current_scenario_memory()["stopped"]
                 and cut_in_vehicle.get_velocity().length() >= 5
             ):
                 LOG.info(
                     f"[Control] ParkingCutIn: Cut-in vehicle cleared (speed={cut_in_vehicle.get_velocity().length() * 3.6:.1f} km/h)"
                 )
-                CarlaDataProvider.memory[self.current_active_scenario_type][
-                    "stopped"
-                ] = True
+                CarlaDataProvider.get_current_scenario_memory()["stopped"] = True
         elif self.current_active_scenario_type in ["StaticCutIn"]:
             assert len(self.cutin_actors) == 1
             cut_in_vehicle = self.cutin_actors[0]
             if (
                 2.1 < cut_in_vehicle.get_velocity().length() < 4.25
-                and not CarlaDataProvider.memory[self.current_active_scenario_type][
-                    "stopped"
-                ]
+                and not CarlaDataProvider.get_current_scenario_memory()["stopped"]
             ):
                 LOG.info(
                     f"[Control] StaticCutIn: Emergency braking for cut-in vehicle (speed={cut_in_vehicle.get_velocity().length() * 3.6:.1f} km/h)"
@@ -608,17 +563,13 @@ class Expert(ExpertData):
                 brake = True
                 target_speed = 0.0
             elif (
-                not CarlaDataProvider.memory[self.current_active_scenario_type][
-                    "stopped"
-                ]
+                not CarlaDataProvider.get_current_scenario_memory()["stopped"]
                 and cut_in_vehicle.get_velocity().length() >= 5
             ):
                 LOG.info(
                     f"[Control] StaticCutIn: Cut-in vehicle cleared (speed={cut_in_vehicle.get_velocity().length() * 3.6:.1f} km/h)"
                 )
-                CarlaDataProvider.memory[self.current_active_scenario_type][
-                    "stopped"
-                ] = True
+                CarlaDataProvider.get_current_scenario_memory()["stopped"] = True
 
         # Compute throttle and brake control
         throttle, control_brake = self._longitudinal_controller.get_throttle_and_brake(
@@ -1061,8 +1012,14 @@ class Expert(ExpertData):
             #     sort_scenarios_by_distance(ego_location)
 
             if self.current_active_scenario_type == "InvadingTurn":
+                # Get the first (current) InvadingTurn memory entry
+                invading_turn_memory = (
+                    CarlaDataProvider.get_current_scenario_memory()
+                    if CarlaDataProvider.get_current_scenario_memory()
+                    else {}
+                )
                 first_cone, last_cone, offset = [
-                    CarlaDataProvider.memory["InvadingTurn"][k]
+                    invading_turn_memory[k]
                     for k in ["first_cone", "last_cone", "offset"]
                 ]
                 closest_distance = first_cone.get_location().distance(ego_location)
@@ -1087,7 +1044,7 @@ class Expert(ExpertData):
                 "ParkedObstacle",
             ]:
                 first_actor, last_actor, direction = [
-                    CarlaDataProvider.memory[self.current_active_scenario_type][k]
+                    CarlaDataProvider.get_current_scenario_memory()[k]
                     for k in ["first_actor", "last_actor", "direction"]
                 ]
 
@@ -1095,11 +1052,15 @@ class Expert(ExpertData):
                     self.ego_vehicle, first_actor
                 )
 
+                LOG.info(
+                    f"[{self.current_active_scenario_type}] Horizontal distance to obstacle: {horizontal_distance:.1f}m"
+                )
+
                 # Shift the route around the obstacles
                 if (
                     horizontal_distance
                     < self.config_expert.default_max_distance_to_process_scenario
-                    and not CarlaDataProvider.memory[self.current_active_scenario_type][
+                    and not CarlaDataProvider.get_current_scenario_memory()[
                         "changed_route"
                     ]
                 ):
@@ -1159,16 +1120,14 @@ class Expert(ExpertData):
                             extra_length_after=add_after_length,
                         )
                     )
-                    CarlaDataProvider.memory[self.current_active_scenario_type].update(
+                    CarlaDataProvider.get_current_scenario_memory().update(
                         {
                             "changed_route": True,
                             "from_index": from_index,
                         }
                     )
 
-                elif CarlaDataProvider.memory[self.current_active_scenario_type][
-                    "changed_route"
-                ]:
+                elif CarlaDataProvider.get_current_scenario_memory()["changed_route"]:
                     first_actor_rel_pos = common_utils.get_relative_transform(
                         self.ego_matrix,
                         np.array(first_actor.get_transform().get_matrix()),
@@ -1193,7 +1152,7 @@ class Expert(ExpertData):
                     to_index,
                     path_clear,
                 ) = [
-                    CarlaDataProvider.memory[self.current_active_scenario_type][k]
+                    CarlaDataProvider.get_current_scenario_memory()[k]
                     for k in [
                         "first_actor",
                         "last_actor",
@@ -1264,7 +1223,7 @@ class Expert(ExpertData):
                     )
 
                     changed_route = True
-                    CarlaDataProvider.memory[self.current_active_scenario_type].update(
+                    CarlaDataProvider.get_current_scenario_memory().update(
                         {
                             "changed_route": changed_route,
                             "from_index": from_index,
@@ -1298,9 +1257,9 @@ class Expert(ExpertData):
                         prev_road_lane_ids,
                         min_speed=self.two_way_overtake_speed,
                     )
-                    CarlaDataProvider.memory[self.current_active_scenario_type][
-                        "path_clear"
-                    ] = path_clear
+                    CarlaDataProvider.get_current_scenario_memory()["path_clear"] = (
+                        path_clear
+                    )
 
                 # If the overtaking path is clear, keep driving; otherwise, wait behind the obstacle
                 if path_clear:
@@ -1364,7 +1323,7 @@ class Expert(ExpertData):
                     to_index,
                     path_clear,
                 ) = [
-                    CarlaDataProvider.memory[self.current_active_scenario_type][k]
+                    CarlaDataProvider.get_current_scenario_memory()[k]
                     for k in [
                         "first_actor",
                         "last_actor",
@@ -1413,9 +1372,7 @@ class Expert(ExpertData):
                             int(from_index), int(to_index), True, transition_length
                         )
                         changed_route = True
-                        CarlaDataProvider.memory[
-                            self.current_active_scenario_type
-                        ].update(
+                        CarlaDataProvider.get_current_scenario_memory().update(
                             {
                                 "changed_route": changed_route,
                                 "from_index": int(from_index),
@@ -1443,7 +1400,7 @@ class Expert(ExpertData):
                     from_index,
                     to_index,
                 ) = [
-                    CarlaDataProvider.memory[self.current_active_scenario_type][k]
+                    CarlaDataProvider.get_current_scenario_memory()[k]
                     for k in [
                         "first_actor",
                         "last_actor",
@@ -1476,7 +1433,7 @@ class Expert(ExpertData):
 
                     to_index -= transition_length
                     changed_first_part_of_route = True
-                    CarlaDataProvider.memory[self.current_active_scenario_type].update(
+                    CarlaDataProvider.get_current_scenario_memory().update(
                         {
                             "changed_first_part_of_route": changed_first_part_of_route,
                             "from_index": from_index,
@@ -1489,9 +1446,9 @@ class Expert(ExpertData):
                         last_actor, to_index
                     )
                     to_index = to_idx_
-                    CarlaDataProvider.memory[self.current_active_scenario_type][
-                        "to_index"
-                    ] = to_index
+                    CarlaDataProvider.get_current_scenario_memory()["to_index"] = (
+                        to_index
+                    )
                 if self.privileged_route_planner.route_index > to_index:
                     LOG.info(
                         "[Scenario Exit] HazardAtSideLane: Passed hazard, cleaning up scenario"
@@ -1500,7 +1457,7 @@ class Expert(ExpertData):
 
             elif self.current_active_scenario_type == "YieldToEmergencyVehicle":
                 emergency_veh, changed_route, from_index, to_index, to_left = [
-                    CarlaDataProvider.memory[self.current_active_scenario_type][k]
+                    CarlaDataProvider.get_current_scenario_memory()[k]
                     for k in [
                         "emergency_vehicle",
                         "changed_route",
@@ -1546,7 +1503,7 @@ class Expert(ExpertData):
 
                     changed_route = True
                     to_index -= transition_length
-                    CarlaDataProvider.memory[self.current_active_scenario_type].update(
+                    CarlaDataProvider.get_current_scenario_memory().update(
                         {
                             "changed_route": changed_route,
                             "from_index": int(from_index),
@@ -1560,9 +1517,9 @@ class Expert(ExpertData):
                         to_left, to_index
                     )
                     to_index = to_idx_
-                    CarlaDataProvider.memory[self.current_active_scenario_type][
-                        "to_index"
-                    ] = to_index
+                    CarlaDataProvider.get_current_scenario_memory()["to_index"] = (
+                        to_index
+                    )
 
                     # Check if the emergency vehicle is in front of the ego vehicle
                     diff = emergency_veh.get_location() - ego_location
@@ -2561,10 +2518,14 @@ class Expert(ExpertData):
             T=self.config_expert.idm_red_light_desired_time_headway,
         )
 
-        LOG.info(
-            f"""[{self.step}] Ego target speed adjusted for red light in {distance_to_traffic_light_stop_point:.2f}m
-from {target_speed:.2f} to {new_target_speed:.2f}"""
-        )
+        if (
+            abs(new_target_speed - target_speed) > 1e-2
+            and distance_to_traffic_light_stop_point < 30.0
+        ):
+            LOG.info(
+                f"""[{self.step}] Ego target speed adjusted for red light in {distance_to_traffic_light_stop_point:.2f}m
+    from {target_speed:.2f} to {new_target_speed:.2f}"""
+            )
 
         return new_target_speed
 
@@ -3200,3 +3161,81 @@ from {target_speed:.2f} to {new_target_speed:.2f}"""
         self.metas.append((self.step, frame, data))
 
         return data
+
+    @beartype
+    def _visualize_route(self) -> None:
+        """Visualize the current route using CARLA debug drawing."""
+        route_points = self.route_waypoints_np
+        if len(route_points) == 0:
+            return
+
+        sampled_points = route_points[:1000:20]
+        for point in sampled_points:
+            location = carla.Location(
+                x=float(point[0]), y=float(point[1]), z=float(point[2]) + 1.0
+            )
+            self.carla_world.debug.draw_point(
+                location,
+                size=0.05,  # Smaller size
+                color=self.config_expert.future_route_color,  # Green
+                life_time=self.config_expert.draw_life_time,  # Short life time for continuous updates
+            )
+
+        # Draw lines between consecutive sampled route points
+        for i in range(len(sampled_points) - 1):
+            start = carla.Location(
+                x=float(sampled_points[i][0]),
+                y=float(sampled_points[i][1]),
+                z=float(sampled_points[i][2]) + 1.0,
+            )
+            end = carla.Location(
+                x=float(sampled_points[i + 1][0]),
+                y=float(sampled_points[i + 1][1]),
+                z=float(sampled_points[i + 1][2]) + 1.0,
+            )
+            self.carla_world.debug.draw_line(
+                start,
+                end,
+                thickness=0.05,  # Thinner lines
+                color=self.config_expert.future_route_color,  # Green
+                life_time=self.config_expert.draw_life_time,
+            )
+
+    @beartype
+    def _visualize_original_route(self) -> None:
+        """Visualize the original route using CARLA debug drawing."""
+        original_route_points = self.original_route_waypoints_np
+        if len(original_route_points) == 0:
+            return
+
+        sampled_points = original_route_points[:1000:20]
+        for point in sampled_points:
+            location = carla.Location(
+                x=float(point[0]), y=float(point[1]), z=float(point[2]) + 1.5
+            )
+            self.carla_world.debug.draw_point(
+                location,
+                size=0.05,  # Even smaller size
+                color=carla.Color(0, 0, 255),  # Blue
+                life_time=self.config_expert.draw_life_time,  # Short life time for continuous updates
+            )
+
+        # Draw lines between consecutive sampled original route points
+        for i in range(len(sampled_points) - 1):
+            start = carla.Location(
+                x=float(sampled_points[i][0]),
+                y=float(sampled_points[i][1]),
+                z=float(sampled_points[i][2]) + 1.5,
+            )
+            end = carla.Location(
+                x=float(sampled_points[i + 1][0]),
+                y=float(sampled_points[i + 1][1]),
+                z=float(sampled_points[i + 1][2]) + 1.5,
+            )
+            self.carla_world.debug.draw_line(
+                start,
+                end,
+                thickness=0.04,  # Thinner lines
+                color=carla.Color(0, 0, 255),  # Blue
+                life_time=self.config_expert.draw_life_time,
+            )

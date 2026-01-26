@@ -625,7 +625,7 @@ class ExpertConfig(BaseConfig):
             },
         }[DemoCameraOptions.HIGH_BEV]
 
-    @property
+    @overridable_property
     def visualize_source_lane(self):
         """If true source lane should be visualized."""
         if not self.visualization_allowed:
@@ -636,7 +636,7 @@ class ExpertConfig(BaseConfig):
             return False
         return False
 
-    @property
+    @overridable_property
     def visualize_target_lane(self):
         """If true target lane should be visualized."""
         if not self.visualization_allowed:
@@ -647,7 +647,7 @@ class ExpertConfig(BaseConfig):
             return False
         return False
 
-    @property
+    @overridable_property
     def visualize_adversarial(self):
         """If true adversarial elements should be visualized."""
         if not self.visualization_allowed:
@@ -658,7 +658,7 @@ class ExpertConfig(BaseConfig):
             return False
         return False
 
-    @property
+    @overridable_property
     def visualize_planning_area(self):
         """If true planning area should be visualized."""
         if not self.visualization_allowed:
@@ -669,7 +669,7 @@ class ExpertConfig(BaseConfig):
             return False
         return False
 
-    @property
+    @overridable_property
     def visualize_radar(self):
         """If true planning area should be visualized."""
         if not self.visualization_allowed:
@@ -680,7 +680,7 @@ class ExpertConfig(BaseConfig):
             return False
         return False
 
-    @property
+    @overridable_property
     def visualize_target_points(self):
         """If true visualize target points during debugging."""
         if not self.visualization_allowed:
@@ -691,7 +691,7 @@ class ExpertConfig(BaseConfig):
             return False
         return False
 
-    @property
+    @overridable_property
     def visualize_route(self):
         if not self.visualization_allowed:
             return False
@@ -701,7 +701,7 @@ class ExpertConfig(BaseConfig):
             return False
         return False
 
-    @property
+    @overridable_property
     def visualize_original_route(self):
         """If true visualize the original route."""
         if not self.visualization_allowed:
@@ -712,7 +712,7 @@ class ExpertConfig(BaseConfig):
             return False
         return False
 
-    @property
+    @overridable_property
     def visualize_bb_ids(self):
         """If true visualize bounding box IDs during debugging."""
         if not self.visualization_allowed:
@@ -723,7 +723,7 @@ class ExpertConfig(BaseConfig):
             return False
         return False
 
-    @property
+    @overridable_property
     def visualize_internal_data(self):
         if not self.visualization_allowed:
             return False
@@ -733,7 +733,7 @@ class ExpertConfig(BaseConfig):
             return False
         return False
 
-    @property
+    @overridable_property
     def visualize_bounding_boxes(self):
         """If true bounding boxes should be visualized."""
         if not self.visualization_allowed:
@@ -744,7 +744,7 @@ class ExpertConfig(BaseConfig):
             return False
         return False
 
-    @property
+    @overridable_property
     def visualize_traffic_lights_bounding_boxes(self):
         """If true traffic light bounding boxes should be visualized."""
         if not self.visualization_allowed:

@@ -438,6 +438,11 @@
                     return;
                 }
 
+                // Update UI: hide directory selection, show sidebar with routes
+                directorySelection.style.display = 'none';
+                document.getElementById('sidebar-initial').style.display = 'none';
+                document.getElementById('sidebar-active').style.display = 'block';
+
                 routesData = data.routes; // Store routes data globally
                 renderRoutes(data.routes);
                 updateRouteStats(data.routes);

@@ -12,6 +12,7 @@ local buffers to avoid blocking calls to CARLA
 
 from __future__ import print_function
 
+import copy
 import math
 import re
 import threading
@@ -32,54 +33,103 @@ def calculate_velocity(actor):
     return math.sqrt(velocity_squared)
 
 def DEFAULT_MEMORY():
-    ret = defaultdict(dict)
-    ret.update({
-        # Unprotected left turn
-        "SignalizedJunctionLeftTurn": {"adversarial_actors": [], "source_wp": None, "sink_wp": None, "intersection_point": None,  "dangerous_adversarial_actor_ids": [],  "safe_adversarial_actors_ids": [], "ignored_adversarial_actors_ids": [], "opponent_traffic_route": None},
-        "NonSignalizedJunctionLeftTurn": {"adversarial_actors": [], "source_wp": None, "sink_wp": None, "intersection_point": None,  "dangerous_adversarial_actor_ids": [], "safe_adversarial_actors_ids": [],  "ignored_adversarial_actors_ids": [], "opponent_traffic_route": None},
-        "NonSignalizedJunctionLeftTurnEnterFlow": {"adversarial_actors": [], "source_wp": None, "sink_wp": None, "intersection_point": None,  "dangerous_adversarial_actor_ids": [], "safe_adversarial_actors_ids": [],  "ignored_adversarial_actors_ids": [], "opponent_traffic_route": None},
-        "SignalizedJunctionLeftTurnEnterFlow": {"adversarial_actors": [], "source_wp": None, "sink_wp": None, "intersection_point": None,  "dangerous_adversarial_actor_ids": [], "safe_adversarial_actors_ids": [],  "ignored_adversarial_actors_ids": [], "opponent_traffic_route": None},
-        "InterurbanActorFlow": {"adversarial_actors": [], "source_wp": None, "sink_wp": None, "intersection_point": None,  "dangerous_adversarial_actor_ids": [], "safe_adversarial_actors_ids": [],  "ignored_adversarial_actors_ids": [], "opponent_traffic_route": None},
-        "InterurbanAdvancedActorFlow": {"adversarial_actors": [], "source_wp_1": None, "sink_wp_1": None, "source_wp_2": None, "sink_wp_2": None, "intersection_point_1": None, "intersection_point_2": None,  "dangerous_adversarial_actor_ids": [],  "safe_adversarial_actors_ids": [],  "ignored_adversarial_actors_ids": [], "opponent_traffic_route_1": None, "opponent_traffic_route_2": None}, # TODO
-        # Unprotected right turn
-        "SignalizedJunctionRightTurn": {"adversarial_actors": [], "source_wp": None, "sink_wp": None, "intersection_point": None,  "dangerous_adversarial_actor_ids": [], "safe_adversarial_actors_ids": [],  "ignored_adversarial_actors_ids": [], "opponent_traffic_route": None},
-        "NonSignalizedJunctionRightTurn": {"adversarial_actors": [], "source_wp": None, "sink_wp": None, "intersection_point": None,  "dangerous_adversarial_actor_ids": [], "safe_adversarial_actors_ids": [],  "ignored_adversarial_actors_ids": [], "opponent_traffic_route": None},
-        # Pedestrians
-        "VehicleTurningRoute": {"pedestrian_moved": defaultdict(lambda: False)},
-        "VehicleTurningRoutePedestrian": {"pedestrian_moved": defaultdict(lambda: False)},
-        "DynamicObjectCrossing": {"pedestrian_moved": defaultdict(lambda: False)},
-        "ParkingCrossingPedestrian": {"pedestrian_moved": defaultdict(lambda: False)},
-        "PedestrianCrossing": {"pedestrian_moved": defaultdict(lambda: False)},
-        # Opposite vehicle taking priority
-        "OppositeVehicleRunningRedLight": {"adversarial_actors": []},
-        "OppositeVehicleTakingPriority": {"adversarial_actors": []},
-        # Obstacle scenarios with one way
-        "Accident": {"source_lane": None, "target_lane": None, "adversarial_actors": [], "changed_route": False, "from_index": None, "dangerous_adversarial_actor_ids": [], "safe_adversarial_actors_ids": [], "ignored_adversarial_actors_ids": [],  "obstacles": []},
-        "ConstructionObstacle": {"source_lane": None, "target_lane": None, "adversarial_actors": [], "changed_route": False, "from_index": None, "dangerous_adversarial_actor_ids": [],  "safe_adversarial_actors_ids": [],  "ignored_adversarial_actors_ids": [], "obstacles": []},
-        "ParkedObstacle": {"source_lane": None, "target_lane": None, "adversarial_actors": [], "changed_route": False, "from_index": None,  "dangerous_adversarial_actor_ids": [], "safe_adversarial_actors_ids": [],  "ignored_adversarial_actors_ids": [],  "obstacles": []},
-        "HazardAtSideLane": {"source_lane": None, "target_lane": None,"bicycle_1": None, "adversarial_actors": [],  "dangerous_adversarial_actor_ids": [],  "safe_adversarial_actors_ids": []}, # TODO
-        # Obstacle scenarios with two ways
-        "AccidentTwoWays": {"source_lane": None, "target_lane": None, "adversarial_actors": [], "changed_route": False, "from_index": None,  "dangerous_adversarial_actor_ids": [], "safe_adversarial_actors_ids": [],  "ignored_adversarial_actors_ids": [], "obstacles": []},
-        "ConstructionObstacleTwoWays": {"source_lane": None, "target_lane": None, "adversarial_actors": [], "changed_route": False, "from_index": None,  "dangerous_adversarial_actor_ids": [],  "safe_adversarial_actors_ids": [],  "ignored_adversarial_actors_ids": [], "obstacles": []},
-        "ParkedObstacleTwoWays": {"source_lane": None, "target_lane": None, "adversarial_actors": [], "changed_route": False, "from_index": None,  "dangerous_adversarial_actor_ids": [],  "safe_adversarial_actors_ids": [],  "ignored_adversarial_actors_ids": [], "obstacles": []},
-        "HazardAtSideLaneTwoWays": {"source_lane": None, "target_lane": None, "adversarial_actors": [], "changed_route": False, "from_index": None,  "dangerous_adversarial_actor_ids": [],  "safe_adversarial_actors_ids": [],  "ignored_adversarial_actors_ids": [], }, # TODO
-        "VehicleOpensDoorTwoWays": {"obstacles": [], "vehicle_opened_door": False, "vehicle_door_side": None},
-        "InvadingTurn": {"obstacles": []}, # TODO
-        # Highway merging scenarios
-        "MergerIntoSlowTraffic": {"source_lane": None, "target_lane": None, "adversarial_actors": [], "changed_route": False, "from_index": None, "dangerous_adversarial_actor_ids": [],  "safe_adversarial_actors_ids": [],  "ignored_adversarial_actors_ids": [], }, # TODO
-        "MergerIntoSlowTrafficV2": {"source_lane": None, "target_lane": None, "adversarial_actors": [], "changed_route": False, "from_index": None,  "dangerous_adversarial_actor_ids": [], "safe_adversarial_actors_ids": [],  "ignored_adversarial_actors_ids": [], }, # TODO
-        # Cut in scenarios
-        "StaticCutIn": {"cut_in_vehicle": None, "stopped": False},
-        "ParkingCutIn": {"cut_in_vehicle": None, "stopped": False},
-        "HighwayCutIn": {"cut_in_vehicle": None, "stopped": False},
-        # Misc
-        "BlockedIntersection": {"obstacles": []},
-        "EnterActorFlow": {"adversarial_actors": [], "source_wp": None, "sink_wp": None, "intersection_point": None,  "dangerous_adversarial_actor_ids": [],  "safe_adversarial_actors_ids": [],  "ignored_adversarial_actors_ids": [], "opponent_traffic_route": None},
-        "EnterActorFlowV2": {"adversarial_actors": [], "source_wp": None, "sink_wp": None, "intersection_point": None,  "dangerous_adversarial_actor_ids": [],  "safe_adversarial_actors_ids": [],  "ignored_adversarial_actors_ids": [], "opponent_traffic_route": None},
-        "allow_new_actors": True, 
-        "next_traffic_light": None, 
-    })
+    ret = defaultdict(list)
+    # Initialize scenario types with empty lists
+    scenario_types = [
+        "SignalizedJunctionLeftTurn", "NonSignalizedJunctionLeftTurn", "NonSignalizedJunctionLeftTurnEnterFlow",
+        "SignalizedJunctionLeftTurnEnterFlow", "InterurbanActorFlow", "InterurbanAdvancedActorFlow",
+        "SignalizedJunctionRightTurn", "NonSignalizedJunctionRightTurn", "VehicleTurningRoute",
+        "VehicleTurningRoutePedestrian", "DynamicObjectCrossing", "ParkingCrossingPedestrian",
+        "PedestrianCrossing", "OppositeVehicleRunningRedLight", "OppositeVehicleTakingPriority",
+        "Accident", "ConstructionObstacle", "ParkedObstacle", "HazardAtSideLane",
+        "AccidentTwoWays", "ConstructionObstacleTwoWays", "ParkedObstacleTwoWays",
+        "HazardAtSideLaneTwoWays", "VehicleOpensDoorTwoWays", "InvadingTurn",
+        "MergerIntoSlowTraffic", "MergerIntoSlowTrafficV2", "StaticCutIn",
+        "ParkingCutIn", "HighwayCutIn", "BlockedIntersection", "EnterActorFlow", "EnterActorFlowV2"
+    ]
+    
+    for scenario_type in scenario_types:
+        ret[scenario_type] = []
+    
+    # Special non-list entries remain as before
+    ret["allow_new_actors"] = True
+    ret["next_traffic_light"] = None
+    
     return ret
+
+
+def get_memory_entry(scenario_type, scenario_id=None):
+    """Get or create a memory entry for a scenario type and ID.
+    
+    Args:
+        scenario_type: The type of scenario (e.g., 'EnterActorFlow')
+        scenario_id: Unique identifier for this scenario instance
+    
+    Returns:
+        The memory dict for this scenario instance
+    """
+    memories = CarlaDataProvider.memory[scenario_type]
+    
+    # If scenario_id is provided, try to find existing memory entry
+    if scenario_id is not None:
+        for memory in memories:
+            if memory.get('id') == scenario_id:
+                return memory
+    
+    # Create new memory entry with appropriate default values
+    if scenario_type in ["SignalizedJunctionLeftTurn", "NonSignalizedJunctionLeftTurn", "NonSignalizedJunctionLeftTurnEnterFlow", "SignalizedJunctionLeftTurnEnterFlow", "InterurbanActorFlow", "SignalizedJunctionRightTurn", "NonSignalizedJunctionRightTurn", "EnterActorFlow", "EnterActorFlowV2"]:
+        new_memory = {
+            "id": scenario_id,
+            "adversarial_actors": [], "source_wp": None, "sink_wp": None, "intersection_point": None,
+            "dangerous_adversarial_actor_ids": [], "safe_adversarial_actors_ids": [], "ignored_adversarial_actors_ids": [],
+            "opponent_traffic_route": None
+        }
+    elif scenario_type == "InterurbanAdvancedActorFlow":
+        new_memory = {
+            "id": scenario_id,
+            "adversarial_actors": [], "source_wp_1": None, "sink_wp_1": None, "source_wp_2": None, "sink_wp_2": None,
+            "intersection_point_1": None, "intersection_point_2": None, "dangerous_adversarial_actor_ids": [],
+            "safe_adversarial_actors_ids": [], "ignored_adversarial_actors_ids": [], 
+            "opponent_traffic_route_1": None, "opponent_traffic_route_2": None
+        }
+    elif scenario_type in ["VehicleTurningRoute", "VehicleTurningRoutePedestrian", "DynamicObjectCrossing", "ParkingCrossingPedestrian", "PedestrianCrossing"]:
+        new_memory = {"id": scenario_id, "pedestrian_moved": defaultdict(lambda: False)}
+    elif scenario_type in ["OppositeVehicleRunningRedLight", "OppositeVehicleTakingPriority"]:
+        new_memory = {"id": scenario_id, "adversarial_actors": []}
+    elif scenario_type in ["Accident", "ConstructionObstacle", "ParkedObstacle", "AccidentTwoWays", "ConstructionObstacleTwoWays", "ParkedObstacleTwoWays"]:
+        new_memory = {
+            "id": scenario_id, "source_lane": None, "target_lane": None, "adversarial_actors": [],
+            "changed_route": False, "from_index": None, "dangerous_adversarial_actor_ids": [],
+            "safe_adversarial_actors_ids": [], "ignored_adversarial_actors_ids": [], "obstacles": []
+        }
+    elif scenario_type in ["HazardAtSideLane"]:
+        new_memory = {
+            "id": scenario_id, "source_lane": None, "target_lane": None, "bicycle_1": None,
+            "adversarial_actors": [], "dangerous_adversarial_actor_ids": [], "safe_adversarial_actors_ids": []
+        }
+    elif scenario_type in ["HazardAtSideLaneTwoWays"]:
+        new_memory = {
+            "id": scenario_id, "source_lane": None, "target_lane": None, "adversarial_actors": [],
+            "changed_route": False, "from_index": None, "dangerous_adversarial_actor_ids": [],
+            "safe_adversarial_actors_ids": [], "ignored_adversarial_actors_ids": []
+        }
+    elif scenario_type == "VehicleOpensDoorTwoWays":
+        new_memory = {"id": scenario_id, "obstacles": [], "vehicle_opened_door": False, "vehicle_door_side": None}
+    elif scenario_type in ["InvadingTurn", "BlockedIntersection"]:
+        new_memory = {"id": scenario_id, "obstacles": []}
+    elif scenario_type in ["MergerIntoSlowTraffic", "MergerIntoSlowTrafficV2"]:
+        new_memory = {
+            "id": scenario_id, "source_lane": None, "target_lane": None, "adversarial_actors": [],
+            "changed_route": False, "from_index": None, "dangerous_adversarial_actor_ids": [],
+            "safe_adversarial_actors_ids": [], "ignored_adversarial_actors_ids": []
+        }
+    elif scenario_type in ["StaticCutIn", "ParkingCutIn", "HighwayCutIn"]:
+        new_memory = {"id": scenario_id, "cut_in_vehicle": None, "stopped": False}
+    else:
+        new_memory = {"id": scenario_id}
+    
+    memories.append(new_memory)
+    return new_memory
 
 
 class ActiveScenario:
@@ -159,25 +209,113 @@ class CarlaDataProvider(object):  # pylint: disable=too-many-public-methods
     _grp = None
     _runtime_init_flag = False
     _lock = threading.Lock()
+    _route_xml_path = None  # Path to the current route XML file
 
     @staticmethod
     def current_active_scenario_type():
         if len(CarlaDataProvider.active_scenarios) > 0:
             return CarlaDataProvider.active_scenarios[0].name
         return None
+    
+    @staticmethod
+    def get_current_scenario_memory():
+        """Get the memory entry for the current active scenario (first in list)."""
+        if len(CarlaDataProvider.active_scenarios) > 0:
+            scenario_type = CarlaDataProvider.active_scenarios[0].name
+            scenario_id = CarlaDataProvider.active_scenarios[0].scenario_id
+            return get_memory_entry(scenario_type, scenario_id)
+        return None
+
+    @staticmethod
+    def remove_scenario(scenario):
+        """Remove a scenario from active scenarios and clean up its memory.
+        
+        Args:
+            scenario: The ActiveScenario to remove and clean up.
+        """
+        # Remove from active scenarios list
+        if scenario in CarlaDataProvider.active_scenarios:
+            CarlaDataProvider.active_scenarios.remove(scenario)
+        
+        # Clean up scenario memory
+        scenario_type = scenario.name
+        scenario_id = scenario.scenario_id
+        
+        if scenario_type in CarlaDataProvider.memory:
+            # Find and remove the memory entry with matching scenario_id
+            memory_list = CarlaDataProvider.memory[scenario_type]
+            for i, memory_entry in enumerate(memory_list):
+                if memory_entry.get('id') == scenario_id:
+                    memory_list.pop(i)
+                    print(f"[CarlaDataProvider] Removed memory for scenario {scenario_type} with ID {scenario_id}")
+                    break
+            
+            # If no memory entries left for this scenario type, remove the entire list
+            if not memory_list:
+                del CarlaDataProvider.memory[scenario_type]
+                print(f"[CarlaDataProvider] Removed empty memory list for scenario type {scenario_type}")
 
     @staticmethod
     def clean_current_active_scenario():
         if len(CarlaDataProvider.active_scenarios) > 0:
             scenario_name = CarlaDataProvider.active_scenarios[0].name
-            CarlaDataProvider.previous_memory[scenario_name] = CarlaDataProvider.memory[scenario_name]
-            CarlaDataProvider.memory[scenario_name] = DEFAULT_MEMORY().get(scenario_name, {})
+            scenario_id = CarlaDataProvider.active_scenarios[0].scenario_id
+            
+            # Copy the current memory entry to previous_memory (shallow copy for actor references)
+            if scenario_name in CarlaDataProvider.memory and len(CarlaDataProvider.memory[scenario_name]) > 0:
+                # Find the memory entry for this specific scenario instance
+                current_memory = None
+                for memory_entry in CarlaDataProvider.memory[scenario_name]:
+                    if memory_entry.get('id') == scenario_id:
+                        # Shallow copy is sufficient since actor references shouldn't be duplicated
+                        current_memory = memory_entry.copy()
+                        break
+                
+                if current_memory:
+                    # Store as a list to match the structure
+                    CarlaDataProvider.previous_memory[scenario_name] = [current_memory]
+                else:
+                    # If no matching entry found, store the entire list (fallback)
+                    CarlaDataProvider.previous_memory[scenario_name] = [mem.copy() for mem in CarlaDataProvider.memory[scenario_name]]
+                
+                # Remove only the specific memory entry for this scenario instance
+                CarlaDataProvider.memory[scenario_name] = [
+                    mem for mem in CarlaDataProvider.memory[scenario_name]
+                    if mem.get('id') != scenario_id
+                ]
+                
+                # If the list is now empty, we can optionally remove it or leave it as empty list
+                if not CarlaDataProvider.memory[scenario_name]:
+                    CarlaDataProvider.memory[scenario_name] = []
+            
             CarlaDataProvider.previous_active_scenario = scenario_name
             CarlaDataProvider.active_scenarios = CarlaDataProvider.active_scenarios[1:]
             print(f"[CarlaDataProvider] Memory after cleaning {CarlaDataProvider.previous_active_scenario}: {CarlaDataProvider.memory[CarlaDataProvider.previous_active_scenario]}")
-            print(f"[CarlaDataProvider] Queue after cleaning {CarlaDataProvider.previous_active_scenario}: {CarlaDataProvider.active_scenarios}")
+            print(f"[CarlaDataProvider] Queue after cleaning {CarlaDataProvider.previous_active_scenario}:")
+            scenarios_str = "\t" + '\n\t'.join([str(scenario) for scenario in CarlaDataProvider.active_scenarios])
+            print(scenarios_str)
         else:
             raise ValueError("No active scenario to clean up")
+
+    @staticmethod
+    def set_route_xml_path(xml_path):
+        """
+        Set the path to the current route XML file.
+        
+        Args:
+            xml_path: Path to the XML file containing the route configuration
+        """
+        CarlaDataProvider._route_xml_path = xml_path
+
+    @staticmethod
+    def get_route_xml_path():
+        """
+        Get the path to the current route XML file.
+        
+        Returns:
+            Path to the XML file or None if not set
+        """
+        return CarlaDataProvider._route_xml_path
 
     @staticmethod
     def register_actor(actor, transform=None):

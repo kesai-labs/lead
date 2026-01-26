@@ -17,7 +17,7 @@ bash scripts/start_carla.sh
 2. Run the expert agent:
 
 ```bash
-python lead/leaderboard_wrapper.py --routes data/data_routes/lead/noScenarios/short_route.xml
+python lead/leaderboard_wrapper.py --expert --routes data/data_routes/lead/noScenarios/short_route.xml
 ```
 
 ## Inspect Collected Data

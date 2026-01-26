@@ -110,7 +110,7 @@ function train() {
 	fi
 }
 
-# Evaluate on shorter routes of bench2drive220
+# Evaluate on shorter routes of bench2drive
 # Usage: evaluate <checkpoint_dir>
 function evaluate() {
 	if [[ -z "$EVALUATION_DATASET" ]]; then
@@ -137,11 +137,11 @@ function evaluate() {
 	screen -dmS "$EXPERIMENT_RUN_ID" bash -c "slurm/evaluate.sh > $EVALUATION_STDOUT 2> $EVALUATION_STDERR"
 }
 
-# Evaluate on shorter routes of bench2drive220
-# Usage: evaluate_bench2drive220 <checkpoint_dir>
-function evaluate_bench2drive220() {
+# Evaluate on shorter routes of bench2drive
+# Usage: evaluate_bench2drive <checkpoint_dir>
+function evaluate_bench2drive() {
 	# Set up default dataset for evaluation.
-	export EVALUATION_DATASET=bench2drive220
+	export EVALUATION_DATASET=bench2drive
 	export USE_PREEMPTABLE_PARTITION=1
 	evaluate "$@"
 }
@@ -196,10 +196,10 @@ function evaluate_expert() {
 	screen -dmS "$EXPERIMENT_RUN_ID" bash -c "slurm/evaluate_expert.sh > $EVALUATION_STDOUT 2> $EVALUATION_STDERR"
 }
 
-# Evaluate expert on shorter routes of bench2drive220
-# Usage: evaluate_expert_bench2drive220
-function evaluate_expert_bench2drive220() {
-	export EVALUATION_DATASET=bench2drive220
+# Evaluate expert on shorter routes of bench2drive
+# Usage: evaluate_expert_bench2drive
+function evaluate_expert_bench2drive() {
+	export EVALUATION_DATASET=bench2drive
 	evaluate_expert "$@"
 }
 
