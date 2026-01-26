@@ -15,6 +15,20 @@ def make_bash(bash_file, route_file, route_id, args):
         [f"export {key}='{value}'" for key, value in os.environ.items()]
     )
 
+    # Select evaluator scripts based on expert mode
+    if args.expert:
+        bench2drive_evaluator = "3rd_party/Bench2Drive/leaderboard/leaderboard/leaderboard_evaluator_local.py"
+        standard_evaluator = (
+            "3rd_party/leaderboard_autopilot/leaderboard/leaderboard_evaluator_local.py"
+        )
+    else:
+        bench2drive_evaluator = (
+            "3rd_party/Bench2Drive/leaderboard/leaderboard/leaderboard_evaluator.py"
+        )
+        standard_evaluator = (
+            "3rd_party/leaderboard/leaderboard/leaderboard_evaluator.py"
+        )
+
     template = f"""#!/bin/bash
 #SBATCH --partition={args.partition}
 #SBATCH --nodes=1
@@ -22,7 +36,9 @@ def make_bash(bash_file, route_file, route_id, args):
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=32gb
 #SBATCH --time={args.slurm_timeout}
-#SBATCH --gres=gpu{":1080ti" if is_on_tcml() else ""}:1 # TCML has issue with 2080ti driver. Only 1080ti works.
+#SBATCH --gres=gpu{
+        ":1080ti" if is_on_tcml() else ""
+    }:1 # TCML has issue with 2080ti driver. Only 1080ti works.
 
 set -e
 set +x
@@ -49,8 +65,14 @@ else
     export DEBUG_ENV_AGENT=0
     export RECORD=1
     export DATAGEN=0
-    export SCENARIO_RUNNER_ROOT=3rd_party/scenario_runner
-    export LEADERBOARD_ROOT=3rd_party/leaderboard
+    export SCENARIO_RUNNER_ROOT={
+        "3rd_party/scenario_runner_autopilot"
+        if args.expert
+        else "3rd_party/scenario_runner"
+    }
+    export LEADERBOARD_ROOT={
+        "3rd_party/leaderboard_autopilot" if args.expert else "3rd_party/leaderboard"
+    }
 fi
 export PYTHONPATH=$SCENARIO_RUNNER_ROOT:$PYTHONPATH
 export PYTHONPATH=$LEADERBOARD_ROOT:$PYTHONPATH
@@ -96,7 +118,7 @@ fi
 set +e
 
 if [[ $EVALUATION_DATASET == "bench2drive" ]]; then
-    CUDA_VISIBLE_DEVICES=0 python3 3rd_party/Bench2Drive/leaderboard/leaderboard/leaderboard_evaluator.py \
+    CUDA_VISIBLE_DEVICES=0 python3 {bench2drive_evaluator} \
     --routes=$ROUTES \
     --track={args.track} \
     --checkpoint=$CHECKPOINT_ENDPOINT \
@@ -112,7 +134,7 @@ if [[ $EVALUATION_DATASET == "bench2drive" ]]; then
     --traffic-manager-seed=$EXPERIMENT_SEED \
     --repetitions={args.repetitions}
 else
-    CUDA_VISIBLE_DEVICES=0 python3 3rd_party/leaderboard/leaderboard/leaderboard_evaluator.py \
+    CUDA_VISIBLE_DEVICES=0 python3 {standard_evaluator} \
     --routes=$ROUTES \
     --track={args.track} \
     --checkpoint=$CHECKPOINT_ENDPOINT \
@@ -185,6 +207,11 @@ def main():
     parser.add_argument("--slurm_timeout", default="0-04:00:00", help="Slurm timeout.")
     parser.add_argument(
         "--repetitions", default=1, type=int, help="Number of repetitions."
+    )
+    parser.add_argument(
+        "--expert",
+        action="store_true",
+        help="Use autopilot scenario_runner and leaderboard with local evaluator.",
     )
     args = parser.parse_args()
 

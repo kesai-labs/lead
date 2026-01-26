@@ -679,10 +679,10 @@ class ExpertData(ExpertBase):
                         camera_rot=cam_config["rot"],
                         perturbation_rotation=0.0,
                         perturbation_translation=0.0,
+                        config=self.config_expert,
                     )
                 )
                 camera_pcs.append(input_data[f"semantics_camera_pc_{camera_idx}"])
-                torch.cuda.empty_cache()
 
             if self.config_expert.perturbate_sensors:
                 for camera_idx in range(1, self.config_expert.num_cameras + 1):
@@ -700,10 +700,9 @@ class ExpertData(ExpertBase):
                             camera_rot=cam_config["rot"],
                             perturbation_rotation=self.perturbation_rotation,
                             perturbation_translation=self.perturbation_translation,
+                            config=self.config_expert,
                         )
                     )
-                    torch.cuda.empty_cache()
-            torch.cuda.synchronize()
             # Concatenate the unprojection together
             input_data["semantics_camera_pc"] = (
                 torch.cat(camera_pcs, dim=0).cpu().numpy()
@@ -1121,8 +1120,6 @@ class ExpertData(ExpertBase):
             )  # Wait up to 10 seconds for clean shutdown
             if self._save_thread.is_alive():
                 LOG.warning("Save thread did not shutdown cleanly within timeout")
-
-        torch.cuda.empty_cache()
 
         if not self.config_expert.eval_expert:
             self._offline_process_data()

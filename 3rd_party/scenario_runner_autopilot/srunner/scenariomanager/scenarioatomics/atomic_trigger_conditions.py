@@ -20,20 +20,20 @@ base class
 
 from __future__ import print_function
 
-import operator
 import datetime
 import math
-import py_trees
+import operator
+
 import carla
-
-from agents.navigation.global_route_planner import GlobalRoutePlanner
-
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import calculate_distance
-from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
-from srunner.scenariomanager.timer import GameTime
-from srunner.tools.scenario_helper import get_distance_along_route, get_distance_between_actors
-
+import py_trees
 import srunner.tools as sr_tools
+from agents.navigation.global_route_planner import GlobalRoutePlanner
+from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
+from srunner.scenariomanager.scenarioatomics.atomic_behaviors import \
+    calculate_distance
+from srunner.scenariomanager.timer import GameTime
+from srunner.tools.scenario_helper import (get_distance_along_route,
+                                           get_distance_between_actors)
 
 EPSILON = 0.001
 
@@ -1244,13 +1244,13 @@ class WaitEndIntersection(AtomicCondition):
     If 'junction_id' is given, it will wait until that specific junction has finished
     """
 
-    def __init__(self, actor, junction_id=None, debug=False, name="WaitEndIntersection", pop_activate_senario=False):
+    def __init__(self, actor, junction_id=None, debug=False, name="WaitEndIntersection", scenario_id=None):
         super(WaitEndIntersection, self).__init__(name)
         self.actor = actor
         self.debug = debug
         self._junction_id = junction_id
         self._inside_junction = False
-        self.pop_activate_senario = pop_activate_senario
+        self.scenario_id = scenario_id
         self.logger.debug("%s.__init__()" % (self.__class__.__name__))
 
     def update(self):
@@ -1271,8 +1271,12 @@ class WaitEndIntersection(AtomicCondition):
         # And to leave it
         elif self._inside_junction and not waypoint.is_junction:
             new_status = py_trees.common.Status.SUCCESS
-            if self.pop_activate_senario:
-                CarlaDataProvider.clean_current_active_scenario()
+            if self.scenario_id is not None:
+                # Find and remove the scenario by ID
+                for scenario in CarlaDataProvider.active_scenarios:
+                    if scenario.scenario_id == self.scenario_id:
+                        CarlaDataProvider.remove_scenario(scenario)
+                        break
         return new_status
 
 

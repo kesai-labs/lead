@@ -14,8 +14,7 @@ from __future__ import print_function
 
 import carla
 import py_trees
-from srunner.scenariomanager.carla_data_provider import (CarlaDataProvider,
-                                                         get_memory_entry)
+from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
 from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
     ActorDestroy, BatchActorTransformSetter, InvadingActorFlow,
     ScenarioTimeout)
@@ -115,14 +114,20 @@ class InvadingTurn(BasicScenario):
         first_cone = self.other_actors[-1]
         last_cone = self.other_actors[0]
         from srunner.scenariomanager.carla_data_provider import ActiveScenario
-        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=first_cone, last_actor=last_cone, metadata=self._true_offset, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
-        memory = get_memory_entry(type(self).__name__, id(self))
-        memory.update({
-            "obstacles": self.other_actors,
-            "first_cone": first_cone,
-            "last_cone": last_cone,
-            "offset": self._true_offset
-        })
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(
+            type(self).__name__, 
+            first_actor=first_cone, 
+            last_actor=last_cone, 
+            metadata=self._true_offset, 
+            scenario_id=id(self), 
+            trigger_location=config.trigger_points[0].location,
+            extra_meta={
+                "obstacles": self.other_actors,
+                "first_cone": first_cone,
+                "last_cone": last_cone,
+                "offset": self._true_offset
+            }
+        ))
 
     def _create_obstacle(self):
 

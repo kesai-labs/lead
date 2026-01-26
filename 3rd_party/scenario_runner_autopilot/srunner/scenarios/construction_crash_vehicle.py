@@ -12,8 +12,7 @@ from __future__ import print_function
 
 import carla
 import py_trees
-from srunner.scenariomanager.carla_data_provider import (CarlaDataProvider,
-                                                         get_memory_entry)
+from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
 from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
     ActorDestroy, ActorTransformSetter, Idle, OppositeActorFlow,
     ScenarioTimeout, SwitchWrongDirectionTest, WaitForever)
@@ -104,11 +103,15 @@ class ConstructionObstacle(BasicScenario):
             from srunner.scenariomanager.carla_data_provider import \
                 ActiveScenario
             scenario_id = id(self)
-            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=traffic_warning, last_actor=last_cone, metadata=self._direction, scenario_id=scenario_id, trigger_location=config.trigger_points[0].location)) # added
-            memory = get_memory_entry(type(self).__name__, scenario_id)
-            memory["obstacles"] = self.other_actors
-            memory.update(
-                {
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(
+                type(self).__name__, 
+                first_actor=traffic_warning, 
+                last_actor=last_cone, 
+                metadata=self._direction, 
+                scenario_id=scenario_id, 
+                trigger_location=config.trigger_points[0].location,
+                extra_meta={
+                    "obstacles": self.other_actors,
                     "first_actor": traffic_warning,
                     "last_actor": last_cone,
                     "direction": self._direction,
@@ -117,7 +120,7 @@ class ConstructionObstacle(BasicScenario):
                     "to_index": 1e9,
                     "path_clear": False
                 }
-            )
+            ))
 
     def _move_waypoint_forward(self, wp, distance):
         dist = 0
@@ -360,11 +363,15 @@ class ConstructionObstacleTwoWays(ConstructionObstacle):
             from srunner.scenariomanager.carla_data_provider import \
                 ActiveScenario
             scenario_id = id(self)
-            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=self.traffic_warning, last_actor=self.last_cone, metadata=self._direction, scenario_id=scenario_id, trigger_location=config.trigger_points[0].location)) # added
-            memory = get_memory_entry(type(self).__name__, scenario_id)
-            memory["obstacles"] = self.other_actors
-            memory.update(
-                {
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(
+                type(self).__name__, 
+                first_actor=self.traffic_warning, 
+                last_actor=self.last_cone, 
+                metadata=self._direction, 
+                scenario_id=scenario_id, 
+                trigger_location=config.trigger_points[0].location,
+                extra_meta={
+                    "obstacles": self.other_actors,
                     "first_actor": self.traffic_warning,
                     "last_actor": self.last_cone,
                     "direction": self._direction,
@@ -372,4 +379,5 @@ class ConstructionObstacleTwoWays(ConstructionObstacle):
                     "from_index": 1e9,
                     "to_index": 1e9,
                     "path_clear": False
-                })
+                }
+            ))

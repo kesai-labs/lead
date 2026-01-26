@@ -12,8 +12,7 @@ is making a left turn
 import carla
 import py_trees
 from numpy import random
-from srunner.scenariomanager.carla_data_provider import (CarlaDataProvider,
-                                                         get_memory_entry)
+from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
 from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
     ActorFlow, ScenarioTimeout, TrafficLightFreezer)
 from srunner.scenariomanager.scenarioatomics.atomic_criteria import (
@@ -196,12 +195,15 @@ class SignalizedJunctionLeftTurnEnterFlow(JunctionLeftTurnEnterFlow):
         if add_scenario_type:
             from srunner.scenariomanager.carla_data_provider import \
                 ActiveScenario
-            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
-            memory = get_memory_entry(type(self).__name__, id(self))
-            memory.update({
-                "source_wp": self._source_wp,
-                "sink_wp": self._sink_wp,
-            })
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(
+                type(self).__name__, 
+                scenario_id=id(self), 
+                trigger_location=config.trigger_points[0].location,
+                extra_meta={
+                    "source_wp": self._source_wp,
+                    "sink_wp": self._sink_wp,
+                }
+            ))
 
 
     def _create_behavior(self):
@@ -224,7 +226,7 @@ class SignalizedJunctionLeftTurnEnterFlow(JunctionLeftTurnEnterFlow):
         root = py_trees.composites.Parallel(policy=py_trees.common.ParallelPolicy.SUCCESS_ON_ONE)
         if self.activate_scenario:
             end_condition = py_trees.composites.Sequence()
-            end_condition.add_child(WaitEndIntersection(self.ego_vehicles[0], pop_activate_senario=True))
+            end_condition.add_child(WaitEndIntersection(self.ego_vehicles[0], scenario_id=id(self)))
             end_condition.add_child(DriveDistance(self.ego_vehicles[0], self._end_distance))
             root.add_child(end_condition)
             root.add_child(ActorFlow(
@@ -269,12 +271,15 @@ class NonSignalizedJunctionLeftTurnEnterFlow(JunctionLeftTurnEnterFlow):
         if add_scenario_type:
             from srunner.scenariomanager.carla_data_provider import \
                 ActiveScenario
-            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
-            memory = get_memory_entry(type(self).__name__, id(self))
-            memory.update({
-                "source_wp": self._source_wp,
-                "sink_wp": self._sink_wp,
-            })
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(
+                type(self).__name__, 
+                scenario_id=id(self), 
+                trigger_location=config.trigger_points[0].location,
+                extra_meta={
+                    "source_wp": self._source_wp,
+                    "sink_wp": self._sink_wp,
+                }
+            ))
 
 
 
@@ -297,7 +302,7 @@ class NonSignalizedJunctionLeftTurnEnterFlow(JunctionLeftTurnEnterFlow):
 
         root = py_trees.composites.Parallel(policy=py_trees.common.ParallelPolicy.SUCCESS_ON_ONE)
         end_condition = py_trees.composites.Sequence()
-        end_condition.add_child(WaitEndIntersection(self.ego_vehicles[0], pop_activate_senario=True))
+        end_condition.add_child(WaitEndIntersection(self.ego_vehicles[0], scenario_id=id(self)))
         end_condition.add_child(DriveDistance(self.ego_vehicles[0], self._end_distance))
         root.add_child(end_condition)
         if self.activate_scenario:

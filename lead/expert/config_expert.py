@@ -42,6 +42,8 @@ class ExpertConfig(BaseConfig):
 
     # If true, also run speed benchmarking during expert data collection
     profile_expert = False
+    # If true, unproject camera on CUDA. Turning this on will speed up unprojection but use more GPU memory.
+    unproject_on_cuda = False
     # How often we log in the main loop
     log_info_freq = 10
     # --- Planning Area ---

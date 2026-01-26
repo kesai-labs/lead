@@ -11,7 +11,6 @@ import typing
 import carla
 import matplotlib
 import numpy as np
-import torch
 from agents.tools.misc import compute_distance, is_within_distance
 from beartype import beartype
 from shapely.geometry import Polygon
@@ -107,14 +106,14 @@ class Expert(ExpertData):
             RuntimeError: If the agent is not initialized before calling this method.
         """
         start_time = time.time()
-        torch.cuda.empty_cache()
 
         # Initialize the agent if not done yet
         if not self.initialized:
             self._init(None)
 
         self.step += 1
-        self.scenario_sorter.sort_scenarios()
+        ego_location = self.ego_vehicle.get_location()
+        self.scenario_sorter.sort_scenarios(ego_location)
 
         # Track scenario changes
         current_scenario = self.current_active_scenario_type
@@ -2497,7 +2496,9 @@ class Expert(ExpertData):
                 )
 
         if self.next_traffic_light is not None:
-            CarlaDataProvider.memory["next_traffic_light"] = self.next_traffic_light
+            CarlaDataProvider._global_memory["next_traffic_light"] = (
+                self.next_traffic_light
+            )
         # If green light, just skip
         if (
             self.next_traffic_light is None

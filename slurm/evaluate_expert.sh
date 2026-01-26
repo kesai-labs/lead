@@ -24,9 +24,11 @@ set -x
 python3 $LEAD_PROJECT_ROOT/slurm/evaluation/evaluate_scripts_generator.py \
 --base_checkpoint_endpoint $EVALUATION_OUTPUT_DIR \
 --route_folder $LEAD_PROJECT_ROOT/data/benchmark_routes/$EVALUATION_DATASET \
---team_agent lead/expert/expert.py $SCRIPT_GENERATOR_PARAMETERS
+--team_agent lead/expert/expert.py $SCRIPT_GENERATOR_PARAMETERS \
+--track MAP \
+--expert
 
 # Run the evaluation scripts parallely.
-python3 $LEAD_PROJECT_ROOT/scripts/tools/evaluation/evaluate.py \
+python3 $LEAD_PROJECT_ROOT/slurm/evaluation/evaluate.py \
 --slurm_dir $EVALUATION_OUTPUT_DIR/scripts \
 --job_name $EXPERIMENT_RUN_ID $EVALUATION_PARAMETERS

@@ -14,8 +14,7 @@ from __future__ import print_function
 
 import carla
 import py_trees
-from srunner.scenariomanager.carla_data_provider import (CarlaDataProvider,
-                                                         get_memory_entry)
+from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
 from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
     ActorDestroy, Idle, OpenVehicleDoor, OppositeActorFlow, ScenarioTimeout,
     SwitchWrongDirectionTest)
@@ -148,23 +147,24 @@ class VehicleOpensDoorTwoWays(BasicScenario):
         if add_scenario_type:
             from srunner.scenariomanager.carla_data_provider import \
                 ActiveScenario
-            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=self._parked_actor, metadata=self._direction, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
-            memory = get_memory_entry(type(self).__name__, id(self))
-            memory["obstacles"] = [
-                self._parked_actor
-            ]
-            memory["vehicle_door_side"] = [
-                "left" if self._direction == 'right' else "right"
-            ]
-            memory.update({
-                "first_actor": self._parked_actor,
-                "last_actor": None,
-                "direction": self._direction,
-                "changed_route": False,
-                "from_index": 1e9,
-                "to_index": 1e9,
-                "path_clear": False
-            })
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(
+                type(self).__name__, 
+                first_actor=self._parked_actor, 
+                metadata=self._direction, 
+                scenario_id=id(self), 
+                trigger_location=config.trigger_points[0].location,
+                extra_meta={
+                    "obstacles": [self._parked_actor],
+                    "vehicle_door_side": ["left" if self._direction == 'right' else "right"],
+                    "first_actor": self._parked_actor,
+                    "last_actor": None,
+                    "direction": self._direction,
+                    "changed_route": False,
+                    "from_index": 1e9,
+                    "to_index": 1e9,
+                    "path_clear": False
+                }
+            ))
 
 
     def _create_behavior(self):

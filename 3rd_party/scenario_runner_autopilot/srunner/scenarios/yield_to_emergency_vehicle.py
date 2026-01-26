@@ -13,8 +13,7 @@ from __future__ import print_function
 
 import carla
 import py_trees
-from srunner.scenariomanager.carla_data_provider import (CarlaDataProvider,
-                                                         get_memory_entry)
+from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
 from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
     ActorDestroy, ActorTransformSetter, AdaptiveConstantVelocityAgentBehavior,
     Idle)
@@ -110,15 +109,19 @@ class YieldToEmergencyVehicle(BasicScenario):
         if add_scenario_type:
             from srunner.scenariomanager.carla_data_provider import \
                 ActiveScenario
-            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=actor, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
-            memory = get_memory_entry(type(self).__name__, id(self))
-            memory.update({
-                "emergency_vehicle": actor,
-                "changed_route": False,
-                "from_index": 1e9,
-                "to_index": 1e9,
-                "to_left": False,
-            })
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(
+                type(self).__name__, 
+                first_actor=actor, 
+                scenario_id=id(self), 
+                trigger_location=config.trigger_points[0].location,
+                extra_meta={
+                    "emergency_vehicle": actor,
+                    "changed_route": False,
+                    "from_index": 1e9,
+                    "to_index": 1e9,
+                    "to_left": False,
+                }
+            ))
 
     def _create_behavior(self):
         """

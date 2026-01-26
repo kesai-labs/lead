@@ -12,17 +12,16 @@ This module provide BasicScenario, the basic class of all the scenarios.
 from __future__ import print_function
 
 import operator
-import py_trees
 
 import carla
-
-from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (WaitForBlackboardVariable,
-                                                                               InTimeToArrivalToLocation)
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import WaitForever
+import py_trees
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
-from srunner.scenariomanager.timer import TimeOut
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import UpdateAllActorControls
+from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
+    UpdateAllActorControls, WaitForever)
 from srunner.scenariomanager.scenarioatomics.atomic_criteria import Criterion
+from srunner.scenariomanager.scenarioatomics.atomic_trigger_conditions import (
+    InTimeToArrivalToLocation, WaitForBlackboardVariable)
+from srunner.scenariomanager.timer import TimeOut
 
 
 class BasicScenario(object):
@@ -336,8 +335,10 @@ class BasicScenario(object):
         return self.parking_slots
 
     def __del__(self):
-        if len(CarlaDataProvider.active_scenarios) > 0:
-            scenario_instance_id = CarlaDataProvider.active_scenarios[0].scenario_id
-            if scenario_instance_id == id(self):
-                print("Popping active scenario: {} automatically after ending.".format(self.name))
-                CarlaDataProvider.clean_current_active_scenario()
+        # Find and remove this scenario from active scenarios by ID and name
+        scenario_instance_id = id(self)
+        for scenario in CarlaDataProvider.active_scenarios:
+            if scenario.scenario_id == scenario_instance_id and scenario.name == self.name:
+                print("Removing active scenario: {} (id={}) automatically after ending.".format(self.name, scenario_instance_id))
+                CarlaDataProvider.remove_scenario(scenario)
+                break

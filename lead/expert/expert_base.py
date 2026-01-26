@@ -1050,7 +1050,9 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
 
     @property
     def previous_active_scenario_type(self) -> str | None:
-        return CarlaDataProvider.previous_active_scenario
+        if CarlaDataProvider.previous_active_scenario is not None:
+            return CarlaDataProvider.previous_active_scenario.name
+        return None
 
     @step_cached_property
     def distance_to_construction_site(self) -> float:
@@ -1411,20 +1413,19 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
         if self.current_active_scenario_type in scenarios:
             ret = CarlaDataProvider.get_current_scenario_memory()["obstacles"]
         elif self.previous_active_scenario_type in scenarios:
-            obstacles = CarlaDataProvider.previous_memory[
-                self.previous_active_scenario_type
-            ][0]["obstacles"]
-            try:
-                obstacles = [
-                    actor for actor in obstacles if self.is_actor_inside_bev(actor)
-                ]
-                ret = obstacles
-            except RuntimeError as e:
-                if "trying to operate on a destroyed actor" in str(e):
-                    # If the scenario obstacles were destroyed, return an empty list
-                    ret = []
-                else:
-                    raise e
+            if CarlaDataProvider.previous_active_scenario is not None:
+                obstacles = CarlaDataProvider.previous_active_scenario.meta["obstacles"]
+                try:
+                    obstacles = [
+                        actor for actor in obstacles if self.is_actor_inside_bev(actor)
+                    ]
+                    ret = obstacles
+                except RuntimeError as e:
+                    if "trying to operate on a destroyed actor" in str(e):
+                        # If the scenario obstacles were destroyed, return an empty list
+                        ret = []
+                    else:
+                        raise e
         ret = [actor for actor in ret if self.is_actor_inside_bev(actor)]
         return ret
 
@@ -1496,18 +1497,19 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                 "vehicle_opened_door"
             ]
         elif self.previous_active_scenario_type == "VehicleOpensDoorTwoWays":
-            try:
-                CarlaDataProvider.previous_memory["VehicleOpensDoorTwoWays"][0][
-                    "obstacles"
-                ][0].get_location()
-                return CarlaDataProvider.previous_memory["VehicleOpensDoorTwoWays"][0][
-                    "vehicle_opened_door"
-                ]
-            except RuntimeError as e:
-                if "trying to operate on a destroyed actor" in str(e):
-                    return False
-                else:
-                    raise e
+            if CarlaDataProvider.previous_active_scenario is not None:
+                try:
+                    CarlaDataProvider.previous_active_scenario.meta["obstacles"][
+                        0
+                    ].get_location()
+                    return CarlaDataProvider.previous_active_scenario.meta[
+                        "vehicle_opened_door"
+                    ]
+                except RuntimeError as e:
+                    if "trying to operate on a destroyed actor" in str(e):
+                        return False
+                    else:
+                        raise e
         return False
 
     @step_cached_property
@@ -1519,9 +1521,10 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
         if self.current_active_scenario_type == "VehicleOpensDoorTwoWays":
             return CarlaDataProvider.get_current_scenario_memory()["vehicle_door_side"]
         elif self.previous_active_scenario_type == "VehicleOpensDoorTwoWays":
-            return CarlaDataProvider.previous_memory["VehicleOpensDoorTwoWays"][0][
-                "vehicle_door_side"
-            ]
+            if CarlaDataProvider.previous_active_scenario is not None:
+                return CarlaDataProvider.previous_active_scenario.meta[
+                    "vehicle_door_side"
+                ]
         return None
 
     @step_cached_property

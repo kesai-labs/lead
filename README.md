@@ -161,9 +161,9 @@ bash scripts/start_carla.sh
 
 # Start policy on one route
 python lead/leaderboard_wrapper.py \
---checkpoint outputs/checkpoints/tfv6_resnet34 \
---routes data/benchmark_routes/bench2drive/23687.xml \
---bench2drive
+  --checkpoint outputs/checkpoints/tfv6_resnet34 \
+  --routes data/benchmark_routes/bench2drive/23687.xml \
+  --bench2drive
 ```
 
 Driving logs will be saved to <code>outputs/local_evaluation</code> with the following structure:
@@ -225,7 +225,8 @@ Start pretraining:
 
 ```bash
 # Train on a single GPU
-python3 lead/training/train.py logdir=outputs/local_training/pretrain
+python3 lead/training/train.py \
+  logdir=outputs/local_training/pretrain
 
 # Or Torch DDP
 bash scripts/pretrain_ddp.sh
@@ -236,9 +237,9 @@ Training logs and checkpoints will be saved to `outputs/local_training/pretrain`
 ```bash
 # Single GPU
 python3 lead/training/train.py \
-logdir=outputs/local_training/posttrain \
-load_file=outputs/local_training/pretrain/model_0030.pth \
-use_planning_decoder=true
+  logdir=outputs/local_training/posttrain \
+  load_file=outputs/local_training/pretrain/model_0030.pth \
+  use_planning_decoder=true
 
 # Distributed Torch DDP
 bash scripts/posttrain_ddp.sh
@@ -256,10 +257,13 @@ To collect your own dataset, you can run the rule-based expert driver. To setup 
 # Start CARLA
 bash scripts/start_carla.sh
 
-# Collect data
+# Collect Data Alternative 1
 python lead/leaderboard_wrapper.py \
---expert \
---routes data/data_routes/lead/noScenarios/short_route.xml
+  --expert \
+  --routes data/data_routes/lead/noScenarios/short_route.xml
+
+# Collect Data Alternative 2
+bash scripts/eval_expert.sh
 ```
 Collected data will be saved to `outputs/expert_evaluation/` with the following sensor outputs:
 
@@ -297,26 +301,34 @@ For large-scale data collection on SLURM clusters, see the [data collection docu
 
 For a more detailed documentation, take a look at the [evaluation documentation](https://ln2697.github.io/lead/docs/evaluation.html).
 
-Start the CARLA simulator before running evaluation:
-
 ```bash
+# Start CARLA
 bash scripts/start_carla.sh
 
-# Bench2Drive
+# Bench2Drive Alternative 1
 python lead/leaderboard_wrapper.py \
---checkpoint outputs/checkpoints/tfv6_resnet34 \
---routes data/benchmark_routes/bench2drive/23687.xml \
---bench2drive
+  --checkpoint outputs/checkpoints/tfv6_resnet34 \
+  --routes data/benchmark_routes/bench2drive/23687.xml \
+  --bench2drive
 
-# Longest6 v2
-python lead/leaderboard_wrapper.py \
---checkpoint outputs/checkpoints/tfv6_resnet34 \
---routes data/benchmark_routes/longest6/00.xml
+# Bench2Drive Alternative 2
+bash scripts/eval_bench2drive.sh
 
-# Town13
+# Longest6 v2 Alternative 1
 python lead/leaderboard_wrapper.py \
---checkpoint outputs/checkpoints/tfv6_resnet34 \
---routes data/benchmark_routes/Town13/0.xml
+  --checkpoint outputs/checkpoints/tfv6_resnet34 \
+  --routes data/benchmark_routes/longest6/00.xml
+
+# Longest6 v2 Alternative 2
+bash scripts/eval_longest6.sh
+
+# Town13 Alternative 1
+python lead/leaderboard_wrapper.py \
+  --checkpoint outputs/checkpoints/tfv6_resnet34 \
+  --routes data/benchmark_routes/Town13/0.xml
+
+# Town13 Alternative 2
+bash scripts/eval_town13.sh
 
 # Clean CARLA
 bash scripts/clean_carla.sh

@@ -11,8 +11,7 @@ from __future__ import print_function
 import carla
 import py_trees
 from agents.navigation.local_planner import RoadOption
-from srunner.scenariomanager.carla_data_provider import (CarlaDataProvider,
-                                                         get_memory_entry)
+from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
 from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
     ActorDestroy, BasicAgentBehavior, BatchActorTransformSetter, CutIn, Idle)
 from srunner.scenariomanager.scenarioatomics.atomic_criteria import \
@@ -201,9 +200,14 @@ class StaticCutIn(BasicScenario):
             blocker_wp = next_wps[0]
 
         from srunner.scenariomanager.carla_data_provider import ActiveScenario
-        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=id(self), trigger_location=config.trigger_points[0].location)) # added
-        memory = get_memory_entry(type(self).__name__, id(self))
-        memory["cut_in_vehicle"] = self._adversary_actor  # added
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(
+            type(self).__name__, 
+            scenario_id=id(self), 
+            trigger_location=config.trigger_points[0].location,
+            extra_meta={
+                "cut_in_vehicle": self._adversary_actor
+            }
+        ))
 
     def _create_behavior(self):
         """

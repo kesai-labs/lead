@@ -15,8 +15,7 @@ from __future__ import print_function
 import carla
 import py_trees
 from agents.navigation.local_planner import RoadOption
-from srunner.scenariomanager.carla_data_provider import (CarlaDataProvider,
-                                                         get_memory_entry)
+from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
 from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
     ActorFlow, ScenarioTimeout, WaitForever)
 from srunner.scenariomanager.scenarioatomics.atomic_criteria import (
@@ -104,14 +103,17 @@ class EnterActorFlow(BasicScenario):
             from srunner.scenariomanager.carla_data_provider import \
                 ActiveScenario
             scenario_id = id(self)
-            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=scenario_id, trigger_location=config.trigger_points[0].location)) # added
-            memory = get_memory_entry(type(self).__name__, scenario_id)
-            memory.update({
-                "source_wp": self._map.get_waypoint(self._start_actor_flow),
-                "sink_wp": self._map.get_waypoint(self._end_actor_flow),
-                "source_wps": get_same_dir_lanes(self._map.get_waypoint(self._start_actor_flow)),
-                "sink_wps": get_same_dir_lanes(self._map.get_waypoint(self._end_actor_flow)),
-            })
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(
+                type(self).__name__, 
+                scenario_id=scenario_id, 
+                trigger_location=config.trigger_points[0].location,
+                extra_meta={
+                    "source_wp": self._map.get_waypoint(self._start_actor_flow),
+                    "sink_wp": self._map.get_waypoint(self._end_actor_flow),
+                    "source_wps": get_same_dir_lanes(self._map.get_waypoint(self._start_actor_flow)),
+                    "sink_wps": get_same_dir_lanes(self._map.get_waypoint(self._end_actor_flow)),
+                }
+            ))
 
     def _create_behavior(self):
         """
@@ -194,14 +196,17 @@ class EnterActorFlowV2(EnterActorFlow):
         super()._initialize_actors(config, add_scenario_type=False)
         from srunner.scenariomanager.carla_data_provider import ActiveScenario
         scenario_id = id(self)
-        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=scenario_id, trigger_location=config.trigger_points[0].location)) # added
-        memory = get_memory_entry(type(self).__name__, scenario_id)
-        memory.update({
-            "source_wp": self._map.get_waypoint(self._start_actor_flow),
-            "sink_wp": self._map.get_waypoint(self._end_actor_flow),
-            "source_wps": get_same_dir_lanes(self._map.get_waypoint(self._start_actor_flow)),
-            "sink_wps": get_same_dir_lanes(self._map.get_waypoint(self._end_actor_flow)),
-        })
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(
+            type(self).__name__, 
+            scenario_id=scenario_id, 
+            trigger_location=config.trigger_points[0].location,
+            extra_meta={
+                "source_wp": self._map.get_waypoint(self._start_actor_flow),
+                "sink_wp": self._map.get_waypoint(self._end_actor_flow),
+                "source_wps": get_same_dir_lanes(self._map.get_waypoint(self._start_actor_flow)),
+                "sink_wps": get_same_dir_lanes(self._map.get_waypoint(self._end_actor_flow)),
+            }
+        ))
 
     def _create_behavior(self):
         """
@@ -627,12 +632,15 @@ class InterurbanActorFlow(BasicScenario):
             from srunner.scenariomanager.carla_data_provider import \
                 ActiveScenario
             scenario_id = id(self)
-            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=scenario_id, trigger_location=config.trigger_points[0].location)) # added
-            memory = get_memory_entry(type(self).__name__, scenario_id)
-            memory.update({
-                "source_wp": self._source_wp,
-                "sink_wp": self._sink_wp,
-            })
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(
+                type(self).__name__, 
+                scenario_id=scenario_id, 
+                trigger_location=config.trigger_points[0].location,
+                extra_meta={
+                    "source_wp": self._source_wp,
+                    "sink_wp": self._sink_wp,
+                }
+            ))
 
     def _get_entry_exit_route_lanes(self, wp, route):
 
@@ -839,14 +847,17 @@ class InterurbanAdvancedActorFlow(BasicScenario):
             from srunner.scenariomanager.carla_data_provider import \
                 ActiveScenario
             scenario_id = id(self)
-            CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=scenario_id, trigger_location=config.trigger_points[0].location)) # added
-            memory = get_memory_entry(type(self).__name__, scenario_id)
-            memory.update({
-                "source_wp_1": self._source_wp_1,
-                "sink_wp_1": self._sink_wp_1,
-                "source_wp_2": self._source_wp_2,
-                "sink_wp_2": self._sink_wp_2,
-            })
+            CarlaDataProvider.active_scenarios.append(ActiveScenario(
+                type(self).__name__, 
+                scenario_id=scenario_id, 
+                trigger_location=config.trigger_points[0].location,
+                extra_meta={
+                    "source_wp_1": self._source_wp_1,
+                    "sink_wp_1": self._sink_wp_1,
+                    "source_wp_2": self._source_wp_2,
+                    "sink_wp_2": self._sink_wp_2,
+                }
+            ))
 
     def _create_behavior(self):
         """

@@ -14,8 +14,7 @@ from __future__ import print_function
 
 import carla
 import py_trees
-from srunner.scenariomanager.carla_data_provider import (CarlaDataProvider,
-                                                         get_memory_entry)
+from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
 from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
     ActorDestroy, ActorTransformSetter, ConstantVelocityAgentBehavior, Idle,
     TrafficLightFreezer)
@@ -200,9 +199,16 @@ class OppositeVehicleRunningRedLight(OppositeVehicleJunction):
                 self._tl_dict[tl] = carla.TrafficLightState.Red
         from srunner.scenariomanager.carla_data_provider import ActiveScenario
         scenario_id = id(self)
-        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=self.opposite_actor, metadata=self._direction, scenario_id=scenario_id, trigger_location=config.trigger_points[0].location)) # added
-        memory = get_memory_entry(type(self).__name__, scenario_id)
-        memory["adversarial_actors"].append(self.opposite_actor)
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(
+            type(self).__name__, 
+            first_actor=self.opposite_actor, 
+            metadata=self._direction, 
+            scenario_id=scenario_id, 
+            trigger_location=config.trigger_points[0].location,
+            extra_meta={
+                "adversarial_actors": [self.opposite_actor]
+            }
+        ))
 
     def _create_behavior(self):
         """
@@ -335,6 +341,13 @@ class OppositeVehicleTakingPriority(OppositeVehicleJunction):
         super()._initialize_actors(config)
         from srunner.scenariomanager.carla_data_provider import ActiveScenario
         scenario_id = id(self)
-        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, first_actor=self.opposite_actor, metadata=self._direction, scenario_id=scenario_id, trigger_location=config.trigger_points[0].location)) # added
-        memory = get_memory_entry(type(self).__name__, scenario_id)
-        memory["adversarial_actors"].append(self.opposite_actor)
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(
+            type(self).__name__, 
+            first_actor=self.opposite_actor, 
+            metadata=self._direction, 
+            scenario_id=scenario_id, 
+            trigger_location=config.trigger_points[0].location,
+            extra_meta={
+                "adversarial_actors": [self.opposite_actor]
+            }
+        ))

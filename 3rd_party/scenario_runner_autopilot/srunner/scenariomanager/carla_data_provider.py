@@ -20,6 +20,7 @@ from collections import defaultdict
 
 import carla
 from agents.navigation.global_route_planner import GlobalRoutePlanner
+from beartype import beartype
 from numpy import random
 from six import iteritems
 
@@ -32,104 +33,29 @@ def calculate_velocity(actor):
     velocity_squared += actor.get_velocity().y**2
     return math.sqrt(velocity_squared)
 
-def DEFAULT_MEMORY():
-    ret = defaultdict(list)
-    # Initialize scenario types with empty lists
-    scenario_types = [
-        "SignalizedJunctionLeftTurn", "NonSignalizedJunctionLeftTurn", "NonSignalizedJunctionLeftTurnEnterFlow",
-        "SignalizedJunctionLeftTurnEnterFlow", "InterurbanActorFlow", "InterurbanAdvancedActorFlow",
-        "SignalizedJunctionRightTurn", "NonSignalizedJunctionRightTurn", "VehicleTurningRoute",
-        "VehicleTurningRoutePedestrian", "DynamicObjectCrossing", "ParkingCrossingPedestrian",
-        "PedestrianCrossing", "OppositeVehicleRunningRedLight", "OppositeVehicleTakingPriority",
-        "Accident", "ConstructionObstacle", "ParkedObstacle", "HazardAtSideLane",
-        "AccidentTwoWays", "ConstructionObstacleTwoWays", "ParkedObstacleTwoWays",
-        "HazardAtSideLaneTwoWays", "VehicleOpensDoorTwoWays", "InvadingTurn",
-        "MergerIntoSlowTraffic", "MergerIntoSlowTrafficV2", "StaticCutIn",
-        "ParkingCutIn", "HighwayCutIn", "BlockedIntersection", "EnterActorFlow", "EnterActorFlowV2"
-    ]
-    
-    for scenario_type in scenario_types:
-        ret[scenario_type] = []
-    
-    # Special non-list entries remain as before
-    ret["allow_new_actors"] = True
-    ret["next_traffic_light"] = None
-    
-    return ret
-
 
 def get_memory_entry(scenario_type, scenario_id=None):
-    """Get or create a memory entry for a scenario type and ID.
+    """DEPRECATED: Get or create the meta dict for an active scenario.
+    
+    This function is deprecated. Use ActiveScenario's extra_meta parameter instead
+    when creating scenarios.
     
     Args:
         scenario_type: The type of scenario (e.g., 'EnterActorFlow')
         scenario_id: Unique identifier for this scenario instance
     
     Returns:
-        The memory dict for this scenario instance
+        The meta dict for this scenario instance from the active scenario
     """
-    memories = CarlaDataProvider.memory[scenario_type]
+    print(f"[DEPRECATED WARNING] get_memory_entry is deprecated. Use extra_meta parameter in ActiveScenario constructor instead.")
+    # Find the scenario in active_scenarios
+    for scenario in CarlaDataProvider.active_scenarios:
+        if scenario.name == scenario_type and (scenario_id is None or scenario.scenario_id == scenario_id):
+            return scenario.meta
     
-    # If scenario_id is provided, try to find existing memory entry
-    if scenario_id is not None:
-        for memory in memories:
-            if memory.get('id') == scenario_id:
-                return memory
-    
-    # Create new memory entry with appropriate default values
-    if scenario_type in ["SignalizedJunctionLeftTurn", "NonSignalizedJunctionLeftTurn", "NonSignalizedJunctionLeftTurnEnterFlow", "SignalizedJunctionLeftTurnEnterFlow", "InterurbanActorFlow", "SignalizedJunctionRightTurn", "NonSignalizedJunctionRightTurn", "EnterActorFlow", "EnterActorFlowV2"]:
-        new_memory = {
-            "id": scenario_id,
-            "adversarial_actors": [], "source_wp": None, "sink_wp": None, "intersection_point": None,
-            "dangerous_adversarial_actor_ids": [], "safe_adversarial_actors_ids": [], "ignored_adversarial_actors_ids": [],
-            "opponent_traffic_route": None
-        }
-    elif scenario_type == "InterurbanAdvancedActorFlow":
-        new_memory = {
-            "id": scenario_id,
-            "adversarial_actors": [], "source_wp_1": None, "sink_wp_1": None, "source_wp_2": None, "sink_wp_2": None,
-            "intersection_point_1": None, "intersection_point_2": None, "dangerous_adversarial_actor_ids": [],
-            "safe_adversarial_actors_ids": [], "ignored_adversarial_actors_ids": [], 
-            "opponent_traffic_route_1": None, "opponent_traffic_route_2": None
-        }
-    elif scenario_type in ["VehicleTurningRoute", "VehicleTurningRoutePedestrian", "DynamicObjectCrossing", "ParkingCrossingPedestrian", "PedestrianCrossing"]:
-        new_memory = {"id": scenario_id, "pedestrian_moved": defaultdict(lambda: False)}
-    elif scenario_type in ["OppositeVehicleRunningRedLight", "OppositeVehicleTakingPriority"]:
-        new_memory = {"id": scenario_id, "adversarial_actors": []}
-    elif scenario_type in ["Accident", "ConstructionObstacle", "ParkedObstacle", "AccidentTwoWays", "ConstructionObstacleTwoWays", "ParkedObstacleTwoWays"]:
-        new_memory = {
-            "id": scenario_id, "source_lane": None, "target_lane": None, "adversarial_actors": [],
-            "changed_route": False, "from_index": None, "dangerous_adversarial_actor_ids": [],
-            "safe_adversarial_actors_ids": [], "ignored_adversarial_actors_ids": [], "obstacles": []
-        }
-    elif scenario_type in ["HazardAtSideLane"]:
-        new_memory = {
-            "id": scenario_id, "source_lane": None, "target_lane": None, "bicycle_1": None,
-            "adversarial_actors": [], "dangerous_adversarial_actor_ids": [], "safe_adversarial_actors_ids": []
-        }
-    elif scenario_type in ["HazardAtSideLaneTwoWays"]:
-        new_memory = {
-            "id": scenario_id, "source_lane": None, "target_lane": None, "adversarial_actors": [],
-            "changed_route": False, "from_index": None, "dangerous_adversarial_actor_ids": [],
-            "safe_adversarial_actors_ids": [], "ignored_adversarial_actors_ids": []
-        }
-    elif scenario_type == "VehicleOpensDoorTwoWays":
-        new_memory = {"id": scenario_id, "obstacles": [], "vehicle_opened_door": False, "vehicle_door_side": None}
-    elif scenario_type in ["InvadingTurn", "BlockedIntersection"]:
-        new_memory = {"id": scenario_id, "obstacles": []}
-    elif scenario_type in ["MergerIntoSlowTraffic", "MergerIntoSlowTrafficV2"]:
-        new_memory = {
-            "id": scenario_id, "source_lane": None, "target_lane": None, "adversarial_actors": [],
-            "changed_route": False, "from_index": None, "dangerous_adversarial_actor_ids": [],
-            "safe_adversarial_actors_ids": [], "ignored_adversarial_actors_ids": []
-        }
-    elif scenario_type in ["StaticCutIn", "ParkingCutIn", "HighwayCutIn"]:
-        new_memory = {"id": scenario_id, "cut_in_vehicle": None, "stopped": False}
-    else:
-        new_memory = {"id": scenario_id}
-    
-    memories.append(new_memory)
-    return new_memory
+    # If not found in active scenarios, this shouldn't happen in normal operation
+    print(f"[WARNING] get_memory_entry called for {scenario_type} (id={scenario_id}) but no matching active scenario found")
+    return ActiveScenario._initialize_meta_for_scenario_type(scenario_type, scenario_id)
 
 
 class ActiveScenario:
@@ -147,10 +73,12 @@ class ActiveScenario:
         path_clear: Boolean flag indicating if the path is clear
         scenario_id: Unique identifier for the scenario instance (typically id(self))
         trigger_location: The trigger point location of the scenario (for sorting)
+        meta: Dictionary holding scenario-specific memory/state data
     """
-    
-    def __init__(self, name, first_actor=None, last_actor=None, metadata=None, 
-                 changed_route=False, from_index=1e9, to_index=1e9, path_clear=False, scenario_id=None, trigger_location=None):
+    @beartype
+    def __init__(self, name, first_actor: carla.Actor | None=None, last_actor: carla.Actor | None =None, metadata=None, 
+                 changed_route=False, from_index=1e9, to_index=1e9, path_clear=False, scenario_id=None, trigger_location=None, 
+                 meta=None, extra_meta=None):
         self.name = name
         self.first_actor = first_actor
         self.last_actor = last_actor
@@ -161,9 +89,126 @@ class ActiveScenario:
         self.path_clear = path_clear
         self.scenario_id = scenario_id
         self.trigger_location = trigger_location
+        # Initialize meta with scenario-type-specific defaults, then update with extra_meta
+        if meta is None:
+            self.meta = self._initialize_meta_for_scenario_type(name, scenario_id)
+            if extra_meta is not None:
+                self.meta.update(extra_meta)
+        else:
+            self.meta = meta
+    
+    @staticmethod
+    def _initialize_meta_for_scenario_type(scenario_type, scenario_id) -> dict:
+        """Initialize meta dictionary with appropriate defaults for scenario type."""
+        if scenario_type in ["SignalizedJunctionLeftTurn", "NonSignalizedJunctionLeftTurn", "NonSignalizedJunctionLeftTurnEnterFlow", "SignalizedJunctionLeftTurnEnterFlow", "InterurbanActorFlow", "SignalizedJunctionRightTurn", "NonSignalizedJunctionRightTurn", "EnterActorFlow", "EnterActorFlowV2"]:
+            return {
+                "id": scenario_id,
+                "adversarial_actors": [], "source_wp": None, "sink_wp": None, "intersection_point": None,
+                "dangerous_adversarial_actor_ids": [], "safe_adversarial_actors_ids": [], "ignored_adversarial_actors_ids": [],
+                "opponent_traffic_route": None
+            }
+        elif scenario_type == "InterurbanAdvancedActorFlow":
+            return {
+                "id": scenario_id,
+                "adversarial_actors": [], "source_wp_1": None, "sink_wp_1": None, "source_wp_2": None, "sink_wp_2": None,
+                "intersection_point_1": None, "intersection_point_2": None, "dangerous_adversarial_actor_ids": [],
+                "safe_adversarial_actors_ids": [], "ignored_adversarial_actors_ids": [], 
+                "opponent_traffic_route_1": None, "opponent_traffic_route_2": None
+            }
+        elif scenario_type in ["VehicleTurningRoute", "VehicleTurningRoutePedestrian", "DynamicObjectCrossing", "ParkingCrossingPedestrian", "PedestrianCrossing"]:
+            return {"id": scenario_id, "pedestrian_moved": defaultdict(lambda: False)}
+        elif scenario_type in ["OppositeVehicleRunningRedLight", "OppositeVehicleTakingPriority"]:
+            return {"id": scenario_id, "adversarial_actors": []}
+        elif scenario_type in ["Accident", "ConstructionObstacle", "ParkedObstacle", "AccidentTwoWays", "ConstructionObstacleTwoWays", "ParkedObstacleTwoWays"]:
+            return {
+                "id": scenario_id, "source_lane": None, "target_lane": None, "adversarial_actors": [],
+                "changed_route": False, "from_index": None, "dangerous_adversarial_actor_ids": [],
+                "safe_adversarial_actors_ids": [], "ignored_adversarial_actors_ids": [], "obstacles": []
+            }
+        elif scenario_type in ["HazardAtSideLane"]:
+            return {
+                "id": scenario_id, "source_lane": None, "target_lane": None, "bicycle_1": None,
+                "adversarial_actors": [], "dangerous_adversarial_actor_ids": [], "safe_adversarial_actors_ids": []
+            }
+        elif scenario_type in ["HazardAtSideLaneTwoWays"]:
+            return {
+                "id": scenario_id, "source_lane": None, "target_lane": None, "adversarial_actors": [],
+                "changed_route": False, "from_index": None, "dangerous_adversarial_actor_ids": [],
+                "safe_adversarial_actors_ids": [], "ignored_adversarial_actors_ids": []
+            }
+        elif scenario_type == "VehicleOpensDoorTwoWays":
+            return {"id": scenario_id, "obstacles": [], "vehicle_opened_door": False, "vehicle_door_side": None}
+        elif scenario_type in ["InvadingTurn", "BlockedIntersection"]:
+            return {"id": scenario_id, "obstacles": []}
+        elif scenario_type in ["MergerIntoSlowTraffic", "MergerIntoSlowTrafficV2"]:
+            return {
+                "id": scenario_id, "source_lane": None, "target_lane": None, "adversarial_actors": [],
+                "changed_route": False, "from_index": None, "dangerous_adversarial_actor_ids": [],
+                "safe_adversarial_actors_ids": [], "ignored_adversarial_actors_ids": []
+            }
+        elif scenario_type in ["StaticCutIn", "ParkingCutIn", "HighwayCutIn"]:
+            return {"id": scenario_id, "cut_in_vehicle": None, "stopped": False}
+        else:
+            return {"id": scenario_id}
     
     def __repr__(self):
         return f"ActiveScenario(name='{self.name}', first_actor={self.first_actor}, last_actor={self.last_actor}, scenario_id={self.scenario_id})"
+    
+    def get_actors_from_memory(self) -> list:
+        """Extract all alive actors from this scenario's meta/memory.
+        
+        Recursively searches through all meta values to find actor objects,
+        regardless of how they are stored (lists, dicts, single values, etc.).
+        
+        Returns:
+            List of alive actors from the scenario's meta.
+        """
+        actors = []
+        
+        # Recursively extract all actors from meta
+        def extract_actors(obj, visited=None):
+            """Recursively extract actors from any data structure."""
+            if visited is None:
+                visited = set()
+            
+            # Avoid infinite recursion
+            obj_id = id(obj)
+            if obj_id in visited:
+                return
+            visited.add(obj_id)
+            
+            # Check if this is an actor
+            if obj is not None and isinstance(obj, carla.Actor) and hasattr(obj, 'is_alive'):
+                try:
+                    if obj.is_alive:
+                        actors.append(obj)
+                except:
+                    pass
+            # Recursively handle lists
+            elif isinstance(obj, list):
+                for item in obj:
+                    extract_actors(item, visited)
+            # Recursively handle dicts (including defaultdict)
+            elif isinstance(obj, dict):
+                for value in obj.values():
+                    extract_actors(value, visited)
+            # Handle tuples
+            elif isinstance(obj, tuple):
+                for item in obj:
+                    extract_actors(item, visited)
+        
+        # Extract actors from meta dict (skip 'id' key)
+        for key, value in self.meta.items():
+            if key != 'id':
+                extract_actors(value)
+        
+        # Also include first_actor and last_actor from scenario itself
+        if self.first_actor is not None and self.first_actor.is_alive:
+            actors.append(self.first_actor)
+        if self.last_actor is not None and self.last_actor.is_alive:
+            actors.append(self.last_actor)
+        
+        return actors
 
 
 class CarlaDataProvider(object):  # pylint: disable=too-many-public-methods
@@ -182,12 +227,14 @@ class CarlaDataProvider(object):  # pylint: disable=too-many-public-methods
 
     In addition it provides access to the map and the transform of all traffic lights
     """
-    # Saves, which type of scenario is currently runninng. That's necessary since some scenarios can't be detected / distinguished.
-    # the key saves the scenario type and the value all relevant data
+    # Saves, which type of scenario is currently running.
+    # That's necessary since some scenarios can't be detected / distinguished.
     active_scenarios: list[ActiveScenario]= []
-    previous_active_scenario = None 
-    memory = DEFAULT_MEMORY()
-    previous_memory = DEFAULT_MEMORY()
+    previous_active_scenario: ActiveScenario | None = None 
+    _global_memory = {"allow_new_actors": True, "next_traffic_light": None}
+    _route_xml_path = None  # Path to the current route XML file
+    
+    # ============================================================================
     _actor_velocity_map = {}
     _actor_location_map = {}
     _actor_transform_map = {}
@@ -209,26 +256,23 @@ class CarlaDataProvider(object):  # pylint: disable=too-many-public-methods
     _grp = None
     _runtime_init_flag = False
     _lock = threading.Lock()
-    _route_xml_path = None  # Path to the current route XML file
 
     @staticmethod
-    def current_active_scenario_type():
+    def current_active_scenario_type() -> str | None:
         if len(CarlaDataProvider.active_scenarios) > 0:
             return CarlaDataProvider.active_scenarios[0].name
         return None
     
     @staticmethod
-    def get_current_scenario_memory():
-        """Get the memory entry for the current active scenario (first in list)."""
+    def get_current_scenario_memory() -> dict | None:
+        """Get the meta dict for the current active scenario (first in list)."""
         if len(CarlaDataProvider.active_scenarios) > 0:
-            scenario_type = CarlaDataProvider.active_scenarios[0].name
-            scenario_id = CarlaDataProvider.active_scenarios[0].scenario_id
-            return get_memory_entry(scenario_type, scenario_id)
+            return CarlaDataProvider.active_scenarios[0].meta
         return None
 
     @staticmethod
-    def remove_scenario(scenario):
-        """Remove a scenario from active scenarios and clean up its memory.
+    def remove_scenario(scenario: ActiveScenario):
+        """Remove a scenario from active scenarios.
         
         Args:
             scenario: The ActiveScenario to remove and clean up.
@@ -236,62 +280,23 @@ class CarlaDataProvider(object):  # pylint: disable=too-many-public-methods
         # Remove from active scenarios list
         if scenario in CarlaDataProvider.active_scenarios:
             CarlaDataProvider.active_scenarios.remove(scenario)
+            print(f"[CarlaDataProvider] Removed scenario {scenario.name} with ID {scenario.scenario_id}")
         
-        # Clean up scenario memory
-        scenario_type = scenario.name
-        scenario_id = scenario.scenario_id
-        
-        if scenario_type in CarlaDataProvider.memory:
-            # Find and remove the memory entry with matching scenario_id
-            memory_list = CarlaDataProvider.memory[scenario_type]
-            for i, memory_entry in enumerate(memory_list):
-                if memory_entry.get('id') == scenario_id:
-                    memory_list.pop(i)
-                    print(f"[CarlaDataProvider] Removed memory for scenario {scenario_type} with ID {scenario_id}")
-                    break
-            
-            # If no memory entries left for this scenario type, remove the entire list
-            if not memory_list:
-                del CarlaDataProvider.memory[scenario_type]
-                print(f"[CarlaDataProvider] Removed empty memory list for scenario type {scenario_type}")
+        # Print queue status after removal
+        print(f"[CarlaDataProvider] Queue after removing {scenario.name}:")
+        scenarios_str = "\t" + '\n\t'.join([str(scenario) for scenario in CarlaDataProvider.active_scenarios])
+        print(scenarios_str)
 
     @staticmethod
     def clean_current_active_scenario():
         if len(CarlaDataProvider.active_scenarios) > 0:
-            scenario_name = CarlaDataProvider.active_scenarios[0].name
-            scenario_id = CarlaDataProvider.active_scenarios[0].scenario_id
-            
-            # Copy the current memory entry to previous_memory (shallow copy for actor references)
-            if scenario_name in CarlaDataProvider.memory and len(CarlaDataProvider.memory[scenario_name]) > 0:
-                # Find the memory entry for this specific scenario instance
-                current_memory = None
-                for memory_entry in CarlaDataProvider.memory[scenario_name]:
-                    if memory_entry.get('id') == scenario_id:
-                        # Shallow copy is sufficient since actor references shouldn't be duplicated
-                        current_memory = memory_entry.copy()
-                        break
-                
-                if current_memory:
-                    # Store as a list to match the structure
-                    CarlaDataProvider.previous_memory[scenario_name] = [current_memory]
-                else:
-                    # If no matching entry found, store the entire list (fallback)
-                    CarlaDataProvider.previous_memory[scenario_name] = [mem.copy() for mem in CarlaDataProvider.memory[scenario_name]]
-                
-                # Remove only the specific memory entry for this scenario instance
-                CarlaDataProvider.memory[scenario_name] = [
-                    mem for mem in CarlaDataProvider.memory[scenario_name]
-                    if mem.get('id') != scenario_id
-                ]
-                
-                # If the list is now empty, we can optionally remove it or leave it as empty list
-                if not CarlaDataProvider.memory[scenario_name]:
-                    CarlaDataProvider.memory[scenario_name] = []
-            
-            CarlaDataProvider.previous_active_scenario = scenario_name
+            # Store the current scenario as previous before removing it
+            current_scenario = CarlaDataProvider.active_scenarios[0]
+            CarlaDataProvider.previous_active_scenario = current_scenario
             CarlaDataProvider.active_scenarios = CarlaDataProvider.active_scenarios[1:]
-            print(f"[CarlaDataProvider] Memory after cleaning {CarlaDataProvider.previous_active_scenario}: {CarlaDataProvider.memory[CarlaDataProvider.previous_active_scenario]}")
-            print(f"[CarlaDataProvider] Queue after cleaning {CarlaDataProvider.previous_active_scenario}:")
+            
+            print(f"[CarlaDataProvider] Cleaned active scenario {current_scenario.name} (id={current_scenario.scenario_id})")
+            print(f"[CarlaDataProvider] Queue after cleaning {current_scenario.name}:")
             scenarios_str = "\t" + '\n\t'.join([str(scenario) for scenario in CarlaDataProvider.active_scenarios])
             print(scenarios_str)
         else:
@@ -842,7 +847,7 @@ class CarlaDataProvider(object):  # pylint: disable=too-many-public-methods
         """
         This method tries to create a new actor, returning it if successful (None otherwise).
         """
-        if CarlaDataProvider.memory["allow_new_actors"] is False:
+        if CarlaDataProvider._global_memory["allow_new_actors"] is False:
             return None
         blueprint = CarlaDataProvider.create_blueprint(model, rolename, color, actor_category, attribute_filter)
 
@@ -897,7 +902,7 @@ class CarlaDataProvider(object):  # pylint: disable=too-many-public-methods
         param:
         - actor_list: list of ActorConfigurationData
         """
-        if CarlaDataProvider.memory["allow_new_actors"] is False:
+        if CarlaDataProvider._global_memory["allow_new_actors"] is False:
             return []
 
         SpawnActor = carla.command.SpawnActor                      # pylint: disable=invalid-name
@@ -978,7 +983,7 @@ class CarlaDataProvider(object):  # pylint: disable=too-many-public-methods
         Some parameters are the same for all actors (rolename, autopilot and random location)
         while others are randomized (color)
         """
-        if CarlaDataProvider.memory["allow_new_actors"] is False:
+        if CarlaDataProvider._global_memory["allow_new_actors"] is False:
             return []
 
         SpawnActor = carla.command.SpawnActor      # pylint: disable=invalid-name

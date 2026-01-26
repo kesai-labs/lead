@@ -825,9 +825,8 @@ def unproject_camera(
     camera_pos: list[float],
     perturbation_rotation: float,
     perturbation_translation: float,
+    device: torch.device,
 ) -> torch.Tensor:
-    device = torch.device("cuda:0")
-
     camera_rot, camera_pos = perturbated_sensor_cfg(
         camera_rot, camera_pos, perturbation_translation, perturbation_rotation
     )
@@ -885,6 +884,7 @@ def semantics_camera_pc(
     camera_pos: list[Real],
     perturbation_rotation: Real,
     perturbation_translation: Real,
+    config: ExpertConfig,
 ) -> torch.Tensor:
     """
     Unproject depth and instance segmentation to a point cloud in ego space with semantic and Unreal Engine instance IDs.
@@ -899,6 +899,7 @@ def semantics_camera_pc(
         camera_pos: Camera position (x, y, z)
         perturbation_rotation: perturbation rotation (degrees)
         perturbation_translation: perturbation translation (meters)
+        config: Configuration object containing parameters.
     Returns:
         torch.Tensor: Array of shape N x 5 with attributes x, y, z,full CARLA semantic_id, unreal_id
 
@@ -907,7 +908,9 @@ def semantics_camera_pc(
     """
     assert depth.ndim == 2
     assert instance.ndim == 3 and instance.shape[2] == 2
-    device = torch.device("cuda:0")
+    device = torch.device("cpu")
+    if config.unproject_on_cuda:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     instance_tensor = torch.from_numpy(instance).to(device)
     depth_tensor = torch.from_numpy(depth).to(device)
     pc = unproject_camera(
@@ -919,6 +922,7 @@ def semantics_camera_pc(
         camera_pos,
         perturbation_rotation,
         perturbation_translation,
+        device,
     )
     semantic_id = instance_tensor[..., 0].flatten()
     instance_id = instance_tensor[..., 1].flatten()

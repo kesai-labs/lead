@@ -11,8 +11,7 @@ from __future__ import print_function
 
 import carla
 import py_trees
-from srunner.scenariomanager.carla_data_provider import (CarlaDataProvider,
-                                                         get_memory_entry)
+from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
 from srunner.scenariomanager.scenarioatomics.atomic_behaviors import (
     ActorDestroy, BasicAgentBehavior)
 from srunner.scenariomanager.scenarioatomics.atomic_criteria import \
@@ -115,9 +114,14 @@ class ParkingCutIn(BasicScenario):
 
         from srunner.scenariomanager.carla_data_provider import ActiveScenario
         scenario_id = id(self)
-        CarlaDataProvider.active_scenarios.append(ActiveScenario(type(self).__name__, scenario_id=scenario_id, trigger_location=config.trigger_points[0].location)) # added
-        memory = get_memory_entry(type(self).__name__, scenario_id)
-        memory["cut_in_vehicle"] = self.other_actors[1]  # added
+        CarlaDataProvider.active_scenarios.append(ActiveScenario(
+            type(self).__name__, 
+            scenario_id=scenario_id, 
+            trigger_location=config.trigger_points[0].location,
+            extra_meta={
+                "cut_in_vehicle": self.other_actors[1]
+            }
+        ))
 
     def _get_displaced_location(self, actor, wp):
         """
