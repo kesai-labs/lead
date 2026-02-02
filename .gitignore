@@ -120,7 +120,6 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
 .venv
 env/
 venv/
@@ -194,3 +193,5 @@ ar1_venv
 3rd_party/carla_route_generator
 alpasim-metric-bench2drive/
 /*.prof
+/None/
+visualization/

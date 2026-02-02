@@ -2,6 +2,25 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Expert Py123D Gen Data",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "lead.leaderboard_wrapper",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--expert",
+                "--py123d",
+                "--routes",
+                "data/debug_routes/Town15.xml"
+            ],
+            "env": {
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "LEAD_EXPERT_CONFIG": "target_dataset=6 py123d_data_format=true use_radars=false lidar_stack_size=2 save_only_non_ground_lidar=false save_lidar_only_inside_bev=false",
+                "PY123D_DATA_ROOT": "${workspaceFolder}/outputs/expert_evaluation/py123d/",
+            }
+        },
+        {
             "name": "Eval Bench2Drive",
             "type": "debugpy",
             "request": "launch",
@@ -9,8 +28,10 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "--checkpoint", "outputs/checkpoints/tfv6_resnet34",
-                "--routes", "data/benchmark_routes/bench2drive/23687.xml",
+                "--checkpoint",
+                "outputs/checkpoints/tfv6_resnet34",
+                "--routes",
+                "data/benchmark_routes/bench2drive/23687.xml",
                 "--bench2drive"
             ],
             "env": {
@@ -25,8 +46,10 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "--checkpoint", "outputs/checkpoints/regnety032",
-                "--routes", "data/routes/longest6/00.xml"
+                "--checkpoint",
+                "outputs/checkpoints/regnety032",
+                "--routes",
+                "data/routes/longest6/00.xml"
             ],
             "env": {
                 "PYTHONDONTWRITEBYTECODE": "1",
@@ -40,9 +63,12 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "args": [
-                "--checkpoint", "outputs/checkpoints/tfv6_resnet34",
-                "--routes", "data/benchmark_routes/Town13/0.xml",
-                "--timeout", "180"
+                "--checkpoint",
+                "outputs/checkpoints/tfv6_resnet34",
+                "--routes",
+                "data/benchmark_routes/Town13/0.xml",
+                "--timeout",
+                "180"
             ],
             "env": {
                 "PYTHONDONTWRITEBYTECODE": "1",
@@ -57,7 +83,8 @@
             "justMyCode": false,
             "args": [
                 "--expert",
-                "--routes", "data/data_routes/lead/noScenarios/short_route.xml"
+                "--routes",
+                "data/data_routes/lead/noScenarios/short_route.xml"
             ],
             "env": {
                 "PYTHONDONTWRITEBYTECODE": "1",
@@ -72,7 +99,8 @@
             "justMyCode": false,
             "args": [
                 "--expert",
-                "--routes", "data/benchmark_routes/Town13/1.xml"
+                "--routes",
+                "data/benchmark_routes/Town13/1.xml"
             ],
             "env": {
                 "PYTHONDONTWRITEBYTECODE": "1",

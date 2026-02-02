@@ -123,6 +123,7 @@ class BaseConfig:
             TargetDataset.CARLA_LEADERBOARD2_6CAMERAS: 6,
             TargetDataset.CARLA_LEADERBOARD2_3CAMERAS: 3,
             TargetDataset.CARLA_LEADERBOARD2_1CAMERA: 1,
+            TargetDataset.CARLA_PY123D_1CAMERA: 1,
             TargetDataset.NAVSIM_4CAMERAS: 4,
             TargetDataset.WAYMO_E2E_2025_3CAMERAS: 3,
         }[self.target_dataset]
@@ -216,6 +217,17 @@ class BaseConfig:
                     "width": 1024,
                     "height": 512,
                     "cropped_height": 384,
+                    "fov": 110,
+                }
+            }
+        elif self.target_dataset == TargetDataset.CARLA_PY123D_1CAMERA:
+            return {
+                1: {
+                    "pos": [-1.5, 0.0, 2.0],
+                    "rot": [0.0, 0.0, 0.0],
+                    "width": 1024,
+                    "height": 512,
+                    "cropped_height": 512,
                     "fov": 110,
                 }
             }
@@ -385,12 +397,12 @@ class BaseConfig:
     @property
     def is_on_slurm(self):
         """Check if running on SLURM cluster environment."""
-        return os.getenv("SLURM_JOB_ID") is not None
+        return "SLURM_JOB_ID" in os.environ and os.environ["SLURM_JOB_ID"] is not None
 
     @property
     def is_on_tcml(self):
         """Check if running on Training Center for Machine Learning of Tübingen."""
-        return os.getenv("TCML") is not None
+        return "TCML" in os.environ and os.environ["TCML"] is not None
 
     # --- Configuration Parsing Methods ---
     def load_from_args(self, loaded_config: Any, raise_error_on_missing_key: bool):

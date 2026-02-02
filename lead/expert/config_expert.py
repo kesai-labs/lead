@@ -28,7 +28,7 @@ class ExpertConfig(BaseConfig):
             raise_error_on_missing_key=True,
         )
 
-    @property
+    @overridable_property
     def target_dataset(self):
         """Set this to the target dataset for data collection. Will affect sensor setup."""
         return TargetDataset.CARLA_LEADERBOARD2_3CAMERAS
@@ -40,12 +40,30 @@ class ExpertConfig(BaseConfig):
             return False
         return True
 
+    # --- Py123D ---
+    # If true, save data in Py123D format instead of classic CARLA Leaderboard Format
+    py123d_data_format = False
+    # Timestep in seconds for Py123D data (0.1 = 10 Hz)
+    py123d_timestep_seconds = 0.1
+    # Save Py123D data every N simulation steps (2 = save every other step for 10 Hz from 20 Hz sim)
+    py123d_save_interval = 2
+    # Log Py123D save progress every N steps
+    py123d_log_interval = 20
+    # Log Py123D debug info every N steps
+    py123d_debug_log_interval = 100
+
+    # ---- Performance settings ---
     # If true, also run speed benchmarking during expert data collection
     profile_expert = False
     # If true, unproject camera on CUDA. Turning this on will speed up unprojection but use more GPU memory.
     unproject_on_cuda = False
     # How often we log in the main loop
     log_info_freq = 10
+
+    # --- Data saving configuration for LiDAR ---
+    # How many steps to stack LiDAR point clouds
+    lidar_stack_size = 5
+
     # --- Planning Area ---
     # Maximum planning area coordinate in x direction (meters)
     # How many pixels make up 1 meter in BEV grids.

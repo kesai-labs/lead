@@ -20,6 +20,24 @@ bash scripts/start_carla.sh
 python lead/leaderboard_wrapper.py --expert --routes data/data_routes/lead/noScenarios/short_route.xml
 ```
 
+**Collecting Data in Py123D Format:**
+
+To collect data in Py123D format for cross-dataset compatibility, set the appropriate environment variables before running the expert:
+
+```bash
+# Set Py123D data root and expert configuration
+export PY123D_DATA_ROOT="data/carla_leaderboard2_py123d/"
+export LEAD_EXPERT_CONFIG="target_dataset=6 py123d_data_format=true use_radars=false lidar_stack_size=2 save_only_non_ground_lidar=false save_lidar_only_inside_bev=false"
+
+# Run expert with py123d agent
+python lead/leaderboard_wrapper.py \
+  --expert \
+  --py123d \
+  --routes data/data_routes/lead/noScenarios/short_route.xml
+```
+
+The Py123D format provides a unified data representation compatible with other major autonomous driving datasets, enabling easier cross-dataset training and evaluation.
+
 ## Inspect Collected Data
 
 Inspect collected data using the notebook [notebooks/inspect_expert_output.ipynb](https://github.com/autonomousvision/lead/blob/main/notebooks/inspect_expert_output.ipynb).

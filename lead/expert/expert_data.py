@@ -94,7 +94,11 @@ class ExpertData(ExpertBase):
         self._save_thread = None
         self._save_thread_stop = threading.Event()
 
-        if self.save_path is not None and self.config_expert.datagen:
+        if (
+            self.save_path is not None
+            and self.config_expert.datagen
+            and not self.config_expert.py123d_data_format
+        ):
             (self.save_path / "lidar").mkdir()
             (self.save_path / "rgb").mkdir()
             if self.config_expert.save_camera_pc:
@@ -713,15 +717,12 @@ class ExpertData(ExpertBase):
         # Bounding box
         input_data["bounding_boxes"] = self.get_bounding_boxes(input_data=input_data)
         self.stored_bounding_boxes_of_this_step = input_data["bounding_boxes"]
-        self.data_agent_id_to_bb_map = {
-            bb["id"]: bb for bb in input_data["bounding_boxes"]
-        }
-        self.data_agent_id_to_actor_map = {
+        self.id2bb_map = {bb["id"]: bb for bb in input_data["bounding_boxes"]}
+        self.id2actor_map = {
             actor.id: actor
             for actor in self.carla_world.get_actors()
-            if actor.is_alive and actor.id in self.data_agent_id_to_bb_map
+            if actor.is_alive and actor.id in self.id2bb_map
         }
-
         # BEV Semantic
         self.stop_sign_criteria.tick(self.ego_vehicle)
         input_data["hdmap"] = self.ss_bev_manager.get_observation(
@@ -1121,7 +1122,10 @@ class ExpertData(ExpertBase):
             if self._save_thread.is_alive():
                 LOG.warning("Save thread did not shutdown cleanly within timeout")
 
-        if not self.config_expert.eval_expert:
+        if (
+            not self.config_expert.eval_expert
+            and not self.config_expert.py123d_data_format
+        ):
             self._offline_process_data()
 
         if hasattr(self, "_3rd_person_camera"):
@@ -1640,8 +1644,11 @@ class ExpertData(ExpertBase):
                 boxes.append(result)
 
         # Note this only saves static actors, which does not include static background objects
-        if not self.config_expert.eval_expert:
+        if self.config_expert.eval_expert:
+            LOG.info("Skipping static actor bounding boxes in eval_expert mode.")
+        else:
             static_list = self._actors.filter("*static*")
+            LOG.info(f"Found {len(static_list)} static actors in the scene.")
             for static in static_list:
                 if (
                     static.get_location().distance(self.ego_vehicle.get_location())
@@ -1658,7 +1665,7 @@ class ExpertData(ExpertBase):
                     static_extent = [static_extent.x, static_extent.y, static_extent.z]
                     if mesh_path is not None and mesh_path in constants.LOOKUP_TABLE:
                         static_extent = constants.LOOKUP_TABLE[mesh_path]
-                    if type_id == "static.propr.trafficwarning":
+                    if type_id == "static.prop.trafficwarning":
                         static_extent[0], static_extent[1] = (
                             self.config_expert.traffic_warning_bb_size[0],
                             self.config_expert.traffic_warning_bb_size[1],
@@ -1917,7 +1924,9 @@ class ExpertData(ExpertBase):
             boxes.append(result)
 
         # Others static meshes that dont belong to an actors but are still relevant for perception
-        if not self.config_expert.eval_expert:
+        if self.config_expert.eval_expert:
+            LOG.info("Skipping static actor bounding boxes in eval_expert mode.")
+        else:
             static_parking_id_start = 1e8
             found = 0
             existed_bboxes_ids = set([box["id"] for box in boxes])

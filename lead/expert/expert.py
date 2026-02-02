@@ -64,7 +64,7 @@ class Expert(ExpertData):
             self.profiler = cProfile.Profile()
             self.profiler.enable()
 
-    def destroy(self, results=None):
+    def destroy(self, results=None) -> None:
         if self.config_expert.profile_expert:
             self.profiler.disable()
 
@@ -115,19 +115,6 @@ class Expert(ExpertData):
         ego_location = self.ego_vehicle.get_location()
         self.scenario_sorter.sort_scenarios(ego_location)
 
-        # Track scenario changes
-        current_scenario = self.current_active_scenario_type
-        if not hasattr(self, "_last_scenario_type"):
-            self._last_scenario_type = None
-        if current_scenario != self._last_scenario_type:
-            if current_scenario is not None:
-                LOG.info(f"[Scenario Change] Entering new scenario: {current_scenario}")
-            if self._last_scenario_type is not None:
-                LOG.info(
-                    f"[Scenario Change] Exiting scenario: {self._last_scenario_type}"
-                )
-            self._last_scenario_type = current_scenario
-
         if not self.config_expert.eval_expert:
             if self.config_expert.datagen:
                 self.perturbate_camera()
@@ -145,7 +132,10 @@ class Expert(ExpertData):
         if self.config_expert.visualize_original_route:
             self._visualize_original_route()
 
-        if not self.config_expert.eval_expert:
+        if (
+            not self.config_expert.eval_expert
+            and not self.config_expert.py123d_data_format
+        ):
             if input_data is not None and "bounding_boxes" in input_data:
                 self.bounding_boxes.append(
                     (
@@ -162,7 +152,10 @@ class Expert(ExpertData):
                 speed_reduced_by_obj,
             )
 
-        if self.step % self.config_expert.data_save_freq == 0:
+        if (
+            self.step % self.config_expert.data_save_freq == 0
+            and not self.config_expert.py123d_data_format
+        ):
             if self.save_path is not None and self.config_expert.datagen:
                 self.save_sensors(input_data)
         if self.step % self.config_expert.log_info_freq == 0:
@@ -221,7 +214,7 @@ class Expert(ExpertData):
         ]:
             for actor in self.walkers_inside_bev + self.bikers_inside_bev:
                 num_visible_pixel = (
-                    self.data_agent_id_to_bb_map[actor.id]["visible_pixels"]
+                    self.id2bb_map[actor.id]["visible_pixels"]
                     if self.config_expert.datagen
                     else -1
                 )
@@ -2458,9 +2451,9 @@ class Expert(ExpertData):
         if (
             self.config_expert.datagen
             and self.next_traffic_light is not None
-            and self.next_traffic_light.id in self.data_agent_id_to_bb_map
+            and self.next_traffic_light.id in self.id2bb_map
         ):
-            next_traffic_light_bb = self.data_agent_id_to_bb_map[
+            next_traffic_light_bb = self.id2bb_map[
                 self.next_traffic_light.id
             ]  # Red light bounding box of the traffic light projected to ego road, doesn't have to be on same lane as ego
             if next_traffic_light_bb is not None:
@@ -2609,9 +2602,9 @@ class Expert(ExpertData):
         if (
             self.config_expert.datagen
             and distance_to_stop_sign < np.inf
-            and self.next_stop_sign.id in self.data_agent_id_to_bb_map
+            and self.next_stop_sign.id in self.id2bb_map
         ):
-            next_traffic_light_bb = self.data_agent_id_to_bb_map[self.next_stop_sign.id]
+            next_traffic_light_bb = self.id2bb_map[self.next_stop_sign.id]
             distance_to_stop_sign = next_traffic_light_bb["distance"]
 
         # Compute the target speed using the IDM
