@@ -14,6 +14,17 @@ Configure the following settings in [slurm/data_collection/collect_data.py](http
 - **`partitions`**: Cluster partition names (e.g., `gpu-2080ti`, `a100-galvani`)
 - **`dataset_name`**: Descriptive name for the dataset (e.g., `carla_leaderboard2_train`)
 
+**Using Py123D Data Format:**
+
+The `--py123d` flag enables collection in Py123D format, which provides a unified data representation compatible with other major autonomous driving datasets. This format is useful for:
+- Cross-dataset training and evaluation
+- Combining CARLA data with real-world datasets
+- Standardized data processing pipelines
+
+When using `--py123d`:
+- Expert agent automatically switches to `expert_py123d.py`
+- Dataset name becomes `carla_leaderboard2_py123d`
+
 Two additional config files control the collection process:
 
 - [slurm/configs/max_num_parallel_jobs_collect_data.txt](https://github.com/autonomousvision/lead/blob/main/slurm/configs/max_num_parallel_jobs_collect_data.txt): Maximum number of parallel jobs (adjust based on cluster capacity)
@@ -24,7 +35,22 @@ Two additional config files control the collection process:
 Log into the cluster login node and start collection:
 
 ```bash
+# Standard LEAD format (default)
 python3 slurm/data_collection/collect_data.py
+
+# Py123D format for cross-dataset compatibility
+python3 slurm/data_collection/collect_data.py --py123d
+
+# Optional: specify custom route and data folders
+python3 slurm/data_collection/collect_data.py \
+  --route_folder data/custom_routes \
+  --root_folder /scratch/datasets/
+
+# Py123D with custom folders
+python3 slurm/data_collection/collect_data.py \
+  --py123d \
+  --route_folder data/custom_routes \
+  --root_folder /scratch/datasets/
 ```
 
 The script creates a structured output directory:

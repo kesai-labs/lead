@@ -507,14 +507,8 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                         not self.is_actor_inside_bev(adversarial_actor)
                         or adversarial_actor.get_velocity().length() < 0.1
                         or (
-                            self.data_agent_id_to_bb_map[adversarial_actor.id][
-                                "visible_pixels"
-                            ]
-                            < 10
-                            and self.data_agent_id_to_bb_map[adversarial_actor.id][
-                                "num_points"
-                            ]
-                            < 10
+                            self.id2bb_map[adversarial_actor.id]["visible_pixels"] < 10
+                            and self.id2bb_map[adversarial_actor.id]["num_points"] < 10
                         )
                     ):
                         continue
@@ -1274,10 +1268,10 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                 for vehicle in vehicles
                 if not (
                     0
-                    <= self.data_agent_id_to_bb_map[vehicle.id]["num_points"]
+                    <= self.id2bb_map[vehicle.id]["num_points"]
                     < self.config_expert.vehicle_occlusion_check_min_num_points
                     and 0
-                    <= self.data_agent_id_to_bb_map[vehicle.id]["visible_pixels"]
+                    <= self.id2bb_map[vehicle.id]["visible_pixels"]
                     < self.config_expert.vehicle_min_num_visible_pixels
                 )
             ]
@@ -1296,7 +1290,7 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                 for walker in walkers
                 if not (
                     0
-                    <= self.data_agent_id_to_bb_map[walker.id]["visible_pixels"]
+                    <= self.id2bb_map[walker.id]["visible_pixels"]
                     < self.config_expert.pedestrian_min_num_visible_pixels
                 )
             ]
@@ -1325,7 +1319,7 @@ class ExpertBase(BaseAgent, autonomous_agent_local.AutonomousAgent):
                 for biker in bikers
                 if not (
                     0
-                    <= self.data_agent_id_to_bb_map[biker.id]["visible_pixels"]
+                    <= self.id2bb_map[biker.id]["visible_pixels"]
                     < self.config_expert.bikers_occlusion_check_min_visible_pixels
                 )
             ]

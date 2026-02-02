@@ -296,6 +296,14 @@ class LeaderboardEvaluator(object):
             self.route_scenario = RouteScenario(world=self.world, config=config, debug_mode=args.debug)
             self.statistics_manager.set_scenario(self.route_scenario)
 
+        except ValueError as e:
+            if "Shutting down, couldn't spawn the ego vehicle" in str(e):
+                print("=" * 100)
+                print("=" * 100)
+                print("Running $LEAD_PROJECT_ROOT/scripts/reset_carla_world.py to fix this problem.")
+                print("=" * 100)
+                print("=" * 100)
+                raise e
         except Exception:
             # The scenario is wrong -> set the ejecution to crashed and stop
             print("\n\033[91mThe scenario could not be loaded:")

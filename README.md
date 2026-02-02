@@ -50,6 +50,9 @@ https://github.com/user-attachments/assets/9f316ad2-e629-4bb4-bffb-9bb55e225738
 
 ## Updates
 
+- **`[2026/02/02]`** Preliminary support for [Py123D](https://github.com/autonomousvision/py123d)
+  > Added initial support for Py123D, enabling: collecting, loading and visualizing driving data in unified data format.
+
 - **`[2026/01/18]`** Deactivated Kalman filter
   > By default, we deactivate the Kalman filter used for ego state estimation and GPS target-point smoothing to evaluate the policy in a fully end-to-end setting. While this may slightly reduce closed-loop performance, it avoids unrealistically noise-free target points. To turn the kalman filter on, set `use_kalman_filter=True` in [config_closed_loop.py](lead/inference/config_closed_loop.py).
 
@@ -264,6 +267,16 @@ python lead/leaderboard_wrapper.py \
 
 # Collect Data Alternative 2
 bash scripts/eval_expert.sh
+
+# Collect Data 123D Format Alternative 1
+export LEAD_EXPERT_CONFIG="target_dataset=6 py123d_data_format=true use_radars=false lidar_stack_size=2 save_only_non_ground_lidar=false save_lidar_only_inside_bev=false"
+python -u $LEAD_PROJECT_ROOT/lead/leaderboard_wrapper.py \
+    --expert \
+    --py123d \
+    --routes data/data_routes/50x38_Town12/ParkingCrossingPedestrian/3250_1.xml
+
+# Collect Data 123D Format Alternative 2
+bash scripts/eval_expert_123d.sh
 ```
 Collected data will be saved to `outputs/expert_evaluation/` with the following sensor outputs:
 

@@ -20,6 +20,7 @@ class TargetDataset(IntEnum):
     CARLA_LEADERBOARD2_1CAMERA = auto()
     NAVSIM_4CAMERAS = auto()
     WAYMO_E2E_2025_3CAMERAS = auto()
+    CARLA_PY123D_1CAMERA = auto()
 
 
 class SourceDataset(IntEnum):
@@ -397,10 +398,6 @@ BIKER_MESHES = {
     "vehicle.diamondback.century",
     "vehicle.gazelle.omafiets",
     "vehicle.bh.crossbike",
-    "vehicle.harley-davidson.low_rider",
-    "vehicle.kawasaki.ninja",
-    "vehicle.vespa.zx125",
-    "vehicle.yamaha.yzf",
 }
 
 URBAN_MAX_SPEED_LIMIT = 15
@@ -463,6 +460,26 @@ LOOKUP_TABLE = {
         0.1720348298549652,
         0.2928849756717682,
     ],
+}
+
+CARLA_MAP_PATHS = {
+    **{
+        location.lower(): f"CarlaUE4/Content/Carla/Maps/OpenDrive/{location}.xodr"
+        for location in [
+            "Town01",
+            "Town02",
+            "Town03",
+            "Town04",
+            "Town05",
+            "Town06",
+            "Town07",
+            "Town10HD",
+        ]
+    },
+    **{
+        location.lower(): f"CarlaUE4/Content/Carla/Maps/{location}/OpenDrive/{location}.xodr"
+        for location in ["Town11", "Town12", "Town13", "Town15"]
+    },
 }
 
 CONSTRUCTION_CONE_BB_SIZE = [0.1720348298549652, 0.1720348298549652]

@@ -41,10 +41,10 @@ class BaseAgent:
         )
 
         self.lidar_pc_queue = deque(
-            maxlen=self.config_expert.data_save_freq
+            maxlen=self.config_expert.lidar_stack_size
         )  # For stacking LiDAR
         self.radar_pc_queue = deque(
-            maxlen=2 * self.config_expert.data_save_freq
+            maxlen=2 * self.config_expert.lidar_stack_size
         )  # For stacking radar as LiDAR
 
         self.control = carla.VehicleControl(steer=0.0, throttle=0.0, brake=1.0)

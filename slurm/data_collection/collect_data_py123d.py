@@ -12,23 +12,22 @@ from tqdm import tqdm
 
 
 def make_bash(
-    data_save_root: str,
-    code_dir: str,
-    route_file_number: str,
-    agent_name: str,
-    route_file: str,
-    ckeckpoint_endpoint: str,
-    save_pth: str,
-    seed: int,
-    carla_root: str,
-    town: str,
-    repetition: int,
-    scenario_name: str,
-    jobname: str,
-    partition_name: str,
-    py123d_format: bool = False,
-    timeout: str = "0-01:00",
-) -> str:
+    data_save_root,
+    code_dir,
+    route_file_number,
+    agent_name,
+    route_file,
+    ckeckpoint_endpoint,
+    save_pth,
+    seed,
+    carla_root,
+    town,
+    repetition,
+    scenario_name,
+    jobname,
+    partition_name,
+    timeout="0-01:00",
+):
     os.makedirs(f"{data_save_root}/stderr", exist_ok=True)
     os.makedirs(f"{data_save_root}/stdout", exist_ok=True)
     os.makedirs(f"{data_save_root}/scripts", exist_ok=True)
@@ -37,13 +36,6 @@ def make_bash(
         max_sleep = int(f.read())
     # create folder
     Path(jobfile).parent.mkdir(parents=True, exist_ok=True)
-
-    # Add py123d environment variables if needed
-    py123d_env_vars = ""
-    if py123d_format:
-        py123d_env_vars = f'''export PY123D_DATA_ROOT="{data_save_root}/"
-export LEAD_EXPERT_CONFIG="target_dataset=6 py123d_data_format=true use_radars=false lidar_stack_size=2 save_only_non_ground_lidar=false save_lidar_only_inside_bev=false"'''
-
     template = f"""#!/bin/bash
 #SBATCH --job-name={jobname}_{route_file_number}
 #SBATCH --partition={partition_name}
@@ -128,7 +120,8 @@ fi
 source activate "$CONDA_INTERPRETER"
 which python3
 
-{py123d_env_vars}
+export PY123D_DATA_ROOT="data/carla_leaderboard2_py123d/"
+export LEAD_EXPERT_CONFIG="target_dataset=6 py123d_data_format=true use_radars=false lidar_stack_size=2 save_only_non_ground_lidar=false save_lidar_only_inside_bev=false"
 
 python 3rd_party/leaderboard_autopilot/leaderboard/leaderboard_evaluator_local.py \
     --port=${{FREE_WORLD_PORT}} \
@@ -150,7 +143,7 @@ python 3rd_party/leaderboard_autopilot/leaderboard/leaderboard_evaluator_local.p
     return jobfile
 
 
-def get_running_jobs(jobname: str, user_name: str) -> tuple[int, list[str], list[str]]:
+def get_running_jobs(jobname, user_name):
     job_list = (
         subprocess.check_output(
             (
@@ -171,9 +164,7 @@ def get_running_jobs(jobname: str, user_name: str) -> tuple[int, list[str], list
     return currently_num_running_jobs, routefile_number_list, pid_list
 
 
-def get_last_line_from_file(
-    filepath: str,
-) -> str:  # this is used to check log files for errors
+def get_last_line_from_file(filepath):  # this is used to check log files for errors
     try:
         with open(filepath, "rb", encoding="utf-8") as f:
             try:
@@ -188,7 +179,7 @@ def get_last_line_from_file(
     return last_line
 
 
-def cancel_jobs_with_err_in_log(logroot: str, jobname: str, user_name: str) -> None:
+def cancel_jobs_with_err_in_log(logroot, jobname, user_name):
     # check if the log file contains certain error messages, then terminate the job
     print("Checking logs for errors...")
     _, routefile_number_list, pid_list = get_running_jobs(jobname, user_name)
@@ -209,9 +200,7 @@ def cancel_jobs_with_err_in_log(logroot: str, jobname: str, user_name: str) -> N
             subprocess.check_output(f"scancel {pid_list[i]}", shell=True)
 
 
-def wait_for_jobs_to_finish(
-    logroot: str, jobname: str, user_name: str, max_n_parallel_jobs: int
-) -> None:
+def wait_for_jobs_to_finish(logroot, jobname, user_name, max_n_parallel_jobs):
     currently_running_jobs, _, _ = get_running_jobs(jobname, user_name)
     print(f"{currently_running_jobs}/{max_n_parallel_jobs} jobs are running...")
     counter = 0
@@ -223,7 +212,7 @@ def wait_for_jobs_to_finish(
         counter = (counter + 1) % 4
 
 
-def get_num_jobs(job_name: str, username: str) -> tuple[int, int]:
+def get_num_jobs(job_name, username):
     len_usrn = len(username)
     num_running_jobs = int(
         subprocess.check_output(
@@ -241,7 +230,7 @@ def get_num_jobs(job_name: str, username: str) -> tuple[int, int]:
     return num_running_jobs, max_num_parallel_jobs
 
 
-def is_job_done(result_file: str) -> bool:
+def is_job_done(result_file):
     need_run_again = False
     if os.path.exists(result_file):
         with open(result_file, encoding="utf-8") as f_result:
@@ -272,7 +261,7 @@ def is_job_done(result_file: str) -> bool:
     return not need_run_again
 
 
-def arg_parse() -> argparse.Namespace:
+def arg_parse():
     parser = argparse.ArgumentParser(description="Collect dataset")
     parser.add_argument(
         "--root_folder", type=str, default="data/", help="Root folder for data"
@@ -282,11 +271,6 @@ def arg_parse() -> argparse.Namespace:
         type=str,
         default="data/data_routes",
         help="Folder containing route files",
-    )
-    parser.add_argument(
-        "--py123d",
-        action="store_true",
-        help="Enable Py123D data format for unified dataset compatibility",
     )
     return parser.parse_args()
 
@@ -301,18 +285,11 @@ if __name__ == "__main__":
     username = os.environ["USER"]
     code_root = os.getcwd()
     carla_root = os.getcwd() + "/3rd_party/CARLA_0915"
-    max_route_per_scenario_type = 40  # -1 means no limit
-
-    # Configure based on data format
-    if args.py123d:
-        agent = f"{code_root}/lead/expert/expert_py123d.py"
-        dataset_name = "carla_leaderboard2_py123d"
-    else:
-        agent = f"{code_root}/lead/expert/expert.py"
-        dataset_name = "carla_leaderboard2"
-
+    agent = f"{code_root}/lead/expert/expert_py123d.py"
+    dataset_name = "carla_leaderboard2_py123d"
     scenario_white_lists = []  # Empty list = all scenarios allowed
     scenario_blacklist = ["YieldToEmergencyVehicle"]  # Scenarios to exclude
+    max_route_per_scenario_type = 40  # -1 means no limit
     root_folder = args.root_folder  # With ending slash
     os.makedirs(root_folder, exist_ok=True)
     data_save_directory = root_folder + dataset_name
@@ -434,7 +411,6 @@ if __name__ == "__main__":
                 scenario_type,
                 job_name,
                 random.choice(partitions),
-                py123d_format=args.py123d,
             )
 
             if is_job_done(ckpt_endpoint):

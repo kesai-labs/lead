@@ -57,7 +57,11 @@ class ModeConfig:
 
     @staticmethod
     def get_mode_config(
-        is_expert: bool, is_bench2drive: bool, checkpoint: str | None, routes: str
+        is_expert: bool,
+        is_bench2drive: bool,
+        checkpoint: str | None,
+        routes: str,
+        use_py123d: bool = False,
     ) -> tuple[LeaderboardType, str, str, str | None, str]:
         """Get mode configuration based on CLI arguments.
 
@@ -66,14 +70,20 @@ class ModeConfig:
             is_bench2drive: Whether bench2drive variant is selected
             checkpoint: Model checkpoint path (None for expert)
             routes: Routes file path
+            use_py123d: Whether to use expert_py123d.py instead of expert.py
 
         Returns:
             Tuple of (leaderboard_type, agent, agent_config, checkpoint_dir, track)
         """
         if is_expert:
+            agent_file = (
+                "lead/expert/expert_py123d.py"
+                if use_py123d
+                else "lead/expert/expert.py"
+            )
             return (
                 LeaderboardType.AUTOPILOT,
-                "lead/expert/expert.py",
+                agent_file,
                 routes,
                 None,
                 "MAP",
@@ -351,6 +361,7 @@ class LeaderboardWrapper:
                 is_bench2drive=self.args.bench2drive,
                 checkpoint=self.args.checkpoint,
                 routes=str(self.routes),
+                use_py123d=self.args.py123d if hasattr(self.args, "py123d") else False,
             )
         )
         self.leaderboard_type = leaderboard_type
@@ -537,6 +548,13 @@ Examples:
         "--bench2drive", action="store_true", help="Use Bench2Drive leaderboard"
     )
 
+    # Py123D option for expert mode
+    parser.add_argument(
+        "--py123d",
+        action="store_true",
+        help="Use expert_py123d.py (saves data in Py123D Arrow format). Only works with --expert.",
+    )
+
     # CARLA settings
     parser.add_argument("--port", type=int, default=2000, help="CARLA server port")
     parser.add_argument(
@@ -551,7 +569,7 @@ Examples:
         "--repetitions", type=int, default=1, help="Number of repetitions per route"
     )
     parser.add_argument(
-        "--timeout", type=float, default=60.0, help="Timeout in seconds"
+        "--timeout", type=float, default=180.0, help="Timeout in seconds"
     )
     parser.add_argument(
         "--resume", action="store_true", default=False, help="Resume from checkpoint"
@@ -595,6 +613,12 @@ def main() -> None:
                 --expert \\
                 --routes data/routes/short_route.xml
 
+        Expert Py123D data generation:
+            $ python leaderboard_wrapper.py \\
+                --expert \\
+                --py123d \\
+                --routes data/routes/short_route.xml
+
         Bench2Drive evaluation:
             $ python leaderboard_wrapper.py \\
                 --checkpoint outputs/checkpoints/model \\
@@ -605,9 +629,20 @@ def main() -> None:
     parser = _create_argument_parser()
     args = parser.parse_args()
 
+    # Validate py123d flag
+    if args.py123d and not args.expert:
+        LOG.warning(
+            "--py123d flag is only valid with --expert mode. Ignoring --py123d flag."
+        )
+
     # Set GPU for model evaluation
     if args.checkpoint:
         os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
+
+    # Log mode information
+    if args.expert:
+        agent_type = "ExpertPy123D" if args.py123d else "Expert"
+        LOG.info(f"Running in expert mode with {agent_type} agent")
 
     # Create wrapper and run
     LeaderboardWrapper(args).run()
