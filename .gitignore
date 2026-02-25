@@ -172,7 +172,6 @@ slurm-*.out
 3rd_party/CARLA_0916/
 3rd_party/carla_route_generator/
 outputs/
-3rd_party/navsim_workspace
 docs/build/
 !slurm/
 !slurm/**/*.sh

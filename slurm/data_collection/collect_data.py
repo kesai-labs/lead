@@ -306,7 +306,7 @@ if __name__ == "__main__":
     # Configure based on data format
     if args.py123d:
         agent = f"{code_root}/lead/expert/expert_py123d.py"
-        dataset_name = "carla_leaderboard2_py123d"
+        dataset_name = "carla_py123d"
     else:
         agent = f"{code_root}/lead/expert/expert.py"
         dataset_name = "carla_leaderboard2"

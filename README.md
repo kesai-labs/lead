@@ -50,6 +50,11 @@ https://github.com/user-attachments/assets/9f316ad2-e629-4bb4-bffb-9bb55e225738
 
 ## Updates
 
+- **`[2026/25/02]`** LEAD is accepted to CVPR 2026! 🎉
+
+- **`[2026/25/02]`** NAVSIM data pre-processing and training instructions released.
+  > Supplementary data coming soon.
+
 - **`[2026/02/02]`** Preliminary support for [Py123D](https://github.com/autonomousvision/py123d)
   > Added initial support for Py123D, enabling: collecting, loading and visualizing driving data in unified data format.
 
@@ -411,11 +416,11 @@ Long Nguyen led development of the project. Kashyap Chitta, Bernhard Jaeger, and
 If you find this work useful, please consider giving this repository a star ⭐ and citing our work in your research:
 
 ```bibtex
-@article{Nguyen2025ARXIV,
-  title={LEAD: Minimizing Learner-Expert Asymmetry in End-to-End Driving},
-  author={Nguyen, Long and Fauth, Micha and Jaeger, Bernhard and Dauner, Daniel and Igl, Maximilian and Geiger, Andreas and Chitta, Kashyap},
-  journal={arXiv preprint arXiv:2512.20563},
-  year={2025}
+@inproceedings{Nguyen2026CVPR,
+	author = {Long Nguyen and Micha Fauth and Bernhard Jaeger and Daniel Dauner and Maximilian Igl and Andreas Geiger and Kashyap Chitta},
+	title = {LEAD: Minimizing Learner-Expert Asymmetry in End-to-End Driving},
+	booktitle = {Conference on Computer Vision and Pattern Recognition (CVPR)},
+	year = {2026},
 }
 ```
 

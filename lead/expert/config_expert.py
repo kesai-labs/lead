@@ -51,6 +51,10 @@ class ExpertConfig(BaseConfig):
     py123d_log_interval = 20
     # Log Py123D debug info every N steps
     py123d_debug_log_interval = 100
+    # Py123D dataset name
+    py123d_dataset = "carla"
+    # Py123D split name
+    py123d_split = "train"
 
     # ---- Performance settings ---
     # If true, also run speed benchmarking during expert data collection

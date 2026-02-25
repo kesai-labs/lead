@@ -4,6 +4,7 @@ Expert agent with Py123D data logging.
 This extends the Expert class to add Py123D Arrow format saving without modifying LEAD's core data processing or driving logic.
 """
 
+import json
 import logging
 import os
 import typing
@@ -233,8 +234,8 @@ class ExpertPy123D(Expert):
 
         # Create log metadata
         log_metadata = LogMetadata(
-            dataset="carla",
-            split="train",
+            dataset=self.config_expert.py123d_dataset,
+            split=self.config_expert.py123d_split,
             log_name=self._log_name,
             location=self._location,
             timestep_seconds=self.config_expert.py123d_timestep_seconds,
@@ -243,7 +244,7 @@ class ExpertPy123D(Expert):
             pinhole_camera_metadata=camera_metadata,
             lidar_metadata=lidar_metadata,
             map_metadata=MapMetadata(
-                dataset="carla",
+                dataset=self.config_expert.py123d_dataset,
                 split=None,
                 log_name=None,
                 location=self._location,
@@ -531,6 +532,7 @@ class ExpertPy123D(Expert):
                 if (
                     bb["class"] == "static"
                     and "mesh_path" in bb
+                    and bb["mesh_path"] is not None
                     and "Car" in bb["mesh_path"]
                 ):
                     box_detections.append(
@@ -695,3 +697,14 @@ class ExpertPy123D(Expert):
         self._py123d_log_writer.close()
         super().destroy(results)
         LOG.info("Cleanup complete - data saved to Py123D format")
+        if results is not None and self.save_path is not None:
+            with open(
+                os.path.join(
+                    self._py123d_logs_root.absolute(),
+                    self.config_expert.py123d_split,
+                    self._log_name + ".json",
+                ),
+                "w",
+                encoding="utf-8",
+            ) as f:
+                json.dump(results.__dict__, f, indent=2)
