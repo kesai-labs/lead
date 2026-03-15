@@ -9,12 +9,16 @@ echo {0..31} | tr ' ' '\n' | parallel -j 8 "
     rm openscene_sensor_test_camera_{}.tgz
 "
 
+wait
+
 echo {0..31} | tr ' ' '\n' | parallel -j 8 "
     wget https://huggingface.co/datasets/OpenDriveLab/OpenScene/resolve/main/openscene-v1.1/openscene_sensor_test_lidar/openscene_sensor_test_lidar_{}.tgz &&
     echo Extracting file openscene_sensor_test_lidar_{}.tgz &&
     tar -xzf openscene_sensor_test_lidar_{}.tgz &&
     rm openscene_sensor_test_lidar_{}.tgz
 "
+
+wait
 
 mv openscene-v1.1/meta_datas test_navsim_logs
 mv openscene-v1.1/sensor_blobs test_sensor_blobs

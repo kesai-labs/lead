@@ -16,11 +16,11 @@ from navsim.common.dataclasses import SensorConfig
 from navsim.planning.training.abstract_feature_target_builder import AbstractFeatureBuilder, AbstractTargetBuilder
 import logging
 
-from open_loop_inference import OpenLoopInference as CarlaOpenLoopInference
-from open_loop_inference import OpenLoopPrediction as CarlaOpenLoopPrediction
 import numpy as np
-from config_open_loop import OpenLoopConfig as CarlaOpenLoopConfig
-from config_training import TrainingConfig as CarlaTrainingConfig
+from lead.inference.open_loop_inference import OpenLoopInference as CarlaOpenLoopInference
+from lead.inference.open_loop_inference import OpenLoopPrediction as CarlaOpenLoopPrediction
+from lead.inference.config_open_loop import OpenLoopConfig as CarlaOpenLoopConfig
+from lead.training.config_training import TrainingConfig as CarlaTrainingConfig
 import random
 import cv2
 import json

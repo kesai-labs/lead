@@ -132,6 +132,7 @@ def setup_logging(level: str = None, format_string: str = None):
         "leaderboard",
         "agents",
         "carla",
+        "timm",
     ]:
         logging.getLogger(logger_name).setLevel(logging.WARNING)
 

@@ -39,18 +39,16 @@ class TrainingConfig(BaseConfig):
 
     @property
     def target_dataset(self):
-        if "expert_debug" in self.carla_root:
-            return TargetDataset.CARLA_LEADERBOARD2_3CAMERAS
-        elif "carla_leaderboad2_v3" in self.carla_root:
-            return TargetDataset.CARLA_LEADERBOARD2_3CAMERAS
+        if self.use_waymo_e2e_data:
+            return TargetDataset.WAYMO_E2E_2025_3CAMERAS
+        elif self.use_navsim_data:
+            return TargetDataset.NAVSIM_4CAMERAS
         elif "carla_leaderboard2" in self.carla_root:
             return TargetDataset.CARLA_LEADERBOARD2_3CAMERAS
         elif "carla_leaderboad2_v8" in self.carla_root:
             return TargetDataset.CARLA_LEADERBOARD2_3CAMERAS
-        elif self.use_waymo_e2e_data and not self.mixed_data_training:
-            return TargetDataset.WAYMO_E2E_2025_3CAMERAS
-        elif self.use_navsim_data and not self.use_carla_data:
-            return TargetDataset.NAVSIM_4CAMERAS
+        elif "carla_leaderboad2_v10" in self.carla_root:
+            return TargetDataset.CARLA_LEADERBOARD2_6CAMERAS
         raise ValueError(
             f"Unknown CARLA root path: {self.carla_root}. Please register it in the config."
         )
@@ -309,6 +307,9 @@ class TrainingConfig(BaseConfig):
     # --- Training speed and memory optimization ---
     # bucket_cap_mb
     bucket_cap_mb = 256
+
+    # gradient_as_bucket_view
+    gradient_as_bucket_view = False
 
     # Number of data loader workers to prefetch batches.
     prefetch_factor = 16
@@ -862,7 +863,7 @@ class TrainingConfig(BaseConfig):
     # If true use NavSim data for training.
     use_navsim_data = False
     # NavSim data root directory.
-    navsim_data_root = "data/navsim_training_cache/trainval"
+    navsim_data_root = "data/navsim_training_cache/navtrain"
     # Size of NavSim data portion in mixed data training. -1 = use all data.
     navsim_num_samples = -1
     # If true then we also schedule number of samples from CARLA in each batch.
@@ -1049,6 +1050,8 @@ class TrainingConfig(BaseConfig):
                 return "a4000"
             elif "rtx 3080" in name:
                 return "rtx3080"
+            elif "rtx 5090" in name:
+                return "rtx5090"
             else:
                 raise Exception(
                     f"Unknown GPU name: {name}. Please register it in the config."

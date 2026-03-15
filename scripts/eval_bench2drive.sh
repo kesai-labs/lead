@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Checkpoints
-export CHECKPOINT_DIR=outputs/checkpoints/tfv6_resnet34/
-export ROUTES=data/benchmark_routes/bench2drive220routes/23687.xml
+export CHECKPOINT_DIR=outputs/checkpoints/noradar_resnet34
+export ROUTES=data/benchmark_routes/bench2drive/23687.xml
 
 # Set environment variables
 export BENCHMARK_ROUTE_ID=$(basename $ROUTES .xml) # Last part of the route file name, e.g., 0 for 0.xml
@@ -22,6 +22,9 @@ set +e
 # Recreate output folders
 rm -rf $EVALUATION_OUTPUT_DIR/
 mkdir -p $EVALUATION_OUTPUT_DIR
+
+# Reset CARLA World
+python3 scripts/reset_carla_world.py
 
 CUDA_VISIBLE_DEVICES=0 python3 3rd_party/Bench2Drive/leaderboard/leaderboard/leaderboard_evaluator.py \
     --routes=$ROUTES \

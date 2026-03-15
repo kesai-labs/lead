@@ -23,6 +23,9 @@ set +e
 rm -rf $EVALUATION_OUTPUT_DIR/
 mkdir -p $EVALUATION_OUTPUT_DIR
 
+# Reset CARLA World
+python3 scripts/reset_carla_world.py
+
 CUDA_VISIBLE_DEVICES=0 python3 3rd_party/leaderboard/leaderboard/leaderboard_evaluator.py \
     --routes=$ROUTES \
     --track=SENSORS \

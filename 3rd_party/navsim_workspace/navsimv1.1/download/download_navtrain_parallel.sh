@@ -20,8 +20,8 @@ download_history() {
 export -f download_current
 export -f download_history
 
-mkdir -p $PROJECT_DIR/3rd_party/navsim_workspace/dataset
-cd $PROJECT_DIR/3rd_party/navsim_workspace/dataset
+mkdir -p $LEAD_PROJECT_ROOT/3rd_party/navsim_workspace/dataset
+cd $LEAD_PROJECT_ROOT/3rd_party/navsim_workspace/dataset
 
 
 # Initial setup
@@ -31,6 +31,8 @@ for split in {1..4}; do
     download_current $split &
     download_history $split &
 done
+
+wait
 
 wget https://motional-nuplan.s3-ap-northeast-1.amazonaws.com/public/nuplan-v1.1/nuplan-maps-v1.1.zip
 unzip nuplan-maps-v1.1.zip

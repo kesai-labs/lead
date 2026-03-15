@@ -12,7 +12,7 @@
 TRAIN_TEST_SPLIT=warmup_two_stage
 CACHE_PATH=$NAVSIM_EXP_ROOT/metric_cache_warmup_two_stage_v2.2
 
-export NAVSIM_DEVKIT_ROOT="${PROJECT_DIR}/3rd_party/navsim_workspace/navsimv2.2"
+export NAVSIM_DEVKIT_ROOT="${LEAD_PROJECT_ROOT}/3rd_party/navsim_workspace/navsimv2.2"
 export HYDRA_FULL_ERROR=1
 
 python $NAVSIM_DEVKIT_ROOT/navsim/planning/script/run_metric_caching.py \

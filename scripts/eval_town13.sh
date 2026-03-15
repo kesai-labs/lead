@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Checkpoints
-export CHECKPOINT_DIR=outputs/checkpoints/tfv6_resnet34/
+export CHECKPOINT_DIR=outputs/checkpoints/visiononly_resnet34
 export ROUTES=data/benchmark_routes/Town13/0.xml
 
 # Set environment variables
@@ -22,6 +22,9 @@ set +e
 # Recreate output folders
 rm -rf $EVALUATION_OUTPUT_DIR/
 mkdir -p $EVALUATION_OUTPUT_DIR
+
+# Reset CARLA World
+python3 scripts/reset_carla_world.py
 
 CUDA_VISIBLE_DEVICES=0 python3 3rd_party/leaderboard/leaderboard/leaderboard_evaluator.py \
     --routes=$ROUTES \
