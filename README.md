@@ -87,7 +87,7 @@ Please verify that `~/.bashrc` reflects these paths correctly.
 
 ### 2. Install dependencies
 
-We utilize [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install), conda-lock and uv:
+We utilize Miniconda, conda-lock and uv:
 
 ```bash
 # Install conda-lock and create conda environment
@@ -118,7 +118,7 @@ ln -s /your/carla/path 3rd_party/CARLA_0915
 
 ### 3. Download checkpoints
 
-Pre-trained checkpoints are hosted on [HuggingFace](https://huggingface.co/ln2697/tfv6).
+Pre-trained checkpoints are hosted on HuggingFace.
 
 <div align="center">
 
@@ -196,7 +196,7 @@ Launch the interactive infraction dashboard to analyze driving failures:
 python lead/infraction_webapp/app.py
 ```
 
-Navigate to [http://localhost:5000](http://localhost:5000/?dir=outputs%2Flocal_evaluation), fill the input field with `outputs/local_evaluation`. Video below shows a short tutorial of the dashboard.
+Navigate to http://localhost:5000, fill the input field with `outputs/local_evaluation`. Video below shows a short tutorial of the dashboard.
 
 <div align="center">
 
@@ -211,7 +211,7 @@ https://github.com/user-attachments/assets/81954b7c-4153-45d1-90a8-80cb426ccb70
 
 ## CARLA Training
 
-Download the CARLA dataset from [HuggingFace](https://huggingface.co/datasets/ln2697/lead_carla):
+Download the CARLA dataset from HuggingFace:
 
 ```bash
 # Download all routes
@@ -254,9 +254,9 @@ bash scripts/posttrain_ddp.sh
 ```
 
 > [!TIP]
-> 1. For a more detailed documentation, take a look at the [documentation page](https://ln2697.github.io/lead/docs/carla_training.html).
-> 2. For distributed training on SLURM, see this [documentation page](https://ln2697.github.io/lead/docs/slurm_training.html).
-> 3. For a complete SLURM workflow of pre-training, post-training, evaluation, see this [example](slurm/experiments/001_example).
+> 1. For distributed training on SLURM, see this [documentation page](https://ln2697.github.io/lead/docs/slurm_training.html).
+> 2. For a complete SLURM workflow of pre-training, post-training, evaluation, see this [example](slurm/experiments/001_example).
+> 3. For a more detailed documentation, take a look at the [documentation page](https://ln2697.github.io/lead/docs/carla_training.html).
 
 ## Data Collection
 
@@ -364,11 +364,12 @@ Results will be saved to `outputs/local_evaluation/` with videos, infractions, a
 
 2. Once `navtrain` cache is built, we can start the training. See example workflows at [slurm/experiments/002_navsim_example](slurm/experiments/002_navsim_example).
 
-3. To evaluate the trained model on `navtest`, TODO
+3. To evaluate the trained model on `navtest`, see [slurm/experiments/002_navsim_example/020_navtest_0.sh](slurm/experiments/002_navsim_example/020_navtest_0.sh)
 
 4. To setup `navhard` split, see [3rd_party/navsim_workspace/navsimv2.2/docs/install.md](3rd_party/navsim_workspace/navsimv2.2/docs/install.md).
 
-5. To evaluate the trained model on `navhard`, TODO
+5. To evaluate the trained model on `navhard`, see [slurm/experiments/002_navsim_example/030_navhard_0.sh](slurm/experiments/002_navsim_example/030_navhard_0.sh)
+
 ## Project Structure
 
 The project is organized into several key directories:
