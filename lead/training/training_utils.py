@@ -142,6 +142,7 @@ def initialize_model(
             output_device=None,
             broadcast_buffers=False,
             bucket_cap_mb=config.bucket_cap_mb,
+            gradient_as_bucket_view=config.gradient_as_bucket_view,
         )
     else:
         model_wrapper = model

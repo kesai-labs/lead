@@ -1,34 +1,12 @@
 #!/usr/bin/env python3
 """
-==============================================================================
-CARLA Leaderboard Evaluation Wrapper
-==============================================================================
-
-1. WHY THIS EXISTS:
-----------------
-- Python-based execution makes debugging with IDE easier.
-- Unified interface for multiple leaderboard variants (Standard/Bench2Drive/Autopilot) & automatic environment setup and path management
-
-2. EXTENDING THIS WRAPPER:
------------------------
-To add a new evaluation mode (e.g., a different agent type):
-
-1. Update get_mode_config() method in ModeConfig:
-   - Add new parameter for mode detection (e.g., is_new_mode)
-   - Add conditional logic to return your mode's configuration
-
-2. Update main() function:
-   - Add CLI argument (e.g., --new-mode flag)
-   - Pass the flag to get_mode_config()
-
-3. Done! The rest of the pipeline handles the new mode automatically.
-
-==============================================================================
+Wrapper for debugging leaderboard.
 """
 
 import argparse
 import logging
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -374,6 +352,11 @@ class LeaderboardWrapper:
 
         env = os.environ.copy()
         env.update(env_vars)
+
+        # Clean output directory (skip if resuming)
+        if not self.args.resume and resolved_output_path.exists():
+            LOG.info(f"Removing existing output directory: {resolved_output_path}")
+            shutil.rmtree(resolved_output_path)
 
         # Build command directly
         checkpoint_path = resolved_output_path / "checkpoint_endpoint.json"

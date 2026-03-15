@@ -347,27 +347,13 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         # Horizontal FOV reduction: crop left and right, then resize back
         if self.training_config.horizontal_fov_reduction > 0:
             crop_pixels = self.training_config.horizontal_fov_reduction
-            # rgb: (C, H, W)
-            if input_data["rgb"] is not None:
-                _, h, w = input_data["rgb"].shape
-                input_data["rgb"] = input_data["rgb"][:, :, crop_pixels:-crop_pixels]
-                input_data["rgb"] = np.transpose(
-                    input_data["rgb"], (1, 2, 0)
-                )  # -> (H, W_crop, C)
-                input_data["rgb"] = cv2.resize(
-                    input_data["rgb"], (w, h), interpolation=cv2.INTER_LINEAR
+            if input_data["rgb"] is not None:  # (C, H, W)
+                input_data["rgb"] = common_utils.fov_crop(
+                    input_data["rgb"], crop_pixels, chw=True
                 )
-                input_data["rgb"] = np.transpose(
-                    input_data["rgb"], (2, 0, 1)
-                )  # -> (C, H, W)
-            # original_rgb: (H, W, C)
-            if input_data["original_rgb"] is not None:
-                h, w = input_data["original_rgb"].shape[:2]
-                input_data["original_rgb"] = input_data["original_rgb"][
-                    :, crop_pixels:-crop_pixels, :
-                ]
-                input_data["original_rgb"] = cv2.resize(
-                    input_data["original_rgb"], (w, h), interpolation=cv2.INTER_LINEAR
+            if input_data["original_rgb"] is not None:  # (H, W, C)
+                input_data["original_rgb"] = common_utils.fov_crop(
+                    input_data["original_rgb"], crop_pixels
                 )
 
         # Cut cameras down to only used cameras

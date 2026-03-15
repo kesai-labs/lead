@@ -9,8 +9,6 @@ import cv2
 import torch
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
-from config_open_loop import OpenLoopConfig as CarlaOpenLoopConfig
-from config_training import TrainingConfig as CarlaTrainingConfig
 import pytorch_lightning as pl
 
 from navsim.agents.abstract_agent import AbstractAgent
@@ -19,8 +17,10 @@ from navsim.agents.transfuser.transfuser_features import TransfuserFeatureBuilde
 from navsim.common.dataclasses import SensorConfig
 from navsim.planning.training.abstract_feature_target_builder import AbstractFeatureBuilder, AbstractTargetBuilder
 
-from open_loop_inference import OpenLoopInference as CarlaOpenLoopInference
-from open_loop_inference import OpenLoopPrediction as CarlaOpenLoopPrediction
+from lead.inference.open_loop_inference import OpenLoopInference as CarlaOpenLoopInference
+from lead.inference.open_loop_inference import OpenLoopPrediction as CarlaOpenLoopPrediction
+from lead.inference.config_open_loop import OpenLoopConfig as CarlaOpenLoopConfig
+from lead.training.config_training import TrainingConfig as CarlaTrainingConfig
 import numpy as np
 
 logger =logging.getLogger(__name__)
@@ -41,8 +41,9 @@ class CarlaTransfuserAgent(AbstractAgent):
 
         self._config = config
 
-        self._checkpoint_path = checkpoint_path.rsplit("/", 1)[0]
-        self._model_filename = checkpoint_path.rsplit("/", 1)[1]
+        if checkpoint_path is not None:
+            self._checkpoint_path = checkpoint_path.rsplit("/", 1)[0]
+            self._model_filename = checkpoint_path.rsplit("/", 1)[1]
 
     def name(self) -> str:
         """Inherited, see superclass."""

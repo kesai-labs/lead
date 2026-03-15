@@ -2,6 +2,22 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Pretrain NAVSIM",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "lead/training/train.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "logdir=outputs/local_training/pretrain",
+                "use_navsim_data=true",
+                "use_carla_data=false", "LTF=true", "epochs=61"
+            ],
+            "env": {
+                "PYTHONDONTWRITEBYTECODE": "1"
+            }
+        },
+        {
             "name": "Expert Py123D Gen Data",
             "type": "debugpy",
             "request": "launch",

@@ -1,5 +1,6 @@
 import glob
 import gzip
+import logging
 import os
 import pickle
 import time
@@ -18,6 +19,8 @@ from lead.common.constants import (
 )
 from lead.data_loader import carla_dataset_utils, navsim_dataset_utils
 from lead.training.config_training import TrainingConfig
+
+LOG = logging.getLogger(__name__)
 
 
 class NavsimData(Dataset):
@@ -50,7 +53,7 @@ class NavsimData(Dataset):
             assert len(self._feature) == len(self._target), (
                 f"Mismatch in number of files. Found {len(self._feature)} features and {len(self._target)} targets."
             )
-            print(
+            LOG.info(
                 f"NavSim: Found {len(self._feature)} samples. Upsampled to {self.size} samples"
             )
 
@@ -124,7 +127,7 @@ class NavsimData(Dataset):
         feature, target = cache[target_path]
 
         rgb = cv2.imdecode(
-            np.frombuffer(feature["camera_feature"], np.uint8), cv2.IMREAD_COLOR
+            feature["camera_feature"].detach().cpu().numpy(), cv2.IMREAD_COLOR
         )
         rgb = np.transpose(rgb, (2, 0, 1))  # HWC to CHW
 

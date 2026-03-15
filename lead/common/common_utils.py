@@ -7,6 +7,7 @@ import pickletools
 from typing import Any
 
 import carla
+import cv2
 import jaxtyping as jt
 import numpy as np
 import numpy.typing as npt
@@ -839,3 +840,29 @@ def project_points_to_image(
 def rgb(r, g, b):
     """Help function to create RGB color tuples. Does not do much except for improving code readability with VSCode extension"""
     return (r, g, b)
+
+
+def fov_crop(
+    img: npt.NDArray,
+    crop_pixels: int,
+    chw: bool = False,
+    interpolation: int = cv2.INTER_LINEAR,
+) -> npt.NDArray:
+    """Crop `crop_pixels` from left and right and resize back to original width.
+
+    Supports (C, H, W) when chw=True, and (H, W) / (H, W, C) otherwise.
+    """
+    if chw:
+        _, h, w = img.shape
+        img = np.transpose(img, (1, 2, 0))  # -> (H, W_crop, C)
+        img = img[:, crop_pixels:-crop_pixels, :]
+        img = cv2.resize(img, (w, h), interpolation=interpolation)
+        return np.transpose(img, (2, 0, 1))  # -> (C, H, W)
+    else:
+        h, w = img.shape[:2]
+        img = (
+            img[:, crop_pixels:-crop_pixels]
+            if img.ndim == 2
+            else img[:, crop_pixels:-crop_pixels, :]
+        )
+        return cv2.resize(img, (w, h), interpolation=interpolation)

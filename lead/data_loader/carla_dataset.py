@@ -685,28 +685,13 @@ class CARLAData(Dataset):
         # Horizontal FOV reduction: crop left and right, then resize back
         if self.config.horizontal_fov_reduction > 0:
             crop_pixels = self.config.horizontal_fov_reduction
-            # RGB: (C, H, W)
-            if data["rgb"] is not None:
-                _, h, w = data["rgb"].shape
-                data["rgb"] = data["rgb"][:, :, crop_pixels:-crop_pixels]
-                data["rgb"] = np.transpose(data["rgb"], (1, 2, 0))  # -> (H, W_crop, C)
-                data["rgb"] = cv2.resize(
-                    data["rgb"], (w, h), interpolation=cv2.INTER_LINEAR
-                )
-                data["rgb"] = np.transpose(data["rgb"], (2, 0, 1))  # -> (C, H, W)
-            # Depth: (H, W)
-            if data.get("depth") is not None:
-                h, w = data["depth"].shape
-                data["depth"] = data["depth"][:, crop_pixels:-crop_pixels]
-                data["depth"] = cv2.resize(
-                    data["depth"], (w, h), interpolation=cv2.INTER_LINEAR
-                )
-            # Semantic: (H, W)
-            if data.get("semantic") is not None:
-                h, w = data["semantic"].shape
-                data["semantic"] = data["semantic"][:, crop_pixels:-crop_pixels]
-                data["semantic"] = cv2.resize(
-                    data["semantic"], (w, h), interpolation=cv2.INTER_NEAREST
+            if data["rgb"] is not None:  # (C, H, W)
+                data["rgb"] = common_utils.fov_crop(data["rgb"], crop_pixels, chw=True)
+            if data.get("depth") is not None:  # (H, W)
+                data["depth"] = common_utils.fov_crop(data["depth"], crop_pixels)
+            if data.get("semantic") is not None:  # (H, W)
+                data["semantic"] = common_utils.fov_crop(
+                    data["semantic"], crop_pixels, interpolation=cv2.INTER_NEAREST
                 )
 
         return data

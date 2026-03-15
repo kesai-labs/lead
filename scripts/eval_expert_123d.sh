@@ -23,6 +23,9 @@ rm -rf data/expert_debug/buckets
 rm -rf data/expert_debug/data
 rm -rf data/expert_debug/results
 
+# Reset CARLA World
+python3 scripts/reset_carla_world.py
+
 # Start the evaluation
 export LEAD_EXPERT_CONFIG="target_dataset=6 py123d_data_format=true use_radars=false lidar_stack_size=2 save_only_non_ground_lidar=false save_lidar_only_inside_bev=false"
 python -u 3rd_party/leaderboard_autopilot/leaderboard/leaderboard_evaluator_local.py \

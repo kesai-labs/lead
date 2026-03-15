@@ -24,6 +24,21 @@ warnings.filterwarnings("error")
 warnings.filterwarnings(
     "ignore", message="Grad strides do not match bucket view strides"
 )
+warnings.filterwarnings(
+    "ignore",
+    category=DeprecationWarning,
+    message=r".*argument 'device' of Tensor\.pin_memory\(\) is deprecated.*",
+)
+warnings.filterwarnings(
+    "ignore",
+    category=DeprecationWarning,
+    message=r".*argument 'device' of Tensor\.is_pinned\(\) is deprecated.*",
+)
+warnings.filterwarnings(
+    "ignore",
+    category=DeprecationWarning,
+    message=r".*Caught DeprecationWarning in pin memory thread.*",
+)
 warnings.filterwarnings("ignore", category=UserWarning, message=".*epoch parameter.*")
 warnings.filterwarnings(
     "ignore",

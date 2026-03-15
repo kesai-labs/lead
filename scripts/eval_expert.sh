@@ -23,6 +23,9 @@ rm -rf data/expert_debug/buckets
 rm -rf data/expert_debug/data
 rm -rf data/expert_debug/results
 
+# Reset CARLA World
+python3 scripts/reset_carla_world.py
+
 # Start the evaluation
 python -u 3rd_party/leaderboard_autopilot/leaderboard/leaderboard_evaluator_local.py \
     --port=2000 \
