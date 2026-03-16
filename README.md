@@ -118,7 +118,7 @@ ln -s /your/carla/path 3rd_party/CARLA_0915
 
 ### 3. Download checkpoints
 
-Pre-trained checkpoints are hosted on HuggingFace.
+Pre-trained checkpoints are hosted on HuggingFace. To reproduce the numbers, please turn on the Kalman filter and stop-sign heuristic.
 
 <div align="center">
 
@@ -397,16 +397,16 @@ When debugging policy / expert, the script `scripts/reset_carla_world.py` can be
 
 The LEAD pipeline and TFv6 models are deployed as **reference implementations and benchmark entries** across multiple autonomous driving simulators and evaluation suites:
 
-* **[Waymo Vision-based End-to-End Driving Challenge (DiffusionLTF)](https://waymo.com/open/challenges/2025/e2e-driving/)**
+* [Waymo Vision-based End-to-End Driving Challenge (DiffusionLTF)](https://waymo.com/open/challenges/2025/e2e-driving/)
   Strong baseline entry for the inaugural end-to-end driving challenge hosted by Waymo, achieving **2nd place** in the final leaderboard.
 
-* **[NAVSIM v1 (LTFv6)](https://huggingface.co/spaces/AGC2024-P/e2e-driving-navtest)**
+* [NAVSIM v1 (LTFv6)](https://huggingface.co/spaces/AGC2024-P/e2e-driving-navtest)
   Latent TransFuser v6 is an updated reference baseline for the `navtest` split, improving PDMS by +3 points over the Latent TransFuser baseline, used to evaluate navigation and control under diverse driving conditions.
 
-* **[NAVSIM v2 (LTFv6)](https://huggingface.co/spaces/AGC2025/e2e-driving-navhard)**
+* [NAVSIM v2 (LTFv6)](https://huggingface.co/spaces/AGC2025/e2e-driving-navhard)
   The same Latent TransFuser v6 improves EPMDS by +6 points over the Latent TransFuser baseline, targeting distribution shift and scenario complexity.
 
-* **[NVIDIA AlpaSim Simulator (TransFuserModel)](https://github.com/NVlabs/alpasim)**
+* [NVIDIA AlpaSim Simulator (TransFuserModel)](https://github.com/NVlabs/alpasim)
   Adapting the NAVSIM's Latent TransFuser v6 checkpoints, AlpaSim also features an official TransFuser driver, serving as a baseline policy for closed-loop simulation.
 
 ## Further Documentation
