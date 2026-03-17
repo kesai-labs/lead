@@ -14,9 +14,9 @@
   <br><br>
   An open-source end-to-end driving stack for CARLA, achieving state-of-the-art closed-loop performance across all major Leaderboard 2.0 benchmarks 🏆
   <br><br>
-<img src="https://img.shields.io/badge/Bench2Drive-95.2-blue?style=flat" alt="Bench2Drive">
-<img src="https://img.shields.io/badge/Longest6 V2-62-blue?style=flat" alt="Longest6 V2">
-<img src="https://img.shields.io/badge/Town13-5.2-blue?style=flat" alt="Town13">
+  <img src="https://img.shields.io/badge/Bench2Drive-95.2 🏆-0F6E56?style=flat&labelColor=1D9E75" alt="Bench2Drive">
+  <img src="https://img.shields.io/badge/Longest6_V2-62 🏆-185FA5?style=flat&labelColor=378ADD" alt="Longest6 V2">
+  <img src="https://img.shields.io/badge/Town13-5.2 🏆-854F0B?style=flat&labelColor=BA7517" alt="Town13">
   <br>
 </p>
 
@@ -25,15 +25,16 @@
 
 - [Table of Contents](#table-of-contents)
 - [Updates](#updates)
-- [Quick Start](#quick-start)
+- [Quick Start CARLA Leaderboard](#quick-start-carla-leaderboard)
   - [1. Environment initialization](#1-environment-initialization)
   - [2. Install dependencies](#2-install-dependencies)
   - [3. Download checkpoints](#3-download-checkpoints)
   - [4. Setup VSCode/PyCharm](#4-setup-vscodepycharm)
   - [5. Evaluate model](#5-evaluate-model)
-  - [6. \[Optional\] Infraction Analysis](#6-optional-infraction-analysis)
+  - [6. \[Optional\] Infraction Analysis Webapp](#6-optional-infraction-analysis-webapp)
 - [CARLA Training](#carla-training)
-- [Data Collection](#data-collection)
+- [CARLA Data Collection](#carla-data-collection)
+- [CARLA 123D Data Collection](#carla-123d-data-collection)
 - [CARLA Benchmarking](#carla-benchmarking)
 - [NAVSIM Training and Evaluation](#navsim-training-and-evaluation)
 - [Project Structure](#project-structure)
@@ -46,30 +47,30 @@
 
 ## Updates
 
-- **`[2026/25/02]`** LEAD is accepted to CVPR 2026! 🎉
+- **`[2026.25.02]`** LEAD is accepted to CVPR 2026! 🎉
 
-- **`[2026/25/02]`** NAVSIM extension released
+- **`[2026.25.02]`** NAVSIM extension released.
   > Code and [instructions](https://github.com/autonomousvision/lead?tab=readme-ov-file#navsim-training-and-evaluation) released. Supplementary data coming soon.
 
-- **`[2026/02/02]`** Preliminary support for [Py123D](https://github.com/autonomousvision/py123d)
-  > Collecting, loading and visualizing driving data in unified data format.
+- **`[2026.02.02]`** Preliminary support for [123D](https://github.com/autonomousvision/py123d).
+  > Collecting, loading and visualizing driving data in unified data format. See [instructions](https://github.com/autonomousvision/lead?tab=readme-ov-file#carla-123d-data-collection).
 
-- **`[2026/01/18]`** Deactivated Kalman filter
-  > By default, we deactivate the Kalman filter introduced in [TFv3](https://www.cvlibs.net/publications/Chitta2022PAMI.pdf). To turn the kalman filter on, set `use_kalman_filter=True` in [config_closed_loop.py](lead/inference/config_closed_loop.py).
+- **`[2026.01.18]`** Deactivated Kalman filter.
+  > By default, we deactivate the Kalman filter introduced in [TFv3](https://www.cvlibs.net/publications/Chitta2022PAMI.pdf). To turn the kalman filter on, set `use_kalman_filter=True` in [config_closed_loop](lead/inference/config_closed_loop.py).
 
-- **`[2026/01/13]`** CARLA dataset and training documentation released
+- **`[2026.01.13]`** CARLA dataset and training documentation released.
   > We publicly release the CARLA dataset to reproduce the paper's main results. The released dataset differs to the original dataset used in our experiments due to refactoring.
 
-- **`[2026/01/05]`** Deactivated stop-sign heuristic
-  > By default, we deactivate explicit stop-sign handling introduced in [TF++/TFv4](https://arxiv.org/abs/2306.07957). To turn the heuristic on, set `slower_for_stop_sign=True` in [config_closed_loop.py](lead/inference/config_closed_loop.py).
+- **`[2026.01.05]`** Deactivated stop-sign heuristic.
+  > By default, we deactivate explicit stop-sign handling introduced in [TFv4](https://arxiv.org/abs/2306.07957). To turn the heuristic on, set `slower_for_stop_sign=True` in [config_closed_loop](lead/inference/config_closed_loop.py).
 
-- **`[2026/01/05]`** RoutePlanner bug fix
+- **`[2026.01.05]`** RoutePlanner bug fix.
   > Fixed an index error that caused the driving policy to crash at the end of routes in Town13. Driving scores have been updated accordingly.
 
-- **`[2025/12/24]`** Initial release
+- **`[2025.12.24]`** Initial release.
   > Paper, checkpoints, expert driver, and inference code are now available.
 
-## Quick Start
+## Quick Start CARLA Leaderboard
 
 ### 1. Environment initialization
 
@@ -78,9 +79,15 @@ Clone the repository and map the project root to your environment:
 ```bash
 git clone https://github.com/autonomousvision/lead.git
 cd lead
-echo -e "export LEAD_PROJECT_ROOT=$(pwd)" >> ~/.bashrc  # Set project root variable
-echo "source $(pwd)/scripts/main.sh" >> ~/.bashrc       # Persist more environment variables
-source ~/.bashrc                                        # Reload config
+
+# Set project root variable
+echo -e "export LEAD_PROJECT_ROOT=$(pwd)" >> ~/.bashrc
+
+# Activate project's hook
+echo "source $(pwd)/scripts/main.sh" >> ~/.bashrc
+
+# Reload shell's config
+source ~/.bashrc
 ```
 
 Please verify that `~/.bashrc` reflects these paths correctly.
@@ -90,7 +97,7 @@ Please verify that `~/.bashrc` reflects these paths correctly.
 We utilize Miniconda, conda-lock and uv:
 
 ```bash
-# Install conda-lock and create conda environment
+# Create conda environment
 pip install conda-lock && conda-lock install -n lead conda-lock.yml
 
 # Activate conda environment
@@ -136,10 +143,10 @@ Pre-trained checkpoints are hosted on HuggingFace. To reproduce the numbers, ple
 To download checkpoints:
 
 ```bash
-# Either download one for test purpose
+# Download one checkpoint for test purpose
 bash scripts/download_one_checkpoint.sh
 
-# Or clone them all (>10GB)
+# Download all checkpoints
 git clone https://huggingface.co/ln2697/tfv6 outputs/checkpoints
 cd outputs/checkpoints
 git lfs pull
@@ -188,26 +195,15 @@ outputs/local_evaluation/1_town15_construction
 └── qualitative_results.mp4
 ```
 
-### 6. [Optional] Infraction Analysis
+### 6. [Optional] Infraction Analysis Webapp
 
-Launch the interactive infraction dashboard to analyze driving failures:
+Launch the interactive infraction dashboard to analyze driving failures. This feature is especially useful for working with Longest6 or Town13 benchmarks, where iterating evaluation logs is time-consuming:
 
 ```bash
 python lead/infraction_webapp/app.py
 ```
 
-Navigate to http://localhost:5000, fill the input field with `outputs/local_evaluation`. Video below shows a short tutorial of the dashboard.
-
-<div align="center">
-
-https://github.com/user-attachments/assets/81954b7c-4153-45d1-90a8-80cb426ccb70
-
-</div>
-
-> [!TIP]
-> 1. Disable video recording in [config_closed_loop](lead/inference/config_closed_loop.py) by turning off `produce_demo_video` and `produce_debug_video`.
-> 2. If memory is limited, modify the file prefixes to load only the first checkpoint seed. By default, the pipeline loads all three seeds as an ensemble.
-> 3. To save time, decrease video FPS in [config_closed_loop](lead/inference/config_closed_loop.py) by increasing `produce_frame_frequency`.
+Navigate to http://localhost:5000, fill the input field with `outputs/local_evaluation`.
 
 ## CARLA Training
 
@@ -236,7 +232,7 @@ Perception pretraining. Training logs and checkpoints will be saved to `outputs/
 python3 lead/training/train.py \
   logdir=outputs/local_training/pretrain
 
-# Or Torch DDP
+# Or Torch Distributed Data Parallel
 bash scripts/pretrain_ddp.sh
 ```
 
@@ -249,7 +245,7 @@ python3 lead/training/train.py \
   load_file=outputs/local_training/pretrain/model_0030.pth \
   use_planning_decoder=true
 
-# Distributed Torch DDP
+# Or Torch Distributed Data Parallel
 bash scripts/posttrain_ddp.sh
 ```
 
@@ -258,37 +254,22 @@ bash scripts/posttrain_ddp.sh
 > 2. For a complete SLURM workflow of pre-training, post-training, evaluation, see this [example](slurm/experiments/001_example).
 > 3. For a more detailed documentation, take a look at the [documentation page](https://ln2697.github.io/lead/docs/carla_training.html).
 
-## Data Collection
+## CARLA Data Collection
 
-Assuming CARLA server is running. For data collection of one route, we either support running benchmark from Python (recommended, since easy to debug):
+Assuming CARLA server is running. For data collection of one route, we either support running benchmark from Python (recommended for debugging):
 
 ```bash
-# CARLA Leaderboard format (recommended)
+# CARLA Leaderboard format
 python lead/leaderboard_wrapper.py \
   --expert \
   --routes data/data_routes/lead/noScenarios/short_route.xml
-
-# Py123D format (still experimental)
-export LEAD_EXPERT_CONFIG="target_dataset=6 \
-  py123d_data_format=true \
-  use_radars=false \
-  lidar_stack_size=2 \
-  save_only_non_ground_lidar=false \
-  save_lidar_only_inside_bev=false"
-python -u $LEAD_PROJECT_ROOT/lead/leaderboard_wrapper.py \
-    --expert \
-    --py123d \
-    --routes data/data_routes/50x38_Town12/ParkingCrossingPedestrian/3250_1.xml
 ```
 
-Or running data collection from bash scripts:
+Or running data collection from classic bash scripts (recommended for high flexibility):
 
 ```bash
-# CARLA Leaderboard format (recommended)
+# CARLA Leaderboard format
 bash scripts/eval_expert.sh
-
-# Py123D format (still experimental)
-bash scripts/eval_expert_123d.sh
 ```
 
 Collected data in CARLA format will be saved to `outputs/expert_evaluation/` with the following sensor outputs:
@@ -316,9 +297,38 @@ Collected data in CARLA format will be saved to `outputs/expert_evaluation/` wit
 > 2. For large-scale data collection on SLURM clusters, see the [data collection documentation](https://ln2697.github.io/lead/docs/data_collection.html).
 > 3. The [Jupyter notebooks](notebooks) provide some example scripts to visualize the collected data.
 
+## CARLA 123D Data Collection
+
+Assuming CARLA server is running. For data collection of one route, we either support running a  Python script (recommended for debugging):
+
+```bash
+# Setting configuration
+export LEAD_EXPERT_CONFIG="target_dataset=6 \
+  py123d_data_format=true \
+  use_radars=false \
+  lidar_stack_size=2 \
+  save_only_non_ground_lidar=false \
+  save_lidar_only_inside_bev=false"
+
+# Start leaderboard
+python -u $LEAD_PROJECT_ROOT/lead/leaderboard_wrapper.py \
+    --expert \
+    --py123d \
+    --routes data/data_routes/50x38_Town12/ParkingCrossingPedestrian/3250_1.xml
+```
+
+Or use classic bash script (recommended for high flexibility):
+
+```bash
+bash scripts/eval_expert_123d.sh
+```
+
+> [!TIP]
+> This feature is still experimental and in development.
+
 ## CARLA Benchmarking
 
-Assuming CARLA server is running. For debugging, we either support running benchmark from Python (recommended, since easy to debug):
+Assuming CARLA server is running. For debugging, we either support running benchmark from Python (recommended for debugging):
 
 ```bash
 # Bench2Drive
@@ -338,7 +348,7 @@ python lead/leaderboard_wrapper.py \
   --routes data/benchmark_routes/Town13/0.xml
 ```
 
-Or running benchmarks from bash scripts:
+Or running benchmarks from classic bash scripts (recommended for high flexibility):
 
 ```bash
 # Bench2Drive
@@ -360,15 +370,16 @@ Results will be saved to `outputs/local_evaluation/` with videos, infractions, a
 
 ## NAVSIM Training and Evaluation
 
-1. To setup `navtrain` and `navtest` splits, see [3rd_party/navsim_workspace/navsimv1.1/docs/install.md](3rd_party/navsim_workspace/navsimv1.1/docs/install.md).
+1. To setup `navtrain` and `navtest` splits, see [navsimv1.1/docs/install.md](3rd_party/navsim_workspace/navsimv1.1/docs/install.md).
 
-2. Once `navtrain` cache is built, we can start the training. See example workflows at [slurm/experiments/002_navsim_example](slurm/experiments/002_navsim_example).
+2. Once `navtrain` training cache is built, we can start the training. See preception pre-training at [here](slurm/experiments/002_navsim_example/000_pretrain1_0.sh) and planning post-training [here](slurm/experiments/002_navsim_example/010_postrain32_0.sh).
 
-3. To evaluate the trained model on `navtest`, see [slurm/experiments/002_navsim_example/020_navtest_0.sh](slurm/experiments/002_navsim_example/020_navtest_0.sh)
+3. To setup `navhard` split, see [navsimv2.2/docs/install.md](3rd_party/navsim_workspace/navsimv2.2/docs/install.md).
 
-4. To setup `navhard` split, see [3rd_party/navsim_workspace/navsimv2.2/docs/install.md](3rd_party/navsim_workspace/navsimv2.2/docs/install.md).
+4. Evaluations on `navtest` is done with [this script](slurm/experiments/002_navsim_example/020_navtest_0.sh). `navhard` score can be obtained with this script [navhard.sh](slurm/experiments/002_navsim_example/030_navhard_0.sh)
 
-5. To evaluate the trained model on `navhard`, see [slurm/experiments/002_navsim_example/030_navhard_0.sh](slurm/experiments/002_navsim_example/030_navhard_0.sh)
+> [!TIP]
+> 1. Similar to CARLA, we train one seed for perception pre-training and three seeds for planning post-training to estimate performance variance.
 
 ## Project Structure
 
