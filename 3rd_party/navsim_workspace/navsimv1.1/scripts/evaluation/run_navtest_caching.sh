@@ -4,7 +4,7 @@
 #SBATCH --time=1-00:00:00
 #SBATCH --gres=gpu:0
 #SBATCH --cpus-per-task=16
-#SBATCH --partition=a100-galvani
+#SBATCH --partition=day
 #SBATCH --mail-type=FAIL,END
 #SBATCH --mail-user=long.nguyen@student.uni-tuebingen.de
 #SBATCH --mem=200gb

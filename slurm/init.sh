@@ -3,6 +3,8 @@
 set -e
 shopt -s globstar
 
+############################# Init. Create variables when script gets sourced. #############################
+
 # Help to identify the run. Don't change this.
 EXPERIMENT_NAME=$(basename "$(dirname "$(realpath "$0")")") # Directory name is the experiment name
 export EXPERIMENT_NAME
@@ -24,6 +26,8 @@ export EVALUATION_OUTPUT_DIR=$LEAD_PROJECT_ROOT/outputs/evaluation/$EXPERIMENT_R
 export TRAINING_OUTPUT_DIR=$LEAD_PROJECT_ROOT/outputs/training/$EXPERIMENT_RUN_DIR
 EXPERIMENT_SEED=$(basename "$0" ".sh" | awk -F'_' '{print $NF}') # Last part of the script name is the seed
 export EXPERIMENT_SEED
+
+############################# Training #############################
 
 # A function that create environment variables for resuming training from the checkpoint directory
 # Usage: resume <checkpoint_dir>
@@ -109,6 +113,7 @@ function train() {
 		bash slurm/train.sh
 	fi
 }
+############################# CARLA Evaluation #############################
 
 # Evaluate on shorter routes of bench2drive
 # Usage: evaluate <checkpoint_dir>
@@ -164,21 +169,6 @@ function evaluate_longest6() {
 	evaluate "$@"
 }
 
-# Evaluate on navtest
-function evaluate_navtest() {
-	sbatch --job-name $EXPERIMENT_RUN_ID --output $EVALUATION_OUTPUT_DIR/stdout.txt --error $EVALUATION_OUTPUT_DIR/stderr.txt $@ slurm/evaluate_navtest.sh
-}
-
-# Evaluate on warmup_two_stage
-function evaluate_warmup() {
-	sbatch --job-name $EXPERIMENT_RUN_ID --output $EVALUATION_OUTPUT_DIR/stdout.txt --error $EVALUATION_OUTPUT_DIR/stderr.txt $@ slurm/evaluate_warmup_two_stage.sh
-}
-
-# Evaluate on navhard_two_stage
-function evaluate_navhard() {
-	sbatch --job-name $EXPERIMENT_RUN_ID --output $EVALUATION_OUTPUT_DIR/stdout.txt --error $EVALUATION_OUTPUT_DIR/stderr.txt $@ slurm/evaluate_navhard_two_stage.sh
-}
-
 # Evaluate expert agent
 # Usage: evaluate_expert
 function evaluate_expert() {
@@ -217,4 +207,30 @@ function evaluate_expert_longest6() {
 	export EVALUATION_DATASET=longest6
 	export SCRIPT_GENERATOR_PARAMETERS="$SCRIPT_GENERATOR_PARAMETERS --slurm_timeout 0-10:00:00"
 	evaluate_expert "$@"
+}
+
+############################# NAVSIM Evaluation #############################
+function evaluate_navsim() {
+	mkdir -p "$EVALUATION_OUTPUT_DIR"
+	ln -s $CHECKPOINT_DIR/$CHECKPOINT_FILE "$EVALUATION_OUTPUT_DIR/$CHECKPOINT_FILE"
+	ln -s $CHECKPOINT_DIR/config.json "$EVALUATION_OUTPUT_DIR/config.json"
+	ls "$CHECKPOINT_DIR"
+	echo "Starting evaluation $EXPERIMENT_RUN_ID"
+	export EVALUATION_STDOUT=$EVALUATION_OUTPUT_DIR/stdout_${SLURM_JOB_DATE}.txt
+	export EVALUATION_STDERR=$EVALUATION_OUTPUT_DIR/stderr_${SLURM_JOB_DATE}.txt
+	echo "$EVALUATION_STDOUT"
+	echo "$EVALUATION_STDERR"
+	export CHECKPOINT=$EVALUATION_OUTPUT_DIR/$CHECKPOINT_FILE
+	echo "Evaluating $CHECKPOINT on NAVSIM"
+	sbatch --job-name $EXPERIMENT_RUN_ID --output $EVALUATION_OUTPUT_DIR/stdout.txt --error $EVALUATION_OUTPUT_DIR/stderr.txt $@
+}
+
+# Evaluate on navtest
+function evaluate_navtest() {
+	evaluate_navsim $@ slurm/evaluate_navtest.sh
+}
+
+# Evaluate on navhard_two_stage
+function evaluate_navhard() {
+	evaluate_navsim $@ slurm/evaluate_navhard_two_stage.sh
 }
