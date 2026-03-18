@@ -25,6 +25,7 @@ from lead.common.sensor_setup import av_sensor_setup
 from lead.data_loader import carla_dataset_utils, training_cache
 from lead.data_loader.carla_dataset_utils import rasterize_lidar
 from lead.expert import expert_utils
+from lead.inference.alpasim_metric_recorder import AlpaSimMetricRecorder
 from lead.inference.closed_loop_inference import (
     ClosedLoopInference,
     ClosedLoopPrediction,
@@ -100,6 +101,7 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         )
         self.metric_info = {}
         self.meters_travelled = 0.0
+        self.alpasim_recorder: AlpaSimMetricRecorder | None = None
 
         # Infraction tracking
         self.infractions_log = []  # List of {"step": int, "infraction": str}
@@ -138,6 +140,20 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         )
 
         self.set_weather()
+
+        # Set up AlpaSim metric recorder
+        if self.config_closed_loop.produce_alpasim_metric and self.config_closed_loop.save_path is not None:
+            route_id = self.config_closed_loop.route_id
+            output_path = self.config_closed_loop.save_path / "alpasim_metric_log.json"
+            self.alpasim_recorder = AlpaSimMetricRecorder(
+                route_original_name=route_id,
+                output_path=output_path,
+            )
+            self.alpasim_recorder.set_ground_truth_from_global_plan(
+                self._global_plan_world_coord
+            )
+            LOG.info("[SensorAgent] AlpaSim metric recorder initialised -> %s", output_path)
+
         self.initialized = True
 
     def set_weather(self):
@@ -569,6 +585,16 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         )
         input_data["meters_travelled"] = self.meters_travelled
 
+        # Record trajectory step for AlpaSim metrics (privileged world position)
+        if self.alpasim_recorder is not None:
+            transform = self._vehicle.get_transform()
+            self.alpasim_recorder.record_step(
+                x=float(transform.location.x),
+                y=float(transform.location.y),
+                heading=float(np.deg2rad(transform.rotation.yaw)),
+                timestamp=self.step,
+            )
+
         self.control = carla.VehicleControl(
             steer=float(closed_loop_prediction.steer),
             throttle=float(closed_loop_prediction.throttle),
@@ -688,6 +714,13 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         return self.control
 
     def destroy(self, _=None):
+        # Write AlpaSim metric JSON
+        if self.alpasim_recorder is not None:
+            number_collisions = sum(
+                1 for e in self.infractions_log if "Collision" in e.get("infraction", "")
+            )
+            self.alpasim_recorder.save(number_collisions=number_collisions)
+
         # Clean up video recorder
         if hasattr(self, "video_recorder"):
             self.video_recorder.cleanup_and_compress()
@@ -834,6 +867,8 @@ class ForceMovePostProcessor:
     def adjust(
         self, ego_speed: float, current_throttle: float, current_brake: float
     ) -> tuple[float, float]:
+        if not self.config_test_time.sensor_agent_creeping:
+            return current_throttle, current_brake
         if (
             ego_speed < 0.1
         ):  # 0.1 is just an arbitrary low number to threshold when the car is stopped

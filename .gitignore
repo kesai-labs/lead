@@ -168,8 +168,8 @@ slurm-*.out
 3rd_party/navsim_workspace/dataset
 3rd_party/navsim_workspace/exp
 3rd_party/CARLA_0.9.15.tar.gz
-3rd_party/CARLA_0915/
-3rd_party/CARLA_0916/
+3rd_party/CARLA_0915
+3rd_party/CARLA_0916
 3rd_party/carla_route_generator/
 outputs/
 docs/build/

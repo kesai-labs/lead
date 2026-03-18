@@ -47,6 +47,9 @@
 
 ## Updates
 
+- **`[2026.18.03]`** Deactivated creeping heuristic.
+  > By default, we deactive the creeping heuristic introduced in [TFv2](https://kait0.github.io/assets/pdf/master_thesis_bernhard_jaeger.pdf). To turn it back, set `sensor_agent_creeping=True` in [config_closed_loop](lead/inference/config_closed_loop.py).
+
 - **`[2026.25.02]`** LEAD is accepted to CVPR 2026! 🎉
 
 - **`[2026.25.02]`** NAVSIM extension released.

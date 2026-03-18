@@ -55,6 +55,8 @@ class ClosedLoopConfig(OpenLoopConfig):
     sensor_agent_pop_distance_adaptive = True
 
     # --- Creeping Heuristic ---
+    # If true, enable the creeping heuristic that forces the agent to move when stuck
+    sensor_agent_creeping = False
     # Number of frames after which the creep controller starts triggering (larger than red light wait time)
     sensor_agent_stuck_threshold = 1100
     # Number of frames to creep forward when stuck
@@ -264,3 +266,7 @@ class ClosedLoopConfig(OpenLoopConfig):
     def video_fps(self):
         """Calculate video FPS based on frame production frequency."""
         return 20 / self.produce_frame_frequency
+
+    # --- AlpaSim Metric Recording ---
+    # If true, record trajectory and ground-truth data and write <route_id>.json alongside other outputs
+    produce_alpasim_metric = True
