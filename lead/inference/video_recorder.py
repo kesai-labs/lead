@@ -238,6 +238,12 @@ class VideoRecorder:
             processed_images.append(processed_image)
 
         # Concatenate horizontally: [cinematic | BEV]
+        if not processed_images:
+            LOG.warning(
+                "[VideoRecorder] No demo camera images available yet, skipping frame %d",
+                self.step,
+            )
+            return
         concatenated = np.hstack(processed_images)
 
         # Store for grid creation (only if grid features are enabled)

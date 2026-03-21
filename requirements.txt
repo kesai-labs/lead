@@ -330,3 +330,4 @@ zstd==1.5.7.2
 ipython_beartype==0.2.0
 pytest==9.0.2
 pytest-cov==7.0.0
+gymnasium==1.2.3

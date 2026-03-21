@@ -37,6 +37,7 @@
 - [CARLA Data Collection](#carla-data-collection)
 - [CARLA 123D Data Collection](#carla-123d-data-collection)
 - [CARLA Benchmarking](#carla-benchmarking)
+- [CaRL Agent Evaluation](#carl-agent-evaluation)
 - [NAVSIM Training and Evaluation](#navsim-training-and-evaluation)
 - [Project Structure](#project-structure)
 - [Common Issues](#common-issues)
@@ -52,17 +53,18 @@
 
 <div align="center">
 
-| Date | Content |
-|:--|:--|
-| **26.03.18** | Deactivated creeping heuristic. Set `sensor_agent_creeping=True` in [config_closed_loop](lead/inference/config_closed_loop.py) to re-enable. |
-| **26.02.25** | LEAD is accepted to **CVPR 2026**!|
-| **26.02.25** | NAVSIM extension released. Code and [instructions](#navsim-training-and-evaluation) available. Supplementary data coming soon. |
-| **26.02.02** | Preliminary support for [123D](https://github.com/autonomousvision/py123d). See [instructions](#carla-123d-data-collection). |
-| **26.01.18** | Deactivated Kalman filter. Set `use_kalman_filter=True` in [config_closed_loop](lead/inference/config_closed_loop.py) to re-enable. |
-| **26.01.13** | CARLA dataset and training documentation released. |
-| **26.01.05** | Deactivated stop-sign heuristic. Set `slower_for_stop_sign=True` in [config_closed_loop](lead/inference/config_closed_loop.py) to re-enable. |
-| **26.01.05** | RoutePlanner bug fix — fixed an index error causing crashes at end of routes in Town13. |
-| **25.12.24** | Initial release — paper, checkpoints, expert driver, and inference code. |
+| Date         | Content                                                                                                                                        |
+| :----------- | :--------------------------------------------------------------------------------------------------------------------------------------------- |
+| **26.03.21** | Added evaluation support for the RL planner [CaRL](https://github.com/autonomousvision/carl), see [instructions](#carl-agent-evaluation). |
+| **26.03.18** | Deactivated creeping heuristic. Set `sensor_agent_creeping=True` in [config_closed_loop](lead/inference/config_closed_loop.py) to re-enable.   |
+| **26.02.25** | LEAD is accepted to **CVPR 2026**!                                                                                                             |
+| **26.02.25** | NAVSIM extension released. Code and [instructions](#navsim-training-and-evaluation) available. Supplementary data coming soon.                 |
+| **26.02.02** | Preliminary support for [123D](https://github.com/autonomousvision/py123d). See [instructions](#carla-123d-data-collection).                   |
+| **26.01.18** | Deactivated Kalman filter. Set `use_kalman_filter=True` in [config_closed_loop](lead/inference/config_closed_loop.py) to re-enable.            |
+| **26.01.13** | CARLA dataset and training documentation released.                                                                                             |
+| **26.01.05** | Deactivated stop-sign heuristic. Set `slower_for_stop_sign=True` in [config_closed_loop](lead/inference/config_closed_loop.py) to re-enable.   |
+| **26.01.05** | RoutePlanner bug fix — fixed an index error causing crashes at end of routes in Town13.                                                        |
+| **25.12.24** | Initial release — paper, checkpoints, expert driver, and inference code.                                                                       |
 
 </div>
 
@@ -123,20 +125,22 @@ ln -s /your/carla/path 3rd_party/CARLA_0915
 
 ### 3. Download checkpoints
 
-Pre-trained checkpoints are hosted on HuggingFace. To reproduce the published numbers, enable the Kalman filter, stop-sign, and creeping heuristics.
+Pre-trained checkpoints are hosted on HuggingFace. To reproduce the published results, enable the Kalman filter, stop-sign, and creeping heuristics. Performance without these heuristics (fully end-to-end) should be comparable to performance with them.
 
 <div align="center">
 
-| Variant | Bench2Drive | Longest6 v2 | Town13 | Checkpoint |
-|:--|:-:|:-:|:-:|:-:|
-| Full TransFuser V6 | **95.2** | **62** | **5.24** | [Link](https://huggingface.co/ln2697/tfv6/tree/main/tfv6_regnety032) |
-| ResNet34 (60M params) | 94.7 | 57 | 5.01 | [Link](https://huggingface.co/ln2697/tfv6/tree/main/tfv6_resnet34) |
-| + Rear camera | 95.1 | 53 | TBD | [Link](https://huggingface.co/ln2697/tfv6/tree/main/4cameras_resnet34) |
-| − Radar | 94.7 | 52 | TBD | [Link](https://huggingface.co/ln2697/tfv6/tree/main/noradar_resnet34) |
-| Vision only | 91.6 | 43 | TBD | [Link](https://huggingface.co/ln2697/tfv6/tree/main/visiononly_resnet34) |
-| Town13 held out | 93.1 | 52 | 3.52 | [Link](https://huggingface.co/ln2697/tfv6/tree/main/town13heldout_resnet34) |
+| Variant                | Bench2Drive | Longest6 v2 |  Town13  |                                 Checkpoint                                  |
+| :--------------------- | :---------: | :---------: | :------: | :-------------------------------------------------------------------------: |
+| Full TransFuser V6     |   **95**    |   **62**    | **5.24** |    [Link](https://huggingface.co/ln2697/tfv6/tree/main/tfv6_regnety032)     |
+| ResNet34 (60M params)  |     94      |     57      |   5.01   |     [Link](https://huggingface.co/ln2697/tfv6/tree/main/tfv6_resnet34)      |
+| &ensp; + Rear camera   |     95      |     53      |   TBD    |   [Link](https://huggingface.co/ln2697/tfv6/tree/main/4cameras_resnet34)    |
+| &ensp; − Radar         |     94      |     52      |   TBD    |    [Link](https://huggingface.co/ln2697/tfv6/tree/main/noradar_resnet34)    |
+| &ensp; Vision only     |     91      |     43      |   TBD    |  [Link](https://huggingface.co/ln2697/tfv6/tree/main/visiononly_resnet34)   |
+| &ensp; Town13 held out |     93      |     52      |   3.52   | [Link](https://huggingface.co/ln2697/tfv6/tree/main/town13heldout_resnet34) |
 
 </div>
+
+Download the checkpoints:
 
 ```bash
 # Download one checkpoint for testing
@@ -177,21 +181,21 @@ Driving logs are saved to `outputs/local_evaluation/<route_id>/`:
 
 <div align="center">
 
-| Output | Description |
-|:--|:--|
-| `*_debug.mp4` | Debug visualization video |
-| `*_demo.mp4` | Demo video |
-| `*_grid.mp4` | Grid visualization video |
-| `*_input.mp4` | Raw input video |
-| `alpasim_metric_log.json` | AlpaSim metric log |
-| `checkpoint_endpoint.json` | Checkpoint endpoint metadata |
-| `infractions.json` | Detected infractions |
-| `metric_info.json` | Evaluation metrics |
-| `debug_images/` | Per-frame debug visualizations |
-| `demo_images/` | Per-frame demo images |
-| `grid_images/` | Per-frame grid visualizations |
-| `input_images/` | Per-frame raw inputs |
-| `input_log/` | Input log data |
+| Output                     | Description                    |
+| :------------------------- | :----------------------------- |
+| `*_debug.mp4`              | Debug visualization video      |
+| `*_demo.mp4`               | Demo video                     |
+| `*_grid.mp4`               | Grid visualization video       |
+| `*_input.mp4`              | Raw input video                |
+| `alpasim_metric_log.json`  | AlpaSim metric log             |
+| `checkpoint_endpoint.json` | Checkpoint endpoint metadata   |
+| `infractions.json`         | Detected infractions           |
+| `metric_info.json`         | Evaluation metrics             |
+| `debug_images/`            | Per-frame debug visualizations |
+| `demo_images/`             | Per-frame demo images          |
+| `grid_images/`             | Per-frame grid visualizations  |
+| `input_images/`            | Per-frame raw inputs           |
+| `input_log/`               | Input log data                 |
 
 </div>
 
@@ -281,22 +285,22 @@ Collected data is saved to `outputs/expert_evaluation/` with the following struc
 
 <div align="center">
 
-| Directory | Content |
-|:--|:--|
-| `bboxes/` | 3D bounding boxes per frame |
-| `depth/` | Compressed and quantized depth maps |
-| `depth_perturbated/` | Depth from perturbated ego state |
-| `hdmap/` | Ego-centric rasterized HD map |
-| `hdmap_perturbated/` | HD map aligned to perturbated ego pose |
-| `lidar/` | LiDAR point clouds |
-| `metas/` | Per-frame metadata and ego state |
-| `radar/` | Radar detections |
-| `radar_perturbated/` | Radar from perturbated ego state |
-| `rgb/` | RGB images |
-| `rgb_perturbated/` | RGB from perturbated ego state |
-| `semantics/` | Semantic segmentation maps |
-| `semantics_perturbated/` | Semantics from perturbated ego state |
-| `results.json` | Route-level summary and evaluation metadata |
+| Directory                | Content                                     |
+| :----------------------- | :------------------------------------------ |
+| `bboxes/`                | 3D bounding boxes per frame                 |
+| `depth/`                 | Compressed and quantized depth maps         |
+| `depth_perturbated/`     | Depth from perturbated ego state            |
+| `hdmap/`                 | Ego-centric rasterized HD map               |
+| `hdmap_perturbated/`     | HD map aligned to perturbated ego pose      |
+| `lidar/`                 | LiDAR point clouds                          |
+| `metas/`                 | Per-frame metadata and ego state            |
+| `radar/`                 | Radar detections                            |
+| `radar_perturbated/`     | Radar from perturbated ego state            |
+| `rgb/`                   | RGB images                                  |
+| `rgb_perturbated/`       | RGB from perturbated ego state              |
+| `semantics/`             | Semantic segmentation maps                  |
+| `semantics_perturbated/` | Semantics from perturbated ego state        |
+| `results.json`           | Route-level summary and evaluation metadata |
 
 </div>
 
@@ -335,11 +339,11 @@ Output in 123D format is saved to `data/carla_leaderboard2_py123d/`:
 
 <div align="center">
 
-| Directory | Content |
-|:--|:--|
+| Directory            | Content                                |
+| :------------------- | :------------------------------------- |
 | `logs/train/*.arrow` | Per-route driving logs in Arrow format |
-| `logs/train/*.json` | Per-route metadata |
-| `maps/carla/*.arrow` | Map data in Arrow format |
+| `logs/train/*.json`  | Per-route metadata                     |
+| `maps/carla/*.arrow` | Map data in Arrow format               |
 
 </div>
 
@@ -361,11 +365,11 @@ python lead/leaderboard_wrapper.py \
 
 <div align="center">
 
-| Benchmark | Route file | Extra flag |
-|:--|:--|:--|
+| Benchmark   | Route file                                    | Extra flag      |
+| :---------- | :-------------------------------------------- | :-------------- |
 | Bench2Drive | `data/benchmark_routes/bench2drive/23687.xml` | `--bench2drive` |
-| Longest6 v2 | `data/benchmark_routes/longest6/00.xml` | — |
-| Town13 | `data/benchmark_routes/Town13/0.xml` | — |
+| Longest6 v2 | `data/benchmark_routes/longest6/00.xml`       | —               |
+| Town13      | `data/benchmark_routes/Town13/0.xml`          | —               |
 
 </div>
 
@@ -386,6 +390,33 @@ Results are saved to `outputs/local_evaluation/` with videos, infractions, and m
 
 ---
 
+## CaRL Agent Evaluation
+
+With CARLA running, evaluate the CaRL agent via **Python**:
+
+```bash
+CUBLAS_WORKSPACE_CONFIG=:4096:8 \
+python lead/leaderboard_wrapper.py \
+  --checkpoint outputs/checkpoints/CaRL \
+  --routes data/benchmark_routes/bench2drive/24240.xml \
+  --carl-agent \
+  --bench2drive \
+  --timeout 900
+```
+
+Or via **bash**:
+
+```bash
+bash scripts/eval_carl.sh
+```
+
+The results are in `outputs/local_evaluation/<route_id>/`.
+
+> [!TIP]
+> With small code changes, you can also integrate CaRL into LEAD's expert-driving pipeline as a hybrid expert policy.
+
+---
+
 ## NAVSIM Training and Evaluation
 
 **Setup.** Install `navtrain` and `navtest` splits following [navsimv1.1/docs/install.md](3rd_party/navsim_workspace/navsimv1.1/docs/install.md), then install the `navhard` split following [navsimv2.2/docs/install.md](3rd_party/navsim_workspace/navsimv2.2/docs/install.md).
@@ -402,15 +433,15 @@ The project is organized into the following top-level directories. See the [full
 
 <div align="center">
 
-| Directory | Purpose |
-|:--|:--|
-| `lead/` | Main package — model architecture, training, inference, expert driver |
-| `3rd_party/` | Third-party dependencies (CARLA, benchmarks, evaluation tools) |
-| `data/` | Route definitions and sensor data |
-| `scripts/` | Utility scripts for data processing, training, and evaluation |
-| `outputs/` | Checkpoints, evaluation results, and visualizations |
-| `notebooks/` | Jupyter notebooks for data inspection and analysis |
-| `slurm/` | SLURM job scripts for large-scale experiments |
+| Directory    | Purpose                                                               |
+| :----------- | :-------------------------------------------------------------------- |
+| `lead/`      | Main package — model architecture, training, inference, expert driver |
+| `3rd_party/` | Third-party dependencies (CARLA, benchmarks, evaluation tools)        |
+| `data/`      | Route definitions. Sensor data will be stored here, too.              |
+| `scripts/`   | Utility scripts for data processing, training, and evaluation         |
+| `outputs/`   | Checkpoints, evaluation results, and visualizations                   |
+| `notebooks/` | Jupyter notebooks for data inspection and analysis                    |
+| `slurm/`     | SLURM job scripts for large-scale experiments                         |
 
 </div>
 
@@ -418,29 +449,27 @@ The project is organized into the following top-level directories. See the [full
 
 ## Common Issues
 
-Most issues can be resolved by:
-
-| Fix | When to try |
-|:--|:--|
-| Delete and rebuild training cache / buckets | Stale or corrupted data errors |
-| Restart CARLA simulator | Simulator hangs or unresponsive |
-| Restart leaderboard | Route or evaluation failures |
-| Run `scripts/reset_carla_world.py` | Need to reset the map without restarting CARLA (much faster on large maps) |
+| Symptom                                        | Fix                                                            |
+| :--------------------------------------------- | :------------------------------------------------------------- |
+| Stale or corrupted data errors                 | Delete and rebuild the training cache / buckets                |
+| Simulator hangs or is unresponsive             | Restart the CARLA simulator                                    |
+| Route or evaluation failures                   | Restart the leaderboard                                        |
+| Need to reset the map without restarting CARL  | Run `scripts/reset_carla_world.py` (much faster on large maps) |
 
 ---
 
 ## Beyond CARLA: Cross-Benchmark Deployment
 
-The LEAD pipeline and TFv6 models serve as reference implementations across multiple autonomous driving platforms:
+The LEAD pipeline and TFv6 models serve as reference implementations across multiple E2E driving platforms:
 
 <div align="center">
 
-| Platform | Model | Highlight |
-|:--|:--|:--|
-| [Waymo E2E Driving Challenge](https://waymo.com/open/challenges/2025/e2e-driving/) | DiffusionLTF | **2nd place** in the inaugural vision-based E2E driving challenge |
-| [NAVSIM v1](https://huggingface.co/spaces/AGC2024-P/e2e-driving-navtest) | LTFv6 | +3 PDMS over Latent TransFuser baseline on `navtest` |
-| [NAVSIM v2](https://huggingface.co/spaces/AGC2025/e2e-driving-navhard) | LTFv6 | +6 EPMDS over Latent TransFuser baseline on `navhard` |
-| [NVIDIA AlpaSim](https://github.com/NVlabs/alpasim) | TransFuserModel | Official baseline policy for closed-loop simulation |
+| Platform                                                                           | Model           | Highlight                                                         |
+| :--------------------------------------------------------------------------------- | :-------------- | :---------------------------------------------------------------- |
+| [Waymo E2E Driving Challenge](https://waymo.com/open/challenges/2025/e2e-driving/) | DiffusionLTF    | **2nd place** in the inaugural vision-based E2E driving challenge |
+| [NAVSIM v1](https://huggingface.co/spaces/AGC2024-P/e2e-driving-navtest)           | LTFv6           | +3 PDMS over Latent TransFuser baseline on `navtest`              |
+| [NAVSIM v2](https://huggingface.co/spaces/AGC2025/e2e-driving-navhard)             | LTFv6           | +6 EPMDS over Latent TransFuser baseline on `navhard`             |
+| [NVIDIA AlpaSim](https://github.com/NVlabs/alpasim)                                | TransFuserModel | Official baseline policy for closed-loop simulation               |
 
 </div>
 
@@ -451,8 +480,10 @@ The LEAD pipeline and TFv6 models serve as reference implementations across mult
 For a deeper dive, visit the [full documentation site](https://ln2697.github.io/lead/docs):
 
 <p align="center">
-  <a href="https://ln2697.github.io/lead/docs/data_collection.html">Data Collection</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="https://ln2697.github.io/lead/docs/carla_training.html">Training</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="https://ln2697.github.io/lead/docs/evaluation.html">Evaluation</a>
+<a href="https://ln2697.github.io/lead/docs/data_collection.html">Data Collection</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="https://ln2697.github.io/lead/docs/carla_training.html">Training</a>&nbsp;&nbsp;·&nbsp;&nbsp;<a href="https://ln2697.github.io/lead/docs/evaluation.html">Evaluation</a>.
 </p>
+
+The documentation will be updated regularly.
 
 ---
 

@@ -36,6 +36,7 @@ class ModeConfig:
     @staticmethod
     def get_mode_config(
         is_expert: bool,
+        is_carl_agent: bool,
         is_bench2drive: bool,
         checkpoint: str | None,
         routes: str,
@@ -64,6 +65,17 @@ class ModeConfig:
                 agent_file,
                 routes,
                 None,
+                "MAP",
+            )
+
+        if is_carl_agent:
+            return (
+                LeaderboardType.BENCH2DRIVE
+                if is_bench2drive
+                else LeaderboardType.STANDARD,
+                "lead/carl_agent/carl_agent.py",
+                checkpoint,
+                checkpoint,
                 "MAP",
             )
 
@@ -271,12 +283,18 @@ class LeaderboardWrapper:
                 }
             )
         else:
+            save_path = resolved_output_dir
             env_vars.update(
                 {
                     "CHECKPOINT_DIR": checkpoint_dir,
-                    "SAVE_PATH": str(resolved_output_dir),
+                    "SAVE_PATH": str(save_path),
                 }
             )
+            if getattr(self.args, "carl_agent", False):
+                # Required by PyTorch deterministic algorithms when using CuBLAS.
+                env_vars["CUBLAS_WORKSPACE_CONFIG"] = os.environ.get(
+                    "CUBLAS_WORKSPACE_CONFIG", ":4096:8"
+                )
 
         # Apply to os.environ
         for key, value in env_vars.items():
@@ -336,6 +354,7 @@ class LeaderboardWrapper:
         leaderboard_type, agent, agent_config, checkpoint_dir, track = (
             ModeConfig.get_mode_config(
                 is_expert=self.args.expert,
+                is_carl_agent=self.args.carl_agent,
                 is_bench2drive=self.args.bench2drive,
                 checkpoint=self.args.checkpoint,
                 routes=str(self.routes),
@@ -502,6 +521,9 @@ Examples:
   # Evaluate model on Bench2Drive
   python $LEAD_PROJECT_ROOT/lead/leaderboard_wrapper.py --checkpoint outputs/checkpoints/tfv6_resnet34 --routes data/benchmark_routes/bench2drive/23687.xml --bench2drive
 
+    # Evaluate CaRL agent on one route
+    python $LEAD_PROJECT_ROOT/lead/leaderboard_wrapper.py --checkpoint outputs/checkpoints/CaRL --routes data/benchmark_routes/bench2drive/24240.xml --carl-agent --timeout 900
+
   # Evaluate expert agent
   python $LEAD_PROJECT_ROOT/lead/leaderboard_wrapper.py --expert --routes data/benchmark_routes/Town13/1.xml
 
@@ -529,6 +551,11 @@ Examples:
     # Leaderboard type
     parser.add_argument(
         "--bench2drive", action="store_true", help="Use Bench2Drive leaderboard"
+    )
+    parser.add_argument(
+        "--carl-agent",
+        action="store_true",
+        help="Use lead/carl_agent/carl_agent.py with MAP track (requires --checkpoint)",
     )
 
     # Py123D option for expert mode
@@ -618,14 +645,20 @@ def main() -> None:
             "--py123d flag is only valid with --expert mode. Ignoring --py123d flag."
         )
 
+    # Validate carl mode flag
+    if args.carl_agent and not args.checkpoint:
+        parser.error("--carl-agent requires --checkpoint")
+
     # Set GPU for model evaluation
-    if args.checkpoint:
+    if args.checkpoint and not args.carl_agent:
         os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu)
 
     # Log mode information
     if args.expert:
         agent_type = "ExpertPy123D" if args.py123d else "Expert"
         LOG.info(f"Running in expert mode with {agent_type} agent")
+    elif args.carl_agent:
+        LOG.info("Running in CaRL evaluation mode")
 
     # Create wrapper and run
     LeaderboardWrapper(args).run()

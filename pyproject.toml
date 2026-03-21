@@ -29,7 +29,8 @@ include = ["lead/**/*.py", "tests/**/*.py"]
 # Ignore specific directories/files
 exclude = [
     "3rd_party",
-    "scripts"
+    "scripts",
+    "lead/carl_agent"
 ]
 
 [tool.ruff.lint]
