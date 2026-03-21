@@ -65,7 +65,7 @@
                 "--checkpoint",
                 "outputs/checkpoints/regnety032",
                 "--routes",
-                "data/routes/longest6/00.xml"
+                "data/benchmark_routes/longest6/00.xml"
             ],
             "env": {
                 "PYTHONDONTWRITEBYTECODE": "1",

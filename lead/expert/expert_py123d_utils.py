@@ -20,7 +20,6 @@ try:
     from py123d.geometry import (
         BoundingBoxSE3,
         EulerAngles,
-        EulerPoseSE3,
         PoseSE3,
         PoseSE3Index,
         Quaternion,
@@ -32,7 +31,7 @@ try:
     )
 except Exception as e:
     print(
-        f"Run 'pip install git+https://github.com/autonomousvision/py123d.git@dev_v0.0.9' to install Py123D. Import error: {e}"
+        f"Run 'pip install git+https://github.com/autonomousvision/py123d.git' to install Py123D. Import error: {e}"
     )
     raise e
 
@@ -239,7 +238,7 @@ def floor_center_to_rear_axle_translate(
     Returns:
         PoseSE3 translated to rear axle reference.
     """
-    zero_pose = EulerPoseSE3(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).pose_se3
+    zero_pose = PoseSE3(x=0.0, y=0.0, z=0.0, qw=1.0, qx=0.0, qy=0.0, qz=0.0)
     rear_axle_translate = translate_se3_along_body_frame(
         zero_pose,
         Vector3D(

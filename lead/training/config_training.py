@@ -45,6 +45,8 @@ class TrainingConfig(BaseConfig):
             return TargetDataset.NAVSIM_4CAMERAS
         elif "carla_leaderboard2" in self.carla_root:
             return TargetDataset.CARLA_LEADERBOARD2_3CAMERAS
+        elif "carla_leaderboad2_v3" in self.carla_root:
+            return TargetDataset.CARLA_LEADERBOARD2_3CAMERAS
         elif "carla_leaderboad2_v8" in self.carla_root:
             return TargetDataset.CARLA_LEADERBOARD2_3CAMERAS
         elif "carla_leaderboad2_v10" in self.carla_root:
@@ -352,7 +354,7 @@ class TrainingConfig(BaseConfig):
         )
 
     # --- RaDAR ---
-    @property
+    @overridable_property
     def radar_detection(self):
         """If true use radar points as additional input to the model."""
         return self.carla_leaderboard_mode

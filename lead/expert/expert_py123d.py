@@ -51,7 +51,7 @@ try:
     from py123d.script.utils.dataset_path_utils import get_dataset_paths
 except Exception as e:
     print(
-        f"Run 'pip install git+https://github.com/autonomousvision/py123d.git@dev_v0.0.9' to install Py123D. Import error: {e}"
+        f"Run 'pip install git+https://github.com/autonomousvision/py123d.git' to install Py123D. Import error: {e}"
     )
     raise e
 from lead.common import constants
