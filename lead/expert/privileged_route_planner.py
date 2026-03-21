@@ -522,7 +522,7 @@ class PrivilegedRoutePlanner:
     @beartype
     def setup_route(
         self,
-        global_plan: list,
+        global_plan: list[tuple[carla.Transform, RoadOption]],
         carla_world: carla.World,
         carla_map: carla.Map,
         starts_with_parking_exit: bool,
@@ -532,7 +532,7 @@ class PrivilegedRoutePlanner:
         Set up the route for the autonomous vehicle based on the given global plan.
 
         Args:
-            global_plan: A list of (carla.Transform, carla.RoadOption) tuples representing the global plan.
+            global_plan: Global plan.
             carla_world: The CARLA world object.
             carla_map: The CARLA map object.
             starts_with_parking_exit: A flag indicating if the route starts with a parking exit scenario.

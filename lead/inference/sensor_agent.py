@@ -142,17 +142,28 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         self.set_weather()
 
         # Set up AlpaSim metric recorder
-        if self.config_closed_loop.produce_alpasim_metric and self.config_closed_loop.save_path is not None:
+        if (
+            self.config_closed_loop.produce_alpasim_metric
+            and self.config_closed_loop.save_path is not None
+        ):
             route_id = self.config_closed_loop.route_id
             output_path = self.config_closed_loop.save_path / "alpasim_metric_log.json"
+
+            model_name = self.config_path.split("+")[0].split("/")[-3]
+
             self.alpasim_recorder = AlpaSimMetricRecorder(
                 route_original_name=route_id,
                 output_path=output_path,
+                agent_name="sensor_agent",
+                team_name="lead",
+                model_name=model_name,
+                vehicle=self._vehicle,
+                global_plan_world_coord=self._global_plan_world_coord,
+                carla_world=self._world,
             )
-            self.alpasim_recorder.set_ground_truth_from_global_plan(
-                self._global_plan_world_coord
+            LOG.info(
+                "[SensorAgent] AlpaSim metric recorder initialised -> %s", output_path
             )
-            LOG.info("[SensorAgent] AlpaSim metric recorder initialised -> %s", output_path)
 
         self.initialized = True
 
@@ -278,7 +289,7 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
                 }
                 with open(infractions_path, "w") as f:
                     json.dump(infractions_data, f, indent=4)
-                LOG.info(
+                LOG.debug(
                     f"[SensorAgent] Saved {len(self.infractions_log)} infractions to {infractions_path}"
                 )
 
@@ -585,16 +596,6 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         )
         input_data["meters_travelled"] = self.meters_travelled
 
-        # Record trajectory step for AlpaSim metrics (privileged world position)
-        if self.alpasim_recorder is not None:
-            transform = self._vehicle.get_transform()
-            self.alpasim_recorder.record_step(
-                x=float(transform.location.x),
-                y=float(transform.location.y),
-                heading=float(np.deg2rad(transform.rotation.yaw)),
-                timestamp=self.step,
-            )
-
         self.control = carla.VehicleControl(
             steer=float(closed_loop_prediction.steer),
             throttle=float(closed_loop_prediction.throttle),
@@ -607,6 +608,19 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
 
         # Check for infractions at this step
         self.check_infractions()
+
+        # Record trajectory step for AlpaSim metrics
+        if self.alpasim_recorder is not None:
+            step_infractions = [
+                e.get("message") or e.get("infraction", "")
+                for e in self.infractions_log
+                if e.get("step") == self.step
+                and "Agent has completed"
+                not in (e.get("message") or e.get("infraction", ""))
+                and "Average speed is"
+                not in (e.get("message") or e.get("infraction", ""))
+            ]
+            self.alpasim_recorder.record_step(step_infractions)
 
         # Visualization of prediction for debugging and video recording
         input_data_tensors.update(
@@ -713,13 +727,16 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
                 json.dump(self.metric_info, outfile, indent=4)
         return self.control
 
-    def destroy(self, _=None):
+    def destroy(self, results=None):
+        LOG.info(results)
+
         # Write AlpaSim metric JSON
         if self.alpasim_recorder is not None:
-            number_collisions = sum(
-                1 for e in self.infractions_log if "Collision" in e.get("infraction", "")
+            score_composed = (
+                results.scores.get("score_composed") if results is not None else None
             )
-            self.alpasim_recorder.save(number_collisions=number_collisions)
+            avg_score = score_composed / 100.0 if score_composed is not None else None
+            self.alpasim_recorder.save(avg_score=avg_score)
 
         # Clean up video recorder
         if hasattr(self, "video_recorder"):

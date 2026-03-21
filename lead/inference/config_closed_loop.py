@@ -138,14 +138,14 @@ class ClosedLoopConfig(OpenLoopConfig):
         """If true produce demo image output."""
         if self.is_on_slurm:
             return False
-        return False
+        return True
 
     @overridable_property
     def produce_demo_video(self):
         """If true produce demo video output."""
         if self.is_on_slurm:
             return False
-        return False
+        return True
 
     @overridable_property
     def produce_debug_image(self):
@@ -166,35 +166,35 @@ class ClosedLoopConfig(OpenLoopConfig):
         """If true produce input image output."""
         if self.is_on_slurm:
             return False
-        return False
+        return True
 
     @overridable_property
     def produce_input_video(self):
         """If true produce input video output."""
         if self.is_on_slurm:
             return False
-        return False
+        return True
 
     @overridable_property
     def produce_grid_image(self):
         """If true produce grid image output (demo + input stacked vertically)."""
         if self.is_on_slurm:
             return False
-        return False
+        return True
 
     @overridable_property
     def produce_grid_video(self):
         """If true produce grid video output (demo + input stacked vertically)."""
         if self.is_on_slurm:
             return False
-        return False
+        return True
 
     @overridable_property
     def produce_input_log(self):
         """If true produce input logging."""
         if self.is_on_slurm:
             return False
-        return False
+        return True
 
     @property
     def save_path(self):

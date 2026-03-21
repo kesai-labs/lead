@@ -3,6 +3,12 @@
 set -e
 shopt -s globstar
 
+# Check conda is available
+if ! command -v conda &>/dev/null; then
+    echo "Error: conda not found! If lazy loading is activated, run 'conda' first!" >&2
+    exit 1
+fi
+
 ############################# Init. Create variables when script gets sourced. #############################
 
 # Help to identify the run. Don't change this.
