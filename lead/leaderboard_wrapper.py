@@ -46,6 +46,7 @@ class ModeConfig:
 
         Args:
             is_expert: Whether expert mode is selected
+            is_carl_agent: Whether CaRL agent mode is selected
             is_bench2drive: Whether bench2drive variant is selected
             checkpoint: Model checkpoint path (None for expert)
             routes: Routes file path

@@ -747,7 +747,8 @@ class VideoRecorder:
             if self.config.produce_input_video and self.input_video_writer is not None:
                 self.input_video_writer.release()
                 self.compress_video(
-                    temp_path=self.config.temp_input_video_path,
+                    temp_path=os.path.splitext(self.config.input_video_path)[0]
+                    + "_temp.mp4",
                     final_path=self.config.input_video_path,
                     crf=18,
                     preset="slow",
@@ -757,7 +758,8 @@ class VideoRecorder:
                 # Debug video - low quality for disk space
                 self.debug_video_writer.release()
                 self.compress_video(
-                    temp_path=self.config.temp_debug_video_path,
+                    temp_path=os.path.splitext(self.config.debug_video_path)[0]
+                    + "_temp.mp4",
                     final_path=self.config.debug_video_path,
                     crf=28,
                     preset="slower",
@@ -767,7 +769,8 @@ class VideoRecorder:
             if self.config.produce_demo_video and self.demo_video_writer is not None:
                 self.demo_video_writer.release()
                 self.compress_video(
-                    temp_path=self.config.temp_demo_video_path,
+                    temp_path=os.path.splitext(self.config.demo_video_path)[0]
+                    + "_temp.mp4",
                     final_path=self.config.demo_video_path,
                     crf=18,
                     preset="slow",
@@ -777,7 +780,8 @@ class VideoRecorder:
             if self.config.produce_grid_video and self.grid_video_writer is not None:
                 self.grid_video_writer.release()
                 self.compress_video(
-                    temp_path=self.config.temp_grid_video_path,
+                    temp_path=os.path.splitext(self.config.grid_video_path)[0]
+                    + "_temp.mp4",
                     final_path=self.config.grid_video_path,
                     crf=18,
                     preset="slow",

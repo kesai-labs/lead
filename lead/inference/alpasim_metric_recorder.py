@@ -7,7 +7,6 @@ import pathlib
 
 import carla
 import numpy as np
-from agents.navigation.global_route_planner import GlobalRoutePlanner
 from agents.navigation.local_planner import RoadOption
 from beartype import beartype
 
@@ -27,10 +26,9 @@ class AlpaSimMetricRecorder:
         model_name: str,
         vehicle: carla.Actor,
         global_plan_world_coord: list[tuple[carla.Transform, RoadOption]],
-        carla_world: carla.World,
         decimal_places: int = 2,
     ) -> None:
-        """Initialize the recorder and compute the dense ground-truth path.
+        """Initialize the recorder and store the dense ground-truth path.
 
         Args:
             route_original_name: Identifier for the route being evaluated.
@@ -40,7 +38,6 @@ class AlpaSimMetricRecorder:
             model_name: Model name for the evaluation entry.
             vehicle: The ego vehicle actor to track.
             global_plan_world_coord: Leaderboard global plan as (Transform, RoadOption) pairs.
-            carla_world: CARLA world instance (used to obtain the map).
             decimal_places: Rounding precision for output coordinates.
         """
         self.route_original_name = route_original_name
@@ -52,10 +49,10 @@ class AlpaSimMetricRecorder:
         self._dp = decimal_places
         self.agent_trajectory: list[dict[str, list[float] | list[str]]] = []
 
-        carla_map = carla_world.get_map()
-        self.ground_truth_path = _dense_route_via_grp(
-            global_plan_world_coord, carla_map, decimal_places=decimal_places
-        )
+        self.ground_truth_path = [
+            [round(t.location.x, decimal_places), round(t.location.y, decimal_places)]
+            for t, _ in global_plan_world_coord
+        ]
 
     def record_step(self, infractions: list[str]) -> None:
         """Append one trajectory waypoint from the vehicle's current transform.
@@ -91,6 +88,9 @@ class AlpaSimMetricRecorder:
             "evaluation": [
                 {
                     "route": self.route_original_name,
+                    "score": round(avg_score, self._dp)
+                    if avg_score is not None
+                    else None,
                     "trajectory": self.agent_trajectory,
                     "gt_path": self.ground_truth_path,
                 }
@@ -103,36 +103,3 @@ class AlpaSimMetricRecorder:
             len(self.agent_trajectory),
             self.output_path,
         )
-
-
-@beartype
-def _dense_route_via_grp(
-    global_plan_world_coord: list[tuple[carla.Transform, RoadOption]],
-    carla_map: carla.Map,
-    sampling_resolution: float = 1.0,
-    decimal_places: int = 2,
-) -> list[list[float]]:
-    """Reconstruct the route at high density using CARLA's GlobalRoutePlanner.
-
-    Args:
-        global_plan_world_coord: Leaderboard global plan as (Transform, RoadOption) pairs.
-        carla_map: CARLA map instance.
-        sampling_resolution: Spacing between output waypoints in metres.
-        decimal_places: Rounding precision for the output coordinates.
-
-    Returns:
-        List of [x, y] pairs at approximately sampling_resolution metre intervals.
-    """
-    grp = GlobalRoutePlanner(carla_map, sampling_resolution)
-    path: list[list[float]] = []
-    for i in range(len(global_plan_world_coord) - 1):
-        loc_a = global_plan_world_coord[i][0].location
-        loc_b = global_plan_world_coord[i + 1][0].location
-        for wp, _ in grp.trace_route(loc_a, loc_b):
-            path.append(
-                [
-                    round(wp.transform.location.x, decimal_places),
-                    round(wp.transform.location.y, decimal_places),
-                ]
-            )
-    return path
