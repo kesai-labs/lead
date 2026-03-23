@@ -107,7 +107,7 @@ conda activate lead
 pip install uv && uv pip install -r requirements.txt && uv pip install -e .
 
 # Install other tools needed for development
-conda install -c conda-forge ffmpeg parallel tree gcc zip unzip
+conda install -c conda-forge ffmpeg parallel tree gcc zip unzip git-lfs
 
 # Optional: activate git hooks
 pre-commit install
@@ -413,7 +413,8 @@ bash scripts/eval_carl.sh
 The results are in `outputs/local_evaluation/<route_id>/`.
 
 > [!TIP]
-> With small code changes, you can also integrate CaRL into LEAD's expert-driving pipeline as a hybrid expert policy.
+> 1. With small code changes, you can also integrate CaRL into LEAD's expert-driving pipeline as a hybrid expert policy.
+> 2. For large scale evaluation on SLURM, see [this directory](slurm/experiments/003_evaluate_carl).
 
 ---
 

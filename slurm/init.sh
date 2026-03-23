@@ -215,6 +215,50 @@ function evaluate_expert_longest6() {
 	evaluate_expert "$@"
 }
 
+############################# CARL Evaluation #############################
+
+# Evaluate CaRL agent
+# Usage: evaluate_carl <checkpoint_dir>
+function evaluate_carl() {
+	if [[ -z "$EVALUATION_DATASET" ]]; then
+		echo "Error: EVALUATION_DATASET is not set."
+		exit 1
+	fi
+	mkdir -p "$EVALUATION_OUTPUT_DIR"
+	export SCRIPT_GENERATOR_PARAMETERS="$SCRIPT_GENERATOR_PARAMETERS --checkpoint_endpoint $CHECKPOINT_DIR"
+	export SCRIPT_GENERATOR_PARAMETERS="$SCRIPT_GENERATOR_PARAMETERS --team_config $CHECKPOINT_DIR"
+	ls "$CHECKPOINT_DIR"
+	echo "Starting CaRL evaluation $EXPERIMENT_RUN_ID"
+	if [[ -z "$CHECKPOINT_DIR" ]]; then
+		echo "Error: CHECKPOINT_DIR is not set."
+		exit 1
+	fi
+	echo "Evaluating CaRL $CHECKPOINT_DIR on $EVALUATION_DATASET"
+	export EVALUATION_STDOUT=$EVALUATION_OUTPUT_DIR/stdout_${SLURM_JOB_DATE}.txt
+	export EVALUATION_STDERR=$EVALUATION_OUTPUT_DIR/stderr_${SLURM_JOB_DATE}.txt
+	echo "$EVALUATION_STDOUT"
+	echo "$EVALUATION_STDERR"
+	screen -dmS "$EXPERIMENT_RUN_ID" bash -c "slurm/evaluate_carl.sh > $EVALUATION_STDOUT 2> $EVALUATION_STDERR"
+}
+
+function evaluate_carl_bench2drive() {
+	export EVALUATION_DATASET=bench2drive
+	export USE_PREEMPTABLE_PARTITION=1
+	evaluate_carl "$@"
+}
+
+function evaluate_carl_town13() {
+	export EVALUATION_DATASET=Town13
+	export SCRIPT_GENERATOR_PARAMETERS="$SCRIPT_GENERATOR_PARAMETERS --slurm_timeout 3-00:00:00"
+	evaluate_carl "$@"
+}
+
+function evaluate_carl_longest6() {
+	export EVALUATION_DATASET=longest6
+	export SCRIPT_GENERATOR_PARAMETERS="$SCRIPT_GENERATOR_PARAMETERS --slurm_timeout 0-10:00:00"
+	evaluate_carl "$@"
+}
+
 ############################# NAVSIM Evaluation #############################
 function evaluate_navsim() {
 	mkdir -p "$EVALUATION_OUTPUT_DIR"

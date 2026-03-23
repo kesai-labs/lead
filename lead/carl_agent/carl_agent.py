@@ -11,6 +11,8 @@ Inference-only port of 3rd_party/carl/team_code/eval_agent.py.
 import math
 import os
 import shutil
+import logging
+from typing import Any
 
 import carla
 import jsonpickle
@@ -28,10 +30,14 @@ from lead.carl_agent.bev.run_stop_sign import RunStopSign
 from lead.carl_agent.config import GlobalConfig
 from lead.carl_agent.model import PPOPolicy
 from lead.carl_agent.nav_planner import RoutePlanner
+from lead.common.logging_config import setup_logging
 from lead.inference.config_closed_loop import ClosedLoopConfig
+from lead.inference.infraction_recorder import InfractionRecorder
 from lead.inference.video_recorder import VideoRecorder
 
 jsonpickle_numpy.register_handlers()
+setup_logging()
+LOG = logging.getLogger(__name__)
 
 torch.manual_seed(0)
 torch.backends.cudnn.benchmark = False
@@ -80,6 +86,12 @@ class CarlAgent(autonomous_agent.AutonomousAgent):
         self.high_freq_inference = int(os.environ.get('HIGH_FREQ_INFERENCE', 0))
 
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        self.meters_travelled = 0.0
+        self.infraction_recorder = InfractionRecorder(
+            config_closed_loop=self.config_closed_loop,
+            agent_name='CarlAgent',
+        )
+        self.infractions_log = self.infraction_recorder.infractions_log
 
         self.observation_space = spaces.Dict({
             'bev_semantics':
@@ -122,6 +134,25 @@ class CarlAgent(autonomous_agent.AutonomousAgent):
         # Store the dense (non-downsampled) route before the parent downsamples it.
         self.dense_global_plan_world_coord = global_plan_world_coord
         super().set_global_plan(global_plan_gps, global_plan_world_coord)
+
+    def set_scenario(self, scenario: Any) -> None:
+        """Set the active scenario used for infraction tracking.
+
+        Args:
+            scenario: Scenario object that provides get_criteria().
+        """
+        self.infraction_recorder.set_scenario(scenario)
+        LOG.info('[CarlAgent] Scenario reference set for infraction tracking')
+
+    def _update_infraction_tracking(self) -> None:
+        """Update travelled distance and log newly detected infractions."""
+        velocity = self.vehicle.get_velocity()
+        speed = float(np.linalg.norm(np.array([velocity.x, velocity.y, velocity.z])))
+        self.meters_travelled += speed * self.config_closed_loop.carla_frame_rate
+        self.infraction_recorder.check_infractions(
+            step=self.step,
+            meters_travelled=self.meters_travelled,
+        )
 
     def _agent_init(self):
         self.vehicle = CarlaDataProvider.get_hero_actor()
@@ -262,7 +293,10 @@ class CarlAgent(autonomous_agent.AutonomousAgent):
                                                maxlen=int(1.0 * self.config.frame_rate))
             control = carla.VehicleControl(steer=0.0, throttle=0.0, brake=1.0)
             self.last_control = control
+            self._update_infraction_tracking()
             return control
+
+        self._update_infraction_tracking()
 
         self.video_recorder.update_step(self.step)
         self.video_recorder.move_demo_cameras_with_ego()

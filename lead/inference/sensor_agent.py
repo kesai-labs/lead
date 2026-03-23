@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import shutil
+import typing
 from collections import deque
 from copy import deepcopy
 
@@ -12,6 +13,7 @@ import matplotlib
 import numpy as np
 import numpy.typing as npt
 import torch
+from agents.navigation.local_planner import RoadOption
 from beartype import beartype
 from leaderboard.autoagents import autonomous_agent
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
@@ -31,6 +33,7 @@ from lead.inference.closed_loop_inference import (
     ClosedLoopPrediction,
 )
 from lead.inference.config_closed_loop import ClosedLoopConfig
+from lead.inference.infraction_recorder import InfractionRecorder
 from lead.inference.video_recorder import VideoRecorder
 from lead.training.config_training import TrainingConfig
 from lead.visualization.visualizer import Visualizer
@@ -104,11 +107,12 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         self.alpasim_recorder: AlpaSimMetricRecorder | None = None
 
         # Infraction tracking
-        self.infractions_log = []  # List of {"step": int, "infraction": str}
-        self.tracked_infraction_ids = (
-            set()
-        )  # Track which infractions we've already logged
-        self.scenario = None  # Will be set by set_scenario() method
+        self.infraction_recorder = InfractionRecorder(
+            config_closed_loop=self.config_closed_loop,
+            agent_name="SensorAgent",
+        )
+        # Keep a stable attribute for existing call sites.
+        self.infractions_log = self.infraction_recorder.infractions_log
 
         self.track = autonomous_agent.Track.SENSORS
 
@@ -117,12 +121,41 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
                 "ffmpeg is not installed or not found in PATH. Please install ffmpeg to use video compression."
             )
 
+    @beartype
+    def set_global_plan(
+        self,
+        global_plan_gps: typing.Any,
+        privileged_org_dense_route_world_coord: list[
+            tuple[carla.Transform, RoadOption]
+        ],
+    ):
+        """Store the global plan for privileged logging .
+        The dense world-coordinate route is stored as privileged information for
+        offline logging and metric computation (e.g. AlpaSim) and must not be
+        used by the driving policy. This is expected to be called by the
+        leaderboard/runner before the scenario starts and before `_init`
+        initialises components that consume the stored plan.
+
+        Args:
+            global_plan_gps: Global route waypoints in GPS space as provided by
+                the leaderboard.
+            privileged_org_dense_route_world_coord: Dense global route in world coordinates.
+        """
+        self.privileged_org_dense_route_world_coord = (
+            privileged_org_dense_route_world_coord
+        )
+        LOG.info(
+            "Set global plan with %d waypoints.",
+            len(self.privileged_org_dense_route_world_coord),
+        )
+        super().set_global_plan(global_plan_gps, privileged_org_dense_route_world_coord)
+
     def set_scenario(self, scenario):
         """Set the scenario reference to track infractions.
 
         This should be called by the leaderboard after loading the scenario.
         """
-        self.scenario = scenario
+        self.infraction_recorder.set_scenario(scenario)
         LOG.info("[SensorAgent] Scenario reference set for infraction tracking")
 
     def _init(self):
@@ -151,6 +184,11 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
 
             model_name = self.config_path.split("+")[0].split("/")[-3]
 
+            LOG.info(
+                "Set global plan with %d waypoints. This is a privileged information, do not use it for driving!",
+                len(self.privileged_org_dense_route_world_coord),
+            )
+
             self.alpasim_recorder = AlpaSimMetricRecorder(
                 route_original_name=route_id,
                 output_path=output_path,
@@ -158,8 +196,7 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
                 team_name="lead",
                 model_name=model_name,
                 vehicle=self._vehicle,
-                global_plan_world_coord=self._global_plan_world_coord,
-                carla_world=self._world,
+                global_plan_world_coord=self.privileged_org_dense_route_world_coord,
             )
             LOG.info(
                 "[SensorAgent] AlpaSim metric recorder initialised -> %s", output_path
@@ -210,91 +247,11 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         )
 
     def check_infractions(self) -> None:
-        """Check for infractions that occurred in the current step and log them.
-
-        Handles two types of infractions:
-        1. Discrete events (e.g., collisions): Each event is logged once
-        2. Continuous infractions (e.g., OutsideRouteLanesTest): Only logged when first detected
-
-        This matches the behavior of scenario_runner where continuous infractions create
-        a single event that gets updated, while discrete infractions create new events.
-        """
-        if self.scenario is None:
-            return
-
-        try:
-            criteria = self.scenario.get_criteria()
-
-            for criterion in criteria:
-                if hasattr(criterion, "events") and criterion.events:
-                    # Track which criterion is currently active
-                    # For continuous infractions (like OutsideRouteLanesTest), we only log once
-                    # until the infraction is cleared
-                    criterion_key = criterion.name
-
-                    for event in criterion.events:
-                        # For discrete events (collisions), use frame as unique identifier
-                        # For continuous events (route lanes), use only criterion name
-                        # Continuous infractions typically have only 1 event that gets updated
-                        is_continuous = len(criterion.events) == 1
-
-                        if is_continuous:
-                            # Continuous infraction: only log if not currently tracked
-                            event_id = criterion_key
-                        else:
-                            # Discrete infraction: log each unique frame
-                            event_id = (criterion_key, event.get_frame())
-
-                        # Only log if we haven't seen this infraction before
-                        if event_id not in self.tracked_infraction_ids:
-                            self.tracked_infraction_ids.add(event_id)
-
-                            # Map criterion name to readable infraction type
-                            infraction_info = {
-                                "step": self.step,
-                                "infraction": criterion.name,
-                                "frame": event.get_frame(),
-                                "message": event.get_message()
-                                if hasattr(event, "get_message")
-                                else "",
-                                "event_type": str(event.get_type())
-                                if hasattr(event, "get_type")
-                                else "",
-                                "meters_travelled": round(self.meters_travelled, 2),
-                            }
-
-                            self.infractions_log.append(infraction_info)
-                            LOG.info(
-                                f"[SensorAgent] Infraction detected at step {self.step}: {criterion.name}"
-                            )
-
-                    # If no events remain for this criterion, remove it from tracking
-                    # This allows continuous infractions to be logged again if they reoccur
-                    if (
-                        not criterion.events
-                        and criterion_key in self.tracked_infraction_ids
-                    ):
-                        self.tracked_infraction_ids.discard(criterion_key)
-
-            # Save infractions log to JSON
-            if self.config_closed_loop.save_path is not None and hasattr(
-                self, "infractions_log"
-            ):
-                infractions_path = (
-                    self.config_closed_loop.save_path / "infractions.json"
-                )
-                infractions_data = {
-                    "infractions": self.infractions_log,
-                    "video_fps": self.config_closed_loop.video_fps,
-                }
-                with open(infractions_path, "w") as f:
-                    json.dump(infractions_data, f, indent=4)
-                LOG.debug(
-                    f"[SensorAgent] Saved {len(self.infractions_log)} infractions to {infractions_path}"
-                )
-
-        except Exception as e:
-            LOG.warning(f"[SensorAgent] Error checking infractions: {e}")
+        """Check and record infractions for the current rollout step."""
+        self.infraction_recorder.check_infractions(
+            step=self.step,
+            meters_travelled=self.meters_travelled,
+        )
 
     @beartype
     def set_target_points(self, input_data: dict, pop_distance: float):
@@ -613,7 +570,7 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         if self.alpasim_recorder is not None:
             step_infractions = [
                 e.get("message") or e.get("infraction", "")
-                for e in self.infractions_log
+                for e in self.infraction_recorder.infractions_log
                 if e.get("step") == self.step
                 and "Agent has completed"
                 not in (e.get("message") or e.get("infraction", ""))

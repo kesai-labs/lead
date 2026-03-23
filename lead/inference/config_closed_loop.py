@@ -138,27 +138,27 @@ class ClosedLoopConfig(OpenLoopConfig):
         """If true produce demo image output."""
         if self.is_on_slurm:
             return False
-        return True
+        return False
 
     @overridable_property
     def produce_demo_video(self):
         """If true produce demo video output."""
         if self.is_on_slurm:
             return False
-        return True
+        return False
 
     @overridable_property
     def produce_debug_image(self):
         """If true produce debug image output."""
         if self.is_on_slurm:
             return False
-        return True
+        return False
 
     @overridable_property
     def produce_debug_video(self):
         """If true produce debug video output."""
         if self.is_on_slurm:
-            return True
+            return False
         return True
 
     @overridable_property
@@ -166,35 +166,35 @@ class ClosedLoopConfig(OpenLoopConfig):
         """If true produce input image output."""
         if self.is_on_slurm:
             return False
-        return True
+        return False
 
     @overridable_property
     def produce_input_video(self):
         """If true produce input video output."""
         if self.is_on_slurm:
             return False
-        return True
+        return False
 
     @overridable_property
     def produce_grid_image(self):
         """If true produce grid image output (demo + input stacked vertically)."""
         if self.is_on_slurm:
             return False
-        return True
+        return False
 
     @overridable_property
     def produce_grid_video(self):
         """If true produce grid video output (demo + input stacked vertically)."""
         if self.is_on_slurm:
             return False
-        return True
+        return False
 
     @overridable_property
     def produce_input_log(self):
         """If true produce input logging."""
         if self.is_on_slurm:
             return False
-        return True
+        return False
 
     @property
     def save_path(self):
@@ -221,19 +221,9 @@ class ClosedLoopConfig(OpenLoopConfig):
         return os.path.join(self.save_path, f"{self.route_id}_debug.mp4")
 
     @property
-    def temp_debug_video_path(self):
-        """Get the path for temporary video output."""
-        return os.path.join(self.save_path, f"{self.route_id}_debug_temp.mp4")
-
-    @property
     def demo_video_path(self):
         """Get the path for demo video output."""
         return os.path.join(self.save_path, f"{self.route_id}_demo.mp4")
-
-    @property
-    def temp_demo_video_path(self):
-        """Get the path for temporary demo video output."""
-        return os.path.join(self.save_path, f"{self.route_id}_demo_temp.mp4")
 
     @property
     def input_log_path(self):
@@ -248,19 +238,9 @@ class ClosedLoopConfig(OpenLoopConfig):
         return os.path.join(self.save_path, f"{self.route_id}_input.mp4")
 
     @property
-    def temp_input_video_path(self):
-        """Get the path for temporary input video output."""
-        return os.path.join(self.save_path, f"{self.route_id}_input_temp.mp4")
-
-    @property
     def grid_video_path(self):
         """Get the path for grid video output."""
         return os.path.join(self.save_path, f"{self.route_id}_grid.mp4")
-
-    @property
-    def temp_grid_video_path(self):
-        """Get the path for temporary grid video output."""
-        return os.path.join(self.save_path, f"{self.route_id}_grid_temp.mp4")
 
     @overridable_property
     def video_fps(self):
