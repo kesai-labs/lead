@@ -75,7 +75,24 @@ class ObsManager(ObsManagerBase):
             self._world = current_world
 
             maps_h5_path = self._map_dir / (world_map.name.rsplit("/", 1)[1] + ".h5")
-            with h5py.File(maps_h5_path, "r", libver="latest", swmr=True) as hf:
+            hf = h5py.File(maps_h5_path, "r", libver="latest", swmr=True)
+            self._world_offset = np.array(
+                hf.attrs["world_offset_in_meters"], dtype=np.float32
+            )
+            assert np.isclose(
+                self._pixels_per_meter, float(hf.attrs["pixels_per_meter"])
+            )
+            self._map_h, self._map_w = hf["road"].shape
+            # OpenCV warpAffine requires src dimensions < SHRT_MAX (32767).
+            # Large maps (e.g. Town11 at 43371x43371) exceed this limit and
+            # also cause OOM if fully loaded. For these maps we keep the h5
+            # file open and read small crops around the ego vehicle each frame.
+            self._need_crop = self._map_h >= 32767 or self._map_w >= 32767
+
+            if self._need_crop:
+                self._h5_file = hf
+                self.hd_map_array = None
+            else:
                 self.hd_map_array = np.stack(
                     (
                         hf["road"],
@@ -83,14 +100,9 @@ class ObsManager(ObsManagerBase):
                         hf["lane_marking_white_broken"],
                     ),
                     axis=2,
-                )
-                self.hd_map_array = self.hd_map_array.astype(dtype=np.uint8)
-                self._world_offset = np.array(
-                    hf.attrs["world_offset_in_meters"], dtype=np.float32
-                )
-                assert np.isclose(
-                    self._pixels_per_meter, float(hf.attrs["pixels_per_meter"])
-                )
+                ).astype(dtype=np.uint8)
+                hf.close()
+                self._h5_file = None
 
             self._distance_threshold = np.ceil(self._width / self._pixels_per_meter)
 
@@ -205,9 +217,27 @@ class ObsManager(ObsManagerBase):
             stop_masks,
         ) = self._get_history_masks(m_warp)
 
-        warped_hd_map = cv.warpAffine(
-            self.hd_map_array, m_warp, (self._width, self._width)
-        )
+        if self._need_crop:
+            # Crop a small region around the ego vehicle from the h5 map and
+            # adjust the warp matrix so source coords are relative to the crop.
+            # See bev_observation.py for detailed explanation of the math.
+            ev_px = self._world_to_pixel(ev_loc)
+            crop_half = int(np.ceil(self._width * 1.5))
+            col0 = max(int(ev_px[0]) - crop_half, 0)
+            row0 = max(int(ev_px[1]) - crop_half, 0)
+            col1 = min(int(ev_px[0]) + crop_half, self._map_w)
+            row1 = min(int(ev_px[1]) + crop_half, self._map_h)
+            hd_map_crop = self._read_h5_crop(row0, row1, col0, col1)
+            m_warp_crop = m_warp.copy()
+            m_warp_crop[0, 2] += m_warp[0, 0] * col0 + m_warp[0, 1] * row0
+            m_warp_crop[1, 2] += m_warp[1, 0] * col0 + m_warp[1, 1] * row0
+            warped_hd_map = cv.warpAffine(
+                hd_map_crop, m_warp_crop, (self._width, self._width)
+            )
+        else:
+            warped_hd_map = cv.warpAffine(
+                self.hd_map_array, m_warp, (self._width, self._width)
+            )
         lane_mask_broken = warped_hd_map[:, :, 2].astype(bool)
 
         route_mask = np.zeros([self._width, self._width], dtype=np.uint8)
@@ -449,7 +479,22 @@ class ObsManager(ObsManagerBase):
         )
         return location
 
+    def _read_h5_crop(self, row0, row1, col0, col1):
+        """Read a crop from the h5 file and build the stacked hd_map channels."""
+        hf = self._h5_file
+        return np.stack(
+            (
+                hf["road"][row0:row1, col0:col1],
+                hf["lane_marking_all"][row0:row1, col0:col1],
+                hf["lane_marking_white_broken"][row0:row1, col0:col1],
+            ),
+            axis=2,
+        ).astype(np.uint8)
+
     def clean(self):
         self.vehicle = None
         self._world = None
+        if hasattr(self, "_h5_file") and self._h5_file is not None:
+            self._h5_file.close()
+            self._h5_file = None
         self._history_queue.clear()

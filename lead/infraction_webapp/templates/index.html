@@ -42,7 +42,7 @@
                         </h5>
                         <div id="route-stats" class="mb-3"></div>
                         <div class="form-check mb-3">
-                            <input class="form-check-input" type="checkbox" id="filter-infractions-only" checked />
+                            <input class="form-check-input" type="checkbox" id="filter-infractions-only" />
                             <label class="form-check-label" for="filter-infractions-only">
                                 <i class="bi bi-exclamation-triangle text-danger"></i> Show only with infractions
                             </label>
@@ -226,7 +226,7 @@
         let videoFPS = 20; // Default FPS, will be updated from infractions.json
         let lastClickedInfractionStep = null; // Track the last clicked infraction step
         let shouldAutoScroll = false; // Flag to control auto-scroll behavior
-        let showInfractionsOnly = true; // Filter to show only routes with infractions
+        let showInfractionsOnly = false; // Filter to show only routes with infractions
 
         // Helper function to parse minute:second format to seconds
         function parseTimeString(timeStr) {

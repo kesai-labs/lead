@@ -101,7 +101,20 @@ class ObsManager(ObsManagerBase):
       self.world = current_world
 
       maps_h5_path = self.map_dir / (world_map.name.rsplit('/', 1)[1] + '.h5')
-      with h5py.File(maps_h5_path, 'r', libver='latest', swmr=True) as hf:
+      hf = h5py.File(maps_h5_path, 'r', libver='latest', swmr=True)
+      self._world_offset = np.array(hf.attrs['world_offset_in_meters'], dtype=np.float32)
+      assert np.isclose(self.pixels_per_meter, float(hf.attrs['pixels_per_meter']))
+      self._map_h, self._map_w = hf['road'].shape
+      # OpenCV warpAffine requires src dimensions < SHRT_MAX (32767).
+      # Large maps (e.g. Town11 at 43371x43371) exceed this limit and also
+      # cause OOM if fully loaded. For these maps we keep the h5 file open
+      # and read small crops around the ego vehicle each frame instead.
+      self._need_crop = (self._map_h >= 32767 or self._map_w >= 32767)
+
+      if self._need_crop:
+        self._h5_file = hf
+        self.hd_map_array = None
+      else:
         parking = np.array(hf['parking'], dtype=np.uint16)
         road = np.array(hf['road'], dtype=np.uint16)
         if self.config.render_shoulder:
@@ -117,9 +130,8 @@ class ObsManager(ObsManagerBase):
           self.hd_map_array = np.stack((full_road, hf['lane_marking_all'], hf['lane_marking_white_broken']), axis=2)
 
         self.hd_map_array = self.hd_map_array.astype(dtype=np.uint8)
-
-        self._world_offset = np.array(hf.attrs['world_offset_in_meters'], dtype=np.float32)
-        assert np.isclose(self.pixels_per_meter, float(hf.attrs['pixels_per_meter']))
+        hf.close()
+        self._h5_file = None
 
       self.distance_threshold = np.ceil(self.width / self.pixels_per_meter)
 
@@ -326,7 +338,26 @@ class ObsManager(ObsManagerBase):
     if self.config.use_history:
       past_vehicle_masks, past_walker_masks = self.get_history_masks(m_warp)
 
-    warped_hd_map = cv.warpAffine(self.hd_map_array, m_warp, (self.width, self.width))
+    if self._need_crop:
+      # Crop a small region around the ego vehicle from the h5 map and adjust
+      # the warp matrix so that source coordinates are relative to the crop.
+      # The warp reads at most ~width*sqrt(1.25) px from ego; crop_half of
+      # width*1.5 provides ample margin for interpolation and rounding.
+      ev_px = self._world_to_pixel(ev_loc)
+      crop_half = int(np.ceil(self.width * 1.5))
+      col0 = max(int(ev_px[0]) - crop_half, 0)
+      row0 = max(int(ev_px[1]) - crop_half, 0)
+      col1 = min(int(ev_px[0]) + crop_half, self._map_w)
+      row1 = min(int(ev_px[1]) + crop_half, self._map_h)
+      hd_map_crop = self._read_h5_crop(row0, row1, col0, col1)
+      # Shift the affine translation to map cropped-array coords to the same
+      # destination pixels: M'*[x-col0, y-row0, 1]^T == M*[x, y, 1]^T
+      m_warp_crop = m_warp.copy()
+      m_warp_crop[0, 2] += m_warp[0, 0] * col0 + m_warp[0, 1] * row0
+      m_warp_crop[1, 2] += m_warp[1, 0] * col0 + m_warp[1, 1] * row0
+      warped_hd_map = cv.warpAffine(hd_map_crop, m_warp_crop, (self.width, self.width))
+    else:
+      warped_hd_map = cv.warpAffine(self.hd_map_array, m_warp, (self.width, self.width))
 
     route_mask = np.zeros((self.width, self.width), dtype=np.uint8)
 
@@ -636,8 +667,32 @@ class ObsManager(ObsManagerBase):
     """Converts the world units to pixel units"""
     return self.pixels_per_meter * width
 
+  def _read_h5_crop(self, row0, row1, col0, col1):
+    """Read a crop from the h5 file and build the stacked hd_map channels."""
+    hf = self._h5_file
+    road = np.array(hf['road'][row0:row1, col0:col1], dtype=np.uint16)
+    parking = np.array(hf['parking'][row0:row1, col0:col1], dtype=np.uint16)
+    shoulder = None
+    if self.config.render_shoulder or self.config.use_shoulder_channel:
+      shoulder = np.array(hf['shoulder'][row0:row1, col0:col1], dtype=np.uint16)
+
+    if shoulder is not None and self.config.render_shoulder:
+      full_road = np.clip((shoulder + parking + road), 0, 255).astype(np.uint8)
+    else:
+      full_road = np.clip((parking + road), 0, 255).astype(np.uint8)
+
+    lane_all = np.array(hf['lane_marking_all'][row0:row1, col0:col1], dtype=np.uint8)
+    lane_broken = np.array(hf['lane_marking_white_broken'][row0:row1, col0:col1], dtype=np.uint8)
+
+    if self.config.use_shoulder_channel:
+      return np.stack((full_road, lane_all, lane_broken, shoulder.astype(np.uint8)), axis=2)
+    return np.stack((full_road, lane_all, lane_broken), axis=2)
+
   def clean(self):
     self.vehicle = None
     self.world = None
+    if hasattr(self, '_h5_file') and self._h5_file is not None:
+      self._h5_file.close()
+      self._h5_file = None
     if self.config.use_history:
       self.history_queue.clear()
