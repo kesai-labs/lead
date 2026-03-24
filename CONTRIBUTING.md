@@ -7,7 +7,7 @@ Thank you for your interest in contributing to LEAD! We appreciate your enthusia
 ## How to Contribute
 
 ### Report Issues
-Found a bug? Please [open an issue](https://github.com/autonomousvision/lead/issues) with:
+Found a bug? Please [open an issue](https://github.com/kesai-labs/lead/issues) with:
 - Clear description of the problem
 - Steps to reproduce
 - Expected vs actual behavior

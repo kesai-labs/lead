@@ -23,7 +23,7 @@ Here's a typical workflow, starting with pre-training a model from scratch.
 
 ### Step 1: Creating Your First Training Script
 
-A minimal pre-training script from [slurm/experiments/001_example/000_pretrain1_0.sh](https://github.com/autonomousvision/lead/blob/main/slurm/experiments/001_example/000_pretrain1_0.sh):
+A minimal pre-training script from [slurm/experiments/001_example/000_pretrain1_0.sh](https://github.com/kesai-labs/lead/blob/main/slurm/experiments/001_example/000_pretrain1_0.sh):
 
 ```{code-block} bash
 :linenos:
@@ -42,8 +42,8 @@ train --cpus-per-task=32 --partition=a100-galvani --time=3-00:00:00 --gres=gpu:4
 **Line-by-line breakdown**:
 
 1. **Line 1**: Standard bash script header
-2. **Line 3**: Sources [slurm/init.sh](https://github.com/autonomousvision/lead/blob/main/slurm/init.sh), which sets up environment variables and defines helper functions like `train`
-3. **Line 5**: Configures model architecture via environment variables (matching options in [lead/training/config_training.py](https://github.com/autonomousvision/lead/blob/main/lead/training/config_training.py))
+2. **Line 3**: Sources [slurm/init.sh](https://github.com/kesai-labs/lead/blob/main/slurm/init.sh), which sets up environment variables and defines helper functions like `train`
+3. **Line 5**: Configures model architecture via environment variables (matching options in [lead/training/config_training.py](https://github.com/kesai-labs/lead/blob/main/lead/training/config_training.py))
 4. **Line 7**: Launches training with SLURM parameters (CPUs, GPUs, time limit, partition name)
 
 ### Step 2: Running Your Experiment

@@ -40,7 +40,7 @@ The Py123D format provides a unified data representation compatible with other m
 
 ## Inspect Collected Data
 
-Inspect collected data using the notebook [notebooks/inspect_expert_output.ipynb](https://github.com/autonomousvision/lead/blob/main/notebooks/inspect_expert_output.ipynb).
+Inspect collected data using the notebook [notebooks/inspect_expert_output.ipynb](https://github.com/kesai-labs/lead/blob/main/notebooks/inspect_expert_output.ipynb).
 
 ## [Optional] Expert Overview
 
@@ -48,7 +48,7 @@ Inspect collected data using the notebook [notebooks/inspect_expert_output.ipynb
 The following sections are optional and only relevant if you want to understand or modify the expert's behavior.
 ```
 
-The data collection expert in [lead/expert/expert.py](https://github.com/autonomousvision/lead/blob/main/lead/expert/expert.py) operates in four steps:
+The data collection expert in [lead/expert/expert.py](https://github.com/kesai-labs/lead/blob/main/lead/expert/expert.py) operates in four steps:
 
 1. Proposes a shortest path by searching the lane graph with A\*
 2. Augments this path to avoid collisions with static obstacles
@@ -61,17 +61,17 @@ The data collection expert in [lead/expert/expert.py](https://github.com/autonom
 The expert is not optimal for human-level driving or policy transfer to learned models. We encourage experimentation with the expert's logic and parameters if you identify suboptimal behaviors.
 ```
 
-The main driving logic is implemented in [lead/expert/expert.py](https://github.com/autonomousvision/lead/blob/main/lead/expert/expert.py),
-with helper functions and properties in [lead/expert/expert_base.py](https://github.com/autonomousvision/lead/blob/main/lead/expert/expert_base.py) and data collection logic in [lead/expert/expert_data.py](https://github.com/autonomousvision/lead/blob/main/lead/expert/expert_data.py).
+The main driving logic is implemented in [lead/expert/expert.py](https://github.com/kesai-labs/lead/blob/main/lead/expert/expert.py),
+with helper functions and properties in [lead/expert/expert_base.py](https://github.com/kesai-labs/lead/blob/main/lead/expert/expert_base.py) and data collection logic in [lead/expert/expert_data.py](https://github.com/kesai-labs/lead/blob/main/lead/expert/expert_data.py).
 
-The entry point is the `run_step` function in [lead/expert/expert.py](https://github.com/autonomousvision/lead/blob/main/lead/expert/expert.py), which:
+The entry point is the `run_step` function in [lead/expert/expert.py](https://github.com/kesai-labs/lead/blob/main/lead/expert/expert.py), which:
 
 1. Collects sensor data, bounding boxes, and metadata
 2. Executes the driving logic in `_get_control`
 
-The expert accesses CARLA simulator internal states to handle various scenarios. The central state registry is in [3rd_party/scenario_runner_autopilot/srunner/scenariomanager/carla_data_provider.py](https://github.com/autonomousvision/lead/blob/main/3rd_party/scenario_runner_autopilot/srunner/scenariomanager/carla_data_provider.py).
+The expert accesses CARLA simulator internal states to handle various scenarios. The central state registry is in [3rd_party/scenario_runner_autopilot/srunner/scenariomanager/carla_data_provider.py](https://github.com/kesai-labs/lead/blob/main/3rd_party/scenario_runner_autopilot/srunner/scenariomanager/carla_data_provider.py).
 
-To understand scenario data registration, examine the scenario classes in [3rd_party/scenario_runner_autopilot/srunner/scenarios](https://github.com/autonomousvision/lead/tree/main/3rd_party/scenario_runner_autopilot/srunner/scenarios).
+To understand scenario data registration, examine the scenario classes in [3rd_party/scenario_runner_autopilot/srunner/scenarios](https://github.com/kesai-labs/lead/tree/main/3rd_party/scenario_runner_autopilot/srunner/scenarios).
 
 We maintain custom forks of CARLA evaluation tools with modifications for expert access: [scenario_runner_autopilot](https://github.com/ln2697/scenario_runner_autopilot) and [leaderboard_autopilot](https://github.com/ln2697/leaderboard_autopilot).
 

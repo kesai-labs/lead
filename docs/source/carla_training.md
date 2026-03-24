@@ -35,8 +35,8 @@ data/carla_leaderboard2
 Buckets group training samples by characteristics (scenarios, towns, weather, road curvature, etc.) to enable curriculum learning and balanced batch sampling.
 
 Default bucket collections:
-- **Pre-training**: [lead/data_buckets/full_pretrain_bucket_collection.py](https://github.com/autonomousvision/lead/blob/main/lead/data_buckets/full_pretrain_bucket_collection.py) samples uniformly across all available data
-- **Post-training**: [lead/data_buckets/full_posttrain_bucket_collection.py](https://github.com/autonomousvision/lead/blob/main/lead/data_buckets/full_posttrain_bucket_collection.py) filters out the initial and final samples of each sequence (which may contain initialization artifacts) and samples uniformly from the remaining data
+- **Pre-training**: [lead/data_buckets/full_pretrain_bucket_collection.py](https://github.com/kesai-labs/lead/blob/main/lead/data_buckets/full_pretrain_bucket_collection.py) samples uniformly across all available data
+- **Post-training**: [lead/data_buckets/full_posttrain_bucket_collection.py](https://github.com/kesai-labs/lead/blob/main/lead/data_buckets/full_posttrain_bucket_collection.py) filters out the initial and final samples of each sequence (which may contain initialization artifacts) and samples uniformly from the remaining data
 
 Buckets are built once, stored on disk, and automatically reused in subsequent runs.
 
@@ -82,7 +82,7 @@ Raw sensor data (images, LiDAR, RADAR) requires preprocessing—decompression, f
 
 Two cache types:
 
-- **`persistent_cache`**: Stored alongside the dataset, reused across all training sessions. See [PersistentCache](https://github.com/autonomousvision/lead/blob/main/lead/data_loader/training_cache.py)
+- **`persistent_cache`**: Stored alongside the dataset, reused across all training sessions. See [PersistentCache](https://github.com/kesai-labs/lead/blob/main/lead/data_loader/training_cache.py)
 - **`training_session_cache`**: Temporary cache on local SSD during cluster jobs, implemented with [diskcache](https://pypi.org/project/diskcache/). During the first few epochs, data is loaded from shared storage and cached on the job's local SSD for faster subsequent access. This implementation is specific to our organization's SLURM cluster setup.
 
 Build the persistent cache:
@@ -135,7 +135,7 @@ outputs/local_training/pretrain
 └── scheduler_0030.pth
 ```
 
-The training script generates WandB/TensorBoard logs and visualization images at `outputs/training_viz`. Control logging frequency with `log_scalars_frequency` and `log_images_frequency` in [lead/training/config_training.py](https://github.com/autonomousvision/lead/blob/main/lead/training/config_training.py).
+The training script generates WandB/TensorBoard logs and visualization images at `outputs/training_viz`. Control logging frequency with `log_scalars_frequency` and `log_images_frequency` in [lead/training/config_training.py](https://github.com/kesai-labs/lead/blob/main/lead/training/config_training.py).
 
 Image logging runs at least once per epoch and can be expensive. Disable it by setting `visualize_training=false` in the config.
 
@@ -168,8 +168,8 @@ To continue from a failed training run, set `continue_failed_training=true` in t
 ## Distributed Training
 
 The pipeline supports [Torch DDP](https://docs.pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html). See example scripts:
-- [scripts/pretrain_ddp.sh](https://github.com/autonomousvision/lead/blob/main/scripts/pretrain_ddp.sh)
-- [scripts/posttrain_ddp.sh](https://github.com/autonomousvision/lead/blob/main/scripts/posttrain_ddp.sh)
+- [scripts/pretrain_ddp.sh](https://github.com/kesai-labs/lead/blob/main/scripts/pretrain_ddp.sh)
+- [scripts/posttrain_ddp.sh](https://github.com/kesai-labs/lead/blob/main/scripts/posttrain_ddp.sh)
 
 ## Common Issues
 
@@ -191,7 +191,7 @@ bash scripts/clean_carla.sh
 
 Register your GPU in the training configuration:
 
-**Step 1:** Add your GPU name to the `gpu_name` function in [lead/training/config_training.py](https://github.com/autonomousvision/lead/blob/main/lead/training/config_training.py).
+**Step 1:** Add your GPU name to the `gpu_name` function in [lead/training/config_training.py](https://github.com/kesai-labs/lead/blob/main/lead/training/config_training.py).
 
 **Step 2:** If your GPU supports [bf16 (bfloat16)](https://docs.pytorch.org/docs/stable/amp.html), add it to both `use_mixed_precision_training` and `use_gradient_scaler` functions in the same file.
 
@@ -199,6 +199,6 @@ Register your GPU in the training configuration:
 
 ### Unknown CARLA Root Path: \<carla_root>
 
-Register your CARLA dataset configuration in the `target_dataset` function in [lead/training/config_training.py](https://github.com/autonomousvision/lead/blob/main/lead/training/config_training.py). Map your CARLA root path to the appropriate dataset configuration, which specifies the expected sensor setup and data format.
+Register your CARLA dataset configuration in the `target_dataset` function in [lead/training/config_training.py](https://github.com/kesai-labs/lead/blob/main/lead/training/config_training.py). Map your CARLA root path to the appropriate dataset configuration, which specifies the expected sensor setup and data format.
 
-**Why this design?** This allows running training experiments while simultaneously collecting data with different sensor configurations. The `target_dataset` in [lead/expert/config_expert.py](https://github.com/autonomousvision/lead/blob/main/lead/expert/config_expert.py) controls which sensors are mounted on the expert vehicle during data collection.
+**Why this design?** This allows running training experiments while simultaneously collecting data with different sensor configurations. The `target_dataset` in [lead/expert/config_expert.py](https://github.com/kesai-labs/lead/blob/main/lead/expert/config_expert.py) controls which sensors are mounted on the expert vehicle during data collection.

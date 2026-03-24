@@ -8,7 +8,7 @@ Before training models, data collection is required. The data collection system 
 
 ## Preparing Your Data Collection Run
 
-Configure the following settings in [slurm/data_collection/collect_data.py](https://github.com/autonomousvision/lead/blob/main/slurm/data_collection/collect_data.py):
+Configure the following settings in [slurm/data_collection/collect_data.py](https://github.com/kesai-labs/lead/blob/main/slurm/data_collection/collect_data.py):
 
 - **`repetitions`**: Number of times to run each route with different random seeds (for data diversity)
 - **`partitions`**: Cluster partition names (e.g., `gpu-2080ti`, `a100-galvani`)
@@ -27,8 +27,8 @@ When using `--py123d`:
 
 Two additional config files control the collection process:
 
-- [slurm/configs/max_num_parallel_jobs_collect_data.txt](https://github.com/autonomousvision/lead/blob/main/slurm/configs/max_num_parallel_jobs_collect_data.txt): Maximum number of parallel jobs (adjust based on cluster capacity)
-- [slurm/configs/max_sleep.txt](https://github.com/autonomousvision/lead/blob/main/slurm/configs/max_sleep.txt): Delay between starting the CARLA server and Python client (prevents connection timing issues)
+- [slurm/configs/max_num_parallel_jobs_collect_data.txt](https://github.com/kesai-labs/lead/blob/main/slurm/configs/max_num_parallel_jobs_collect_data.txt): Maximum number of parallel jobs (adjust based on cluster capacity)
+- [slurm/configs/max_sleep.txt](https://github.com/kesai-labs/lead/blob/main/slurm/configs/max_sleep.txt): Delay between starting the CARLA server and Python client (prevents connection timing issues)
 
 ## Launching the Collection
 

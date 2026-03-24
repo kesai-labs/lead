@@ -12,7 +12,7 @@ LEAD must be installed as a package in your Python environment. Ensure you're in
 
 ## Overview
 
-The [Quick Start](https://github.com/autonomousvision/lead?tab=readme-ov-file#quick-start) tutorial demonstrates evaluating a trained policy on a single Bench2Drive route. We provide a unified Python-based evaluation interface (`lead.leaderboard_wrapper`) that simplifies debugging and configuration for the three most popular benchmarks:
+The [Quick Start](https://github.com/kesai-labs/lead?tab=readme-ov-file#quick-start) tutorial demonstrates evaluating a trained policy on a single Bench2Drive route. We provide a unified Python-based evaluation interface (`lead.leaderboard_wrapper`) that simplifies debugging and configuration for the three most popular benchmarks:
 
 - **Bench2Drive**: See [official repository](https://github.com/Thinklab-SJTU/Bench2Drive) for benchmark details
 - **Longest6 v2**: See [carla_garage](https://github.com/autonomousvision/carla_garage?tab=readme-ov-file#longest6-v2) for benchmark details
@@ -61,7 +61,7 @@ python lead/leaderboard_wrapper.py \
 
 ### Configuration Options
 
-Evaluation behavior is controlled by [config_closed_loop.py](https://github.com/autonomousvision/lead/blob/main/lead/inference/config_closed_loop.py). Key settings:
+Evaluation behavior is controlled by [config_closed_loop.py](https://github.com/kesai-labs/lead/blob/main/lead/inference/config_closed_loop.py). Key settings:
 
 - `produce_demo_video` - Generate bird's-eye view visualization videos
 - `produce_debug_video` - Generate detailed debug videos with sensor data
@@ -95,7 +95,7 @@ outputs/local_evaluation/<route_id>/
 
 ### Longest6 v2 and Town13
 
-After completing all routes, aggregate results using the [result parser](https://github.com/autonomousvision/lead/blob/main/scripts/tools/result_parser.py):
+After completing all routes, aggregate results using the [result parser](https://github.com/kesai-labs/lead/blob/main/scripts/tools/result_parser.py):
 
 **Longest6 v2:**
 ```bash
@@ -121,7 +121,7 @@ This generates a summary CSV containing:
 
 Bench2Drive provides extended metrics beyond standard Leaderboard 2.0 metrics. See the [official evaluation guide](https://github.com/Thinklab-SJTU/Bench2Drive?tab=readme-ov-file#eval-tools).
 
-Bench2Drive evaluation tools are located at [3rd_party/Bench2Drive/tools/](https://github.com/autonomousvision/lead/blob/main/3rd_party/Bench2Drive/tools/).
+Bench2Drive evaluation tools are located at [3rd_party/Bench2Drive/tools/](https://github.com/kesai-labs/lead/blob/main/3rd_party/Bench2Drive/tools/).
 
 ## Best Practices
 
@@ -158,7 +158,7 @@ The pipeline loads all three checkpoint seeds as an ensemble by default. If GPU 
 ### 3. Use Correct Evaluation Tools
 
 - **Longest6 v2 and Town13**: Evaluate using standard leaderboard setup
-- **Bench2Drive**: Must evaluate using [Bench2Drive's code](https://github.com/autonomousvision/lead/tree/main/3rd_party/Bench2Drive)—otherwise results are invalid
+- **Bench2Drive**: Must evaluate using [Bench2Drive's code](https://github.com/kesai-labs/lead/tree/main/3rd_party/Bench2Drive)—otherwise results are invalid
 
 ### 4. Account for Evaluation Variance
 

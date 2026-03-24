@@ -77,7 +77,7 @@
 Clone the repository and register the project root:
 
 ```bash
-git clone https://github.com/autonomousvision/lead.git
+git clone https://github.com/kesai-labs/lead.git
 cd lead
 
 # Set project root variable

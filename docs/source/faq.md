@@ -45,8 +45,8 @@ Roughly 10% of launch attempts may fail due to startup hangs, port conflicts, or
 
 ## How do I add custom scenarios?
 
-See [3rd_party/scenario_runner_autopilot/srunner/scenarios](https://github.com/autonomousvision/lead/tree/main/3rd_party/scenario_runner_autopilot/srunner/scenarios).
+See [3rd_party/scenario_runner_autopilot/srunner/scenarios](https://github.com/kesai-labs/lead/tree/main/3rd_party/scenario_runner_autopilot/srunner/scenarios).
 
 ## How does the expert access scenario-specific data?
 
-See [3rd_party/scenario_runner_autopilot/srunner/scenariomanager/carla_data_provider.py](https://github.com/autonomousvision/lead/blob/main/3rd_party/scenario_runner_autopilot/srunner/scenariomanager/carla_data_provider.py).
+See [3rd_party/scenario_runner_autopilot/srunner/scenariomanager/carla_data_provider.py](https://github.com/kesai-labs/lead/blob/main/3rd_party/scenario_runner_autopilot/srunner/scenariomanager/carla_data_provider.py).

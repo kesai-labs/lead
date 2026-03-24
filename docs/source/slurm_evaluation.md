@@ -9,13 +9,13 @@ After training models, the next step is systematic evaluation across benchmark s
 
 ## Overview
 
-A complete example pipeline is available at [slurm/experiments/001_example](https://github.com/autonomousvision/lead/tree/main/slurm/experiments/001_example), demonstrating training and evaluation workflows.
+A complete example pipeline is available at [slurm/experiments/001_example](https://github.com/kesai-labs/lead/tree/main/slurm/experiments/001_example), demonstrating training and evaluation workflows.
 
 For reliable results, train three models with different random seeds and evaluate each once on both Bench2Drive and Longest6 v2. For higher confidence, evaluate each seed three times.
 
 ## Running Evaluations
 
-Here's an example evaluation script [slurm/experiments/001_example/020_b2d_0.sh](https://github.com/autonomousvision/lead/blob/main/slurm/experiments/001_example/020_b2d_0.sh):
+Here's an example evaluation script [slurm/experiments/001_example/020_b2d_0.sh](https://github.com/kesai-labs/lead/blob/main/slurm/experiments/001_example/020_b2d_0.sh):
 
 ```{code-block} bash
 :linenos:
@@ -38,7 +38,7 @@ evaluate_bench2drive220
 - **Line 7**: Optional override for closed-loop evaluation parameters (e.g., simulation settings)
 - **Line 9**: Launches evaluation using the `evaluate_bench2drive220` function, which starts a `screen` session and distributes SLURM jobs for each route
 
-Runtime parameters for evaluations are configured in [slurm/configs](https://github.com/autonomousvision/lead/tree/main/slurm/configs).
+Runtime parameters for evaluations are configured in [slurm/configs](https://github.com/kesai-labs/lead/tree/main/slurm/configs).
 
 ## Tracking Results
 

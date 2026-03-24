@@ -8,7 +8,7 @@ With your dataset collected, the next step is training models. The SLURM wrapper
 
 ## A Complete Training Pipeline
 
-A full example pipeline is available at [slurm/experiments/001_example](https://github.com/autonomousvision/lead/tree/main/slurm/experiments/001_example), demonstrating the workflow from initial training to evaluation-ready models.
+A full example pipeline is available at [slurm/experiments/001_example](https://github.com/kesai-labs/lead/tree/main/slurm/experiments/001_example), demonstrating the workflow from initial training to evaluation-ready models.
 
 ## Step 1: Pre-training From Scratch
 
@@ -52,7 +52,7 @@ train --cpus-per-task=64 --partition=L40Sday --time=4-00:00:00 --gres=gpu:4
 
 **Key points**:
 - **Lines 5-6**: Model architecture configuration, consistent with pre-training plus new components
-- **Line 7**: The `posttrain` function (defined in [slurm/init.sh](https://github.com/autonomousvision/lead/blob/main/slurm/init.sh)) helps the training script with loading the pre-trained weights
+- **Line 7**: The `posttrain` function (defined in [slurm/init.sh](https://github.com/kesai-labs/lead/blob/main/slurm/init.sh)) helps the training script with loading the pre-trained weights
 - **Line 9**: SLURM parameters for the fine-tuning job
 
 ## Handling Crashes: Automatic Resume
