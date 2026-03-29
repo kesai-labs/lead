@@ -1648,7 +1648,7 @@ class ExpertData(ExpertBase):
             LOG.info("Skipping static actor bounding boxes in eval_expert mode.")
         else:
             static_list = self._actors.filter("*static*")
-            LOG.info(f"Found {len(static_list)} static actors in the scene.")
+            LOG.debug(f"Found {len(static_list)} static actors in the scene.")
             for static in static_list:
                 if (
                     static.get_location().distance(self.ego_vehicle.get_location())

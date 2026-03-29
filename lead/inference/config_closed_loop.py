@@ -249,4 +249,4 @@ class ClosedLoopConfig(OpenLoopConfig):
 
     # --- AlpaSim Metric Recording ---
     # If true, record trajectory and ground-truth data and write <route_id>.json alongside other outputs
-    produce_alpasim_metric = True
+    produce_alpasim_metric = False

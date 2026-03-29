@@ -187,16 +187,6 @@ This typically indicates a CARLA server is consuming VRAM in the background. Kil
 bash scripts/clean_carla.sh
 ```
 
-### Unknown GPU Name: \<gpu_name>
-
-Register your GPU in the training configuration:
-
-**Step 1:** Add your GPU name to the `gpu_name` function in [lead/training/config_training.py](https://github.com/kesai-labs/lead/blob/main/lead/training/config_training.py).
-
-**Step 2:** If your GPU supports [bf16 (bfloat16)](https://docs.pytorch.org/docs/stable/amp.html), add it to both `use_mixed_precision_training` and `use_gradient_scaler` functions in the same file.
-
-**Why explicit registration?** Mixed precision training (BF16) is opt-in rather than automatic. On some older GPUs like RTX 2080 Ti, BF16 can degrade training performance, so we require explicit configuration.
-
 ### Unknown CARLA Root Path: \<carla_root>
 
 Register your CARLA dataset configuration in the `target_dataset` function in [lead/training/config_training.py](https://github.com/kesai-labs/lead/blob/main/lead/training/config_training.py). Map your CARLA root path to the appropriate dataset configuration, which specifies the expected sensor setup and data format.

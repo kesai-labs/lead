@@ -9,15 +9,15 @@ Scenario spawning elements to make the town dynamic and interesting
 """
 
 from collections import OrderedDict
-import py_trees
 
 import carla
-
+import py_trees
 from agents.navigation.local_planner import RoadOption
-
 from srunner.scenariomanager.carla_data_provider import CarlaDataProvider
-from srunner.scenariomanager.scenarioatomics.atomic_behaviors import AtomicBehavior
-from srunner.tools.scenario_helper import get_same_dir_lanes, get_opposite_dir_lanes
+from srunner.scenariomanager.scenarioatomics.atomic_behaviors import \
+    AtomicBehavior
+from srunner.tools.scenario_helper import (get_opposite_dir_lanes,
+                                           get_same_dir_lanes)
 
 JUNCTION_ENTRY = 'entry'
 JUNCTION_MIDDLE = 'middle'

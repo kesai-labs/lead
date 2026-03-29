@@ -275,14 +275,16 @@ class TrainingConfig(BaseConfig):
     @property
     def torch_float_type(self):
         """PyTorch float precision type for training."""
-        if self.use_mixed_precision_training and self.gpu_name in ["a100", "l40s"]:
+        if self.use_mixed_precision_training:
             return torch.bfloat16
         return torch.float32
 
     @property
     def use_mixed_precision_training(self):
         """If true use mixed precision training."""
-        return self.gpu_name in ["a100", "l40s"]
+        # Context: We found that on some GPUs (e.g., 2080ti) using mixed precision
+        # with b/float16 can be slower
+        return True
 
     @property
     def need_grad_scaler(self):
@@ -1035,32 +1037,6 @@ class TrainingConfig(BaseConfig):
         return False
 
     # --- Hardware configuration ---
-    @property
-    def gpu_name(self):
-        """Normalized GPU name for hardware-specific configurations."""
-        try:
-            name = torch.cuda.get_device_name().lower()
-            if "rtx 2080 ti" in name:
-                return "rtx2080ti"
-            elif "gtx 1080 ti" in name:
-                return "gtx1080ti"
-            elif "a100" in name:
-                return "a100"
-            elif "l40s" in name:
-                return "l40s"
-            elif "a4000" in name:
-                return "a4000"
-            elif "rtx 3080" in name:
-                return "rtx3080"
-            elif "rtx 5090" in name:
-                return "rtx5090"
-            else:
-                raise Exception(
-                    f"Unknown GPU name: {name}. Please register it in the config."
-                )
-        except RuntimeError:
-            return ""
-
     @property
     def rank(self):
         """Current process rank in distributed training."""

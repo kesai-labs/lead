@@ -14,46 +14,42 @@ from pathlib import Path
 import carla
 import numpy as np
 from beartype import beartype
+from py123d.api.map.arrow.arrow_map_writer import ArrowMapWriter
+from py123d.api.scene.arrow.arrow_log_writer import ArrowLogWriter
+from py123d.api.scene.arrow.utils.log_writer_config import LogWriterConfig
+from py123d.datatypes.detections.box_detection_label import DefaultBoxDetectionLabel
+from py123d.datatypes.detections.box_detections import (
+    BoxDetectionAttributes,
+    BoxDetectionSE3,
+    BoxDetectionsSE3,
+)
+from py123d.datatypes.detections.box_detections_metadata import (
+    BoxDetectionsSE3Metadata,
+)
+from py123d.datatypes.detections.traffic_light_detections import (
+    TrafficLightDetection,
+    TrafficLightDetections,
+)
+from py123d.datatypes.metadata.log_metadata import LogMetadata
+from py123d.datatypes.metadata.map_metadata import MapMetadata
+from py123d.datatypes.sensors.base_camera import Camera, CameraID
+from py123d.datatypes.sensors.lidar import Lidar, LidarFeature, LidarID, LidarMetadata
+from py123d.datatypes.sensors.pinhole_camera import (
+    PinholeCameraMetadata,
+    PinholeIntrinsics,
+)
+from py123d.datatypes.time.timestamp import Timestamp
+from py123d.datatypes.vehicle_state.dynamic_state import DynamicStateSE3
+from py123d.datatypes.vehicle_state.ego_state import EgoStateSE3
+from py123d.datatypes.vehicle_state.ego_state_metadata import (
+    get_carla_lincoln_mkz_2020_metadata,
+)
+from py123d.geometry import PoseSE3, Vector3D
+from py123d.geometry.transform.transform_se3 import rel_to_abs_se3
+from py123d.parser.base_dataset_parser import ModalitiesSync
+from py123d.parser.opendrive.opendrive_map_parser import iter_xodr_map_objects
+from py123d.script.utils.dataset_path_utils import get_dataset_paths
 
-try:
-    from py123d.conversion.dataset_converter_config import DatasetConverterConfig
-    from py123d.conversion.log_writer.abstract_log_writer import LiDARData
-    from py123d.conversion.log_writer.arrow_log_writer import ArrowLogWriter, CameraData
-    from py123d.conversion.map_writer.arrow_map_writer import ArrowMapWriter
-    from py123d.conversion.registry.box_detection_label_registry import (
-        DefaultBoxDetectionLabel,
-    )
-    from py123d.conversion.registry.lidar_index_registry import CARLALiDARIndex
-    from py123d.conversion.utils.map_utils.opendrive.opendrive_map_conversion import (
-        convert_xodr_map,
-    )
-    from py123d.datatypes.detections.box_detections import (
-        BoxDetectionMetadata,
-        BoxDetectionSE3,
-        BoxDetectionWrapper,
-    )
-    from py123d.datatypes.detections.traffic_light_detections import (
-        TrafficLightDetectionWrapper,
-    )
-    from py123d.datatypes.metadata import LogMetadata, MapMetadata
-    from py123d.datatypes.sensors.lidar import LiDARMetadata, LiDARType
-    from py123d.datatypes.sensors.pinhole_camera import (
-        PinholeCameraMetadata,
-        PinholeCameraType,
-        PinholeIntrinsics,
-    )
-    from py123d.datatypes.time.time_point import TimePoint
-    from py123d.datatypes.vehicle_state.ego_state import DynamicStateSE3, EgoStateSE3
-    from py123d.datatypes.vehicle_state.vehicle_parameters import (
-        get_carla_lincoln_mkz_2020_parameters,
-    )
-    from py123d.geometry import PoseSE3, Vector3D
-    from py123d.script.utils.dataset_path_utils import get_dataset_paths
-except Exception as e:
-    print(
-        f"Run 'pip install git+https://github.com/autonomousvision/py123d.git' to install Py123D. Import error: {e}"
-    )
-    raise e
 from lead.common import constants
 from lead.common.logging_config import setup_logging
 from lead.expert import expert_py123d_utils
@@ -110,27 +106,34 @@ class ExpertPy123D(Expert):
         LOG.info(f"Created logs directory: {self._py123d_logs_root.absolute()}")
         LOG.info(f"Created maps directory: {self._py123d_maps_root.absolute()}")
 
-        # Initialize Py123D writers
-        self._py123d_log_writer = ArrowLogWriter(logs_root=self._py123d_logs_root)
-        self._py123d_map_writer = ArrowMapWriter(maps_root=self._py123d_maps_root)
-
-        # Vehicle parameters (fixed for CARLA)
-        self._vehicle_parameters = get_carla_lincoln_mkz_2020_parameters()
-
-        # Dataset converter config
-        self._dataset_converter_config = DatasetConverterConfig(
+        # Log writer config
+        self._log_writer_config = LogWriterConfig(
             force_log_conversion=True,
+            camera_store_option="jpeg_binary",
+            lidar_store_option="binary",
+            lidar_codec="laz",
+        )
+
+        # Initialize Py123D writers
+        self._py123d_sensors_root = Path(dataset_paths.py123d_sensors_root)
+        self._py123d_sensors_root.mkdir(parents=True, exist_ok=True)
+        self._py123d_log_writer = ArrowLogWriter(
+            log_writer_config=self._log_writer_config,
+            logs_root=self._py123d_logs_root,
+            sensors_root=self._py123d_sensors_root,
+        )
+        self._py123d_map_writer = ArrowMapWriter(
             force_map_conversion=False,
-            include_map=True,
-            include_ego=True,
-            include_box_detections=True,
-            include_traffic_lights=False,  # Not implemented yet
-            include_pinhole_cameras=True,
-            pinhole_camera_store_option="jpeg_binary",
-            include_lidars=True,
-            lidar_store_option="laz_binary",
-            include_scenario_tags=False,
-            include_route=False,
+            maps_root=self._py123d_maps_root,
+            logs_root=self._py123d_logs_root,
+        )
+
+        # Vehicle metadata (fixed for CARLA)
+        self._ego_metadata = get_carla_lincoln_mkz_2020_metadata()
+
+        # Box detections metadata
+        self._box_detections_metadata = BoxDetectionsSE3Metadata(
+            box_detection_label_class=DefaultBoxDetectionLabel,
         )
 
         LOG.info("Py123D writers initialized")
@@ -170,15 +173,13 @@ class ExpertPy123D(Expert):
 
         map_metadata = MapMetadata(
             dataset="carla",
-            split=None,
-            log_name=None,
             location=self._location,
             map_has_z=True,
-            map_is_local=False,
+            map_is_per_log=False,
         )
 
         # Check if map needs conversion
-        if self._py123d_map_writer.reset(self._dataset_converter_config, map_metadata):
+        if self._py123d_map_writer.reset(map_metadata):
             LOG.info(f"Converting map for {self._location}...")
 
             # Get CARLA root
@@ -202,7 +203,8 @@ class ExpertPy123D(Expert):
                         LOG.info(
                             f"Starting map conversion from: {xodr_file.absolute()}"
                         )
-                        convert_xodr_map(xodr_file, self._py123d_map_writer)
+                        for map_object in iter_xodr_map_objects(xodr_file):
+                            self._py123d_map_writer.write_map_object(map_object)
                         LOG.info(
                             f"Map conversion complete. Saved to: {self._py123d_maps_root.absolute()}"
                         )
@@ -218,60 +220,44 @@ class ExpertPy123D(Expert):
 
     @beartype
     def _init_py123d_log(self) -> None:
-        """Initialize Py123D log writer with camera and LiDAR metadata."""
+        """Initialize Py123D log writer."""
         LOG.info(f"Initializing log writer for: {self._log_name}")
         LOG.info(f"Log output directory: {self._py123d_logs_root.absolute()}")
 
-        # Get camera metadata
-        LOG.info("Setting up camera metadata...")
-        camera_metadata = self._get_py123d_camera_metadata()
-        LOG.info(f"Camera metadata: {list(camera_metadata.keys())}")
+        # Store camera/lidar metadata for use in extraction methods
+        self._camera_metadata = self._get_py123d_camera_metadata()
+        self._lidar_metadata = self._get_py123d_lidar_metadata()
 
-        # Get LiDAR metadata
-        LOG.info("Setting up LiDAR metadata...")
-        lidar_metadata = self._get_py123d_lidar_metadata()
-        LOG.info(f"LiDAR metadata: {list(lidar_metadata.keys())}")
-
-        # Create log metadata
+        # Create log metadata (sensor metadata is now per-modality, not in LogMetadata)
         log_metadata = LogMetadata(
             dataset=self.config_expert.py123d_dataset,
             split=self.config_expert.py123d_split,
             log_name=self._log_name,
             location=self._location,
-            timestep_seconds=self.config_expert.py123d_timestep_seconds,
-            vehicle_parameters=self._vehicle_parameters,
-            box_detection_label_class=DefaultBoxDetectionLabel,
-            pinhole_camera_metadata=camera_metadata,
-            lidar_metadata=lidar_metadata,
             map_metadata=MapMetadata(
                 dataset=self.config_expert.py123d_dataset,
-                split=None,
-                log_name=None,
                 location=self._location,
                 map_has_z=True,
-                map_is_local=False,
+                map_is_per_log=False,
             ),
         )
 
         LOG.info(
             f"Log metadata created - log_name={self._log_name}, location={self._location}"
         )
-        self._py123d_log_writer.reset(self._dataset_converter_config, log_metadata)
+        self._py123d_log_writer.reset(log_metadata)
         LOG.info(
             f"Log writer initialized. Data will be saved to: {self._py123d_logs_root.absolute()}/{self._log_name}"
         )
 
     @beartype
-    def _get_py123d_camera_metadata(
-        self,
-    ) -> dict[PinholeCameraType, PinholeCameraMetadata]:
+    def _get_py123d_camera_metadata(self) -> PinholeCameraMetadata:
         """Get camera metadata for Py123D from CARLA camera configuration.
 
         Returns:
-            Dict mapping camera type to camera metadata.
+            PinholeCameraMetadata for the front camera.
         """
-        # Use PCAM_F0 as the main camera (front center)
-        camera_type = PinholeCameraType.PCAM_F0
+        camera_id = CameraID.PCAM_F0
 
         # Calculate intrinsics from CARLA camera parameters
         width = self.config_expert.camera_calibration[1]["width"]
@@ -285,27 +271,35 @@ class ExpertPy123D(Expert):
 
         intrinsics = PinholeIntrinsics(fx=focal_length, fy=focal_length, cx=cx, cy=cy)
 
-        camera_metadata = PinholeCameraMetadata(
-            camera_name=str(camera_type),
-            camera_type=camera_type,
+        # Get camera extrinsic relative to IMU (rear axle)
+        camera_pos = self.config_expert.camera_calibration[1]["pos"]
+        camera_rot = self.config_expert.camera_calibration[1]["rot"]
+        camera_to_imu_se3 = expert_py123d_utils.get_camera_extrinsic_as_iso(
+            camera_pos=camera_pos,
+            camera_rot=camera_rot,
+            ego_metadata=self._ego_metadata,
+        )
+
+        return PinholeCameraMetadata(
+            camera_name=str(camera_id),
+            camera_id=camera_id,
             intrinsics=intrinsics,
             distortion=None,
             width=width,
             height=height,
+            camera_to_imu_se3=camera_to_imu_se3,
         )
 
-        return {camera_type: camera_metadata}
-
     @beartype
-    def _get_py123d_lidar_metadata(self) -> dict[LiDARType, LiDARMetadata]:
+    def _get_py123d_lidar_metadata(self) -> LidarMetadata:
         """Get LiDAR metadata for Py123D from CARLA LiDAR configuration.
 
         Returns:
-            Dict mapping LiDAR type to LiDAR metadata.
+            LidarMetadata for the top LiDAR.
         """
-        lidar_type = LiDARType.LIDAR_TOP
+        lidar_id = LidarID.LIDAR_TOP
 
-        # Get LiDAR extrinsic (relative to ego rear axle)
+        # Get LiDAR extrinsic (relative to IMU / rear axle)
         lidar_pos = self.config_expert.lidar_pos_1
         lidar_rot = self.config_expert.lidar_rot_1
 
@@ -313,7 +307,7 @@ class ExpertPy123D(Expert):
             carla.Rotation(roll=lidar_rot[0], pitch=lidar_rot[1], yaw=lidar_rot[2])
         )
 
-        lidar_extrinsic = PoseSE3(
+        lidar_to_imu_se3 = PoseSE3(
             x=lidar_pos[0],
             y=-lidar_pos[1],  # Invert Y
             z=lidar_pos[2],
@@ -323,14 +317,11 @@ class ExpertPy123D(Expert):
             qz=quaternion.qz,
         )
 
-        lidar_metadata = LiDARMetadata(
-            lidar_name=str(lidar_type),
-            lidar_type=lidar_type,
-            lidar_index=CARLALiDARIndex,
-            extrinsic=lidar_extrinsic,
+        return LidarMetadata(
+            lidar_name=str(lidar_id),
+            lidar_id=lidar_id,
+            lidar_to_imu_se3=lidar_to_imu_se3,
         )
-
-        return {lidar_type: lidar_metadata}
 
     @beartype
     def run_step(
@@ -357,8 +348,8 @@ class ExpertPy123D(Expert):
             self.config_expert.datagen
             and self.step % self.config_expert.py123d_save_interval == 0
         ):
-            py123d_data = self._convert_to_py123d(input_data, timestamp)
-            self._py123d_log_writer.write(**py123d_data)
+            modalities_sync = self._convert_to_py123d(input_data, timestamp)
+            self._py123d_log_writer.write_sync(modalities_sync)
             if self.step % self.config_expert.py123d_log_interval == 0:
                 LOG.info(
                     f"Saved Py123D data at step {self.step} (timestamp={timestamp:.2f}s)"
@@ -374,7 +365,7 @@ class ExpertPy123D(Expert):
         return control
 
     @beartype
-    def _convert_to_py123d(self, input_data: dict, timestamp: float) -> dict:
+    def _convert_to_py123d(self, input_data: dict, timestamp: float) -> ModalitiesSync:
         """Convert LEAD's processed data to Py123D format.
 
         Args:
@@ -382,43 +373,44 @@ class ExpertPy123D(Expert):
             timestamp: Current simulation timestamp in seconds.
 
         Returns:
-            Dict with Py123D formatted data for log writer.
+            ModalitiesSync containing all modalities for this frame.
         """
-        timestamp_pt = TimePoint.from_s(timestamp)
+        ts = Timestamp.from_s(timestamp)
+        modalities: list[typing.Any] = []
 
         # Extract ego state
-        ego_state = self._extract_py123d_ego_state()
+        ego_state = self._extract_py123d_ego_state(ts)
+        modalities.append(ego_state)
 
         # Convert LEAD's bounding boxes format to Py123D
-        box_detections = self._extract_py123d_box_detections(input_data, timestamp_pt)
+        box_detections = self._extract_py123d_box_detections(input_data, ts)
         LOG.debug(f"Extracted {len(box_detections.box_detections)} bounding boxes")
+        if box_detections.box_detections:
+            modalities.append(box_detections)
 
-        # Convert camera data
-        camera_data = self._extract_py123d_camera_data(input_data, timestamp_pt)
-        LOG.debug(f"Extracted {len(camera_data)} camera frames")
+        # Convert camera data (needs ego state for world-space extrinsic)
+        camera = self._extract_py123d_camera_data(input_data, ts, ego_state)
+        LOG.debug("Extracted camera frame")
+        modalities.append(camera)
 
         # Convert LiDAR data
-        lidar_data = self._extract_py123d_lidar_data(timestamp_pt)
-        if lidar_data:
-            LOG.debug(
-                f"Extracted LiDAR with {lidar_data[0].point_cloud.shape[0]} points"
-            )
+        lidar = self._extract_py123d_lidar_data(ts)
+        if lidar is not None:
+            LOG.debug(f"Extracted LiDAR with {lidar.point_cloud_3d.shape[0]} points")
+            modalities.append(lidar)
 
-        # Traffic lights (empty for now)
-        traffic_lights = TrafficLightDetectionWrapper(traffic_light_detections=[])
+        # Traffic light detections
+        traffic_lights = self._extract_py123d_traffic_lights(ts)
+        modalities.append(traffic_lights)
 
-        return {
-            "timestamp": timestamp_pt,
-            "ego_state": ego_state,
-            "box_detections": box_detections,
-            "traffic_lights": traffic_lights,
-            "pinhole_cameras": camera_data,
-            "lidars": lidar_data,
-        }
+        return ModalitiesSync(timestamp=ts, modalities=modalities)
 
     @beartype
-    def _extract_py123d_ego_state(self) -> EgoStateSE3:
+    def _extract_py123d_ego_state(self, timestamp: Timestamp) -> EgoStateSE3:
         """Extract ego state from CARLA in Py123D format.
+
+        Args:
+            timestamp: Current simulation timestamp.
 
         Returns:
             EgoStateSE3 with position, velocity, and acceleration.
@@ -456,26 +448,25 @@ class ExpertPy123D(Expert):
             ),
         )
 
-        ego_state = EgoStateSE3.from_center(
+        return EgoStateSE3.from_center(
             center_se3=ego_center_se3,
-            vehicle_parameters=self._vehicle_parameters,
+            metadata=self._ego_metadata,
+            timestamp=timestamp,
             dynamic_state_se3=dynamic_state,
         )
 
-        return ego_state
-
     @beartype
     def _extract_py123d_box_detections(
-        self, input_data: dict, timestamp: TimePoint
-    ) -> BoxDetectionWrapper:
+        self, input_data: dict, timestamp: Timestamp
+    ) -> BoxDetectionsSE3:
         """Convert LEAD's bounding boxes format to Py123D.
 
         Args:
             input_data: Sensor data containing bounding boxes.
-            timestamp: Current simulation timepoint.
+            timestamp: Current simulation timestamp.
 
         Returns:
-            BoxDetectionWrapper with all detected objects.
+            BoxDetectionsSE3 with all detected objects.
         """
         box_detections: list[BoxDetectionSE3] = []
 
@@ -492,10 +483,9 @@ class ExpertPy123D(Expert):
 
             box_detections.append(
                 BoxDetectionSE3(
-                    metadata=BoxDetectionMetadata(
+                    attributes=BoxDetectionAttributes(
                         label=label,
                         track_token=str(vehicle.id),
-                        timepoint=timestamp,
                     ),
                     bounding_box_se3=expert_py123d_utils.get_actor_bounding_box_se3(
                         vehicle
@@ -510,10 +500,9 @@ class ExpertPy123D(Expert):
         for walker in self.walkers_inside_bev:
             box_detections.append(
                 BoxDetectionSE3(
-                    metadata=BoxDetectionMetadata(
+                    attributes=BoxDetectionAttributes(
                         label=DefaultBoxDetectionLabel.PERSON,
                         track_token=str(walker.id),
-                        timepoint=timestamp,
                     ),
                     bounding_box_se3=expert_py123d_utils.get_actor_bounding_box_se3(
                         walker
@@ -537,10 +526,9 @@ class ExpertPy123D(Expert):
                 ):
                     box_detections.append(
                         BoxDetectionSE3(
-                            metadata=BoxDetectionMetadata(
+                            attributes=BoxDetectionAttributes(
                                 label=DefaultBoxDetectionLabel.VEHICLE,
                                 track_token=str(bb["id"]),
-                                timepoint=None,
                             ),
                             bounding_box_se3=expert_py123d_utils.get_bounding_box_se3(
                                 bb
@@ -550,15 +538,14 @@ class ExpertPy123D(Expert):
                             ),
                         )
                     )
-                    LOG.info(f"Parking car detected: {bb['mesh_path']}")
+                    LOG.debug(f"Parking car detected: {bb['mesh_path']}")
                 elif actor is None:  # static_prob_car that is not spawned as an actor
                     assert bb["class"] == "static_prop_car"
                     box_detections.append(
                         BoxDetectionSE3(
-                            metadata=BoxDetectionMetadata(
+                            attributes=BoxDetectionAttributes(
                                 label=DefaultBoxDetectionLabel.VEHICLE,
                                 track_token=str(bb["id"]),
-                                timepoint=None,
                             ),
                             bounding_box_se3=expert_py123d_utils.get_bounding_box_se3(
                                 bb
@@ -587,10 +574,9 @@ class ExpertPy123D(Expert):
                         LOG.info(f"{bb['type_id']} classified as {label}")
                         box_detections.append(
                             BoxDetectionSE3(
-                                metadata=BoxDetectionMetadata(
+                                attributes=BoxDetectionAttributes(
                                     label=label,
                                     track_token=str(actor.id),
-                                    timepoint=None,
                                 ),
                                 bounding_box_se3=expert_py123d_utils.get_actor_bounding_box_se3(
                                     actor, overwrite_extent=overwrite_extent
@@ -601,86 +587,119 @@ class ExpertPy123D(Expert):
                             )
                         )
 
-        return BoxDetectionWrapper(box_detections=box_detections)
+        return BoxDetectionsSE3(
+            box_detections=box_detections,
+            timestamp=timestamp,
+            metadata=self._box_detections_metadata,
+        )
 
     @beartype
     def _extract_py123d_camera_data(
-        self, input_data: dict, timestamp: TimePoint
-    ) -> list[CameraData]:
+        self, input_data: dict, timestamp: Timestamp, ego_state: EgoStateSE3
+    ) -> Camera:
         """Extract camera data from LEAD's input_data.
 
         Args:
             input_data: Sensor data containing RGB images.
-            timestamp: Current simulation timepoint.
+            timestamp: Current simulation timestamp.
+            ego_state: Ego state for composing camera extrinsic in global frame.
 
         Returns:
-            List of CameraData with RGB images.
+            Camera with RGB image.
         """
-        camera_data_list = []
-        camera_type = PinholeCameraType.PCAM_F0
-
-        # Get camera extrinsic with proper ISO 8855 conversion
-        camera_pos = self.config_expert.camera_calibration[1]["pos"]
-        camera_rot = self.config_expert.camera_calibration[1]["rot"]
-
-        camera_extrinsic = expert_py123d_utils.get_camera_extrinsic_as_iso(
-            camera_pos=camera_pos,
-            camera_rot=camera_rot,
-            vehicle_parameters=self._vehicle_parameters,
-        )
-
-        # Get RGB image from LEAD (use first camera)
-        rgb_image = (
-            input_data["rgb_1"][1][:, :, :3]
+        # Get RGB image from LEAD (CARLA provides BGRA, convert to RGB)
+        bgra_image = (
+            input_data["rgb_1"][1]
             if isinstance(input_data["rgb_1"], tuple)
-            else input_data["rgb_1"][:, :, :3]
+            else input_data["rgb_1"]
+        )
+        rgb_image = bgra_image[:, :, :3][:, :, ::-1].copy()
+
+        # Compose camera-to-global: imu_to_global @ camera_to_imu
+        camera_to_global = rel_to_abs_se3(
+            origin=ego_state.imu_se3,
+            pose_se3=self._camera_metadata.camera_to_imu_se3,
         )
 
-        camera_data_list.append(
-            CameraData(
-                camera_name=str(camera_type),
-                camera_type=camera_type,
-                extrinsic=camera_extrinsic,
-                timestamp=timestamp,
-                numpy_image=rgb_image,
-            )
+        return Camera(
+            metadata=self._camera_metadata,
+            image=rgb_image,
+            camera_to_global_se3=camera_to_global,
+            timestamp=timestamp,
         )
-
-        return camera_data_list
 
     @beartype
-    def _extract_py123d_lidar_data(self, timestamp: TimePoint) -> list[LiDARData]:
+    def _extract_py123d_traffic_lights(
+        self, timestamp: Timestamp
+    ) -> TrafficLightDetections:
+        """Extract traffic light detections from CARLA.
+
+        Uses close_traffic_lights populated by the parent expert class and
+        list_traffic_lights to resolve affected lane IDs.
+
+        Args:
+            timestamp: Current simulation timestamp.
+
+        Returns:
+            TrafficLightDetections with per-lane status.
+        """
+        detections: list[TrafficLightDetection] = []
+
+        # Build actor → waypoints lookup from list_traffic_lights
+        actor_waypoints: dict[int, list[carla.Waypoint]] = {
+            actor.id: waypoints
+            for actor, _center, waypoints in self.list_traffic_lights
+        }
+
+        for _tl_actor, _bb, tl_state, tl_id, _affects_ego in self.close_traffic_lights:
+            status = expert_py123d_utils.carla_traffic_light_status_to_py123d(tl_state)
+            waypoints = actor_waypoints.get(tl_id, [])
+            if waypoints:
+                for wp in waypoints:
+                    detections.append(
+                        TrafficLightDetection(lane_id=wp.lane_id, status=status)
+                    )
+            else:
+                LOG.warning(
+                    f"Traffic light ID {tl_id} has no associated waypoints. Using negative actor ID as lane_id fallback."
+                )
+
+        return TrafficLightDetections(detections=detections, timestamp=timestamp)
+
+    @beartype
+    def _extract_py123d_lidar_data(self, timestamp: Timestamp) -> Lidar | None:
         """Extract LiDAR data from accumulated point cloud.
 
         Args:
-            timestamp: Current simulation timepoint.
+            timestamp: Current simulation timestamp.
 
         Returns:
-            List of LiDARData with point cloud.
+            Lidar with point cloud, or None if no data.
         """
-        lidar_type = LiDARType.LIDAR_TOP
-        lidar_pc_py123d = self.accumulate_lidar().copy()
+        lidar_pc = self.accumulate_lidar().copy()
 
-        lidar_pc_py123d[:, CARLALiDARIndex.Y] = -lidar_pc_py123d[:, CARLALiDARIndex.Y]
-        lidar_pc_py123d[:, CARLALiDARIndex.X] += (
-            self._vehicle_parameters.rear_axle_to_center_longitudinal
-        )
-        lidar_pc_py123d[:, CARLALiDARIndex.Z] += self.config_expert.lidar_pos_1[-1] / 2
+        # Convert to ISO 8855: invert Y, shift X by rear axle offset, adjust Z
+        lidar_pc[:, 1] = -lidar_pc[:, 1]  # Y
+        lidar_pc[:, 0] += self._ego_metadata.rear_axle_to_center_longitudinal  # X
+        lidar_pc[:, 2] += self.config_expert.lidar_pos_1[-1] / 2  # Z
 
-        # Set intensity to 1.0
-        lidar_pc_py123d[..., -1] = 1.0
+        # Split into xyz (Nx3) and features
+        point_cloud_3d = lidar_pc[:, :3].astype(np.float32)
+        num_points = lidar_pc.shape[0]
+        point_cloud_features = {
+            LidarFeature.IDS.serialize(): np.full(
+                num_points, int(LidarID.LIDAR_TOP.value), dtype=np.uint8
+            ),
+            LidarFeature.INTENSITY.serialize(): np.ones(num_points, dtype=np.uint8),
+        }
 
-        lidar_data = LiDARData(
-            lidar_name=str(lidar_type),
-            lidar_type=lidar_type,
+        return Lidar(
             timestamp=timestamp,
-            iteration=None,
-            dataset_root=None,
-            relative_path=None,
-            point_cloud=lidar_pc_py123d,
+            timestamp_end=timestamp,
+            metadata=self._lidar_metadata,
+            point_cloud_3d=point_cloud_3d,
+            point_cloud_features=point_cloud_features,
         )
-
-        return [lidar_data]
 
     @beartype
     def destroy(self, results: typing.Any = None) -> None:
