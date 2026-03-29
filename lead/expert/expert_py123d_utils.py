@@ -1,5 +1,4 @@
-"""
-Utility functions for Py123D data conversion.
+"""Utility functions for Py123D data conversion.
 
 These utilities handle coordinate system conversions between CARLA (Unreal Engine)
 and ISO 8855 (Py123D) coordinate systems.
@@ -10,30 +9,24 @@ import jaxtyping as jt
 import numpy as np
 import numpy.typing as npt
 from beartype import beartype
-
-try:
-    from py123d.conversion.utils.sensor_utils.camera_conventions import (
-        CameraConvention,
-        convert_camera_convention,
-    )
-    from py123d.datatypes.vehicle_state.vehicle_parameters import VehicleParameters
-    from py123d.geometry import (
-        BoundingBoxSE3,
-        EulerAngles,
-        PoseSE3,
-        PoseSE3Index,
-        Quaternion,
-        Vector3D,
-    )
-    from py123d.geometry.transform.transform_se3 import (
-        translate_se3_along_body_frame,
-        translate_se3_along_z,
-    )
-except Exception as e:
-    print(
-        f"Run 'pip install git+https://github.com/autonomousvision/py123d.git' to install Py123D. Import error: {e}"
-    )
-    raise e
+from py123d.datatypes.detections.traffic_light_detections import TrafficLightStatus
+from py123d.datatypes.vehicle_state.ego_state_metadata import EgoStateSE3Metadata
+from py123d.geometry import (
+    BoundingBoxSE3,
+    EulerAngles,
+    PoseSE3,
+    PoseSE3Index,
+    Quaternion,
+    Vector3D,
+)
+from py123d.geometry.transform.transform_se3 import (
+    translate_se3_along_body_frame,
+    translate_se3_along_z,
+)
+from py123d.parser.utils.sensor_utils.camera_conventions import (
+    CameraConvention,
+    convert_camera_convention,
+)
 
 
 @beartype
@@ -227,13 +220,13 @@ def get_actor_velocity(actor: carla.Actor) -> Vector3D:
 
 @beartype
 def floor_center_to_rear_axle_translate(
-    pose: PoseSE3, vehicle_parameters: VehicleParameters
+    pose: PoseSE3, ego_metadata: EgoStateSE3Metadata
 ) -> PoseSE3:
     """Translate pose from CARLA floor center to ISO 8855 rear axle frame.
 
     Args:
         pose: PoseSE3 in floor center reference.
-        vehicle_parameters: Vehicle parameters with rear axle offsets.
+        ego_metadata: Ego vehicle metadata with rear axle offsets.
 
     Returns:
         PoseSE3 translated to rear axle reference.
@@ -242,10 +235,9 @@ def floor_center_to_rear_axle_translate(
     rear_axle_translate = translate_se3_along_body_frame(
         zero_pose,
         Vector3D(
-            x=vehicle_parameters.rear_axle_to_center_longitudinal,
+            x=ego_metadata.rear_axle_to_center_longitudinal,
             y=0.0,
-            z=-(vehicle_parameters.half_height)
-            + vehicle_parameters.rear_axle_to_center_vertical,
+            z=-(ego_metadata.half_height) + ego_metadata.rear_axle_to_center_vertical,
         ),
     )
     pose.array[PoseSE3Index.XYZ] += rear_axle_translate.array[PoseSE3Index.XYZ]
@@ -256,14 +248,14 @@ def floor_center_to_rear_axle_translate(
 def get_camera_extrinsic_as_iso(
     camera_pos: jt.Float[npt.NDArray, "3"] | list[float],
     camera_rot: jt.Float[npt.NDArray, "3"] | list[float],
-    vehicle_parameters: VehicleParameters,
+    ego_metadata: EgoStateSE3Metadata,
 ) -> PoseSE3:
     """Convert camera extrinsic from Unreal Engine to ISO 8855 format.
 
     Args:
         camera_pos: Camera position [x, y, z] in Unreal coordinates.
         camera_rot: Camera rotation [roll, pitch, yaw] in degrees.
-        vehicle_parameters: Vehicle parameters for rear axle offset.
+        ego_metadata: Ego vehicle metadata for rear axle offset.
 
     Returns:
         PoseSE3 camera extrinsic in ISO 8855/OpenCV convention.
@@ -286,7 +278,7 @@ def get_camera_extrinsic_as_iso(
 
     # Convert from floor center to rear axle reference
     camera_extrinsic = floor_center_to_rear_axle_translate(
-        camera_extrinsic, vehicle_parameters
+        camera_extrinsic, ego_metadata
     )
 
     # Convert camera convention from pXpZmY (Unreal) to pZmYpX (ISO 8855/OpenCV)
@@ -297,3 +289,25 @@ def get_camera_extrinsic_as_iso(
     )
 
     return camera_extrinsic
+
+
+@beartype
+def carla_traffic_light_status_to_py123d(
+    state: carla.TrafficLightState,
+) -> TrafficLightStatus:
+    """Convert CARLA TrafficLightState to Py123D TrafficLightStatus.
+
+    Args:
+        state: CARLA traffic light state.
+
+    Returns:
+        Corresponding Py123D TrafficLightStatus.
+    """
+    _MAP = {
+        carla.TrafficLightState.Green: TrafficLightStatus.GREEN,
+        carla.TrafficLightState.Yellow: TrafficLightStatus.YELLOW,
+        carla.TrafficLightState.Red: TrafficLightStatus.RED,
+        carla.TrafficLightState.Off: TrafficLightStatus.OFF,
+        carla.TrafficLightState.Unknown: TrafficLightStatus.UNKNOWN,
+    }
+    return _MAP.get(state, TrafficLightStatus.UNKNOWN)

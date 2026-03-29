@@ -170,7 +170,6 @@ slurm-*.out
 3rd_party/CARLA_0.9.15.tar.gz
 3rd_party/CARLA_0915
 3rd_party/CARLA_0916
-3rd_party/carla_route_generator/
 outputs/
 docs/build/
 !slurm/
@@ -189,8 +188,8 @@ outputs/checkpoints
 outputs/local_evaluation
 3rd_party/alpamayo
 ar1_venv
-3rd_party/carla_route_generator
 alpasim-metric-bench2drive/
 /*.prof
 /None/
 visualization/
+3rd_party/alpamayo1.5

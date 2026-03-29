@@ -156,11 +156,11 @@ git lfs pull
 
 **VSCode** — install recommended extensions when prompted. Debugging works out of the box.
 
-![](docs/assets/vscode.png)
+![VSCode recommended extensions prompt](docs/assets/vscode.png)
 
 **PyCharm** — add the CARLA Python API `3rd_party/CARLA_0915/PythonAPI/carla` to your interpreter paths via `Settings → Python → Interpreter → Show All → Show Interpreter Paths`.
 
-![](docs/assets/pycharm.png)
+![PyCharm interpreter paths setting](docs/assets/pycharm.png)
 
 ### 5. Evaluate model
 
@@ -346,6 +346,12 @@ Output in 123D format is saved to `data/carla_leaderboard2_py123d/`:
 | `maps/carla/*.arrow` | Map data in Arrow format               |
 
 </div>
+
+To visualize collected scenes in 3D with [Viser](https://viser.studio/):
+
+```bash
+python scripts/123d_viser.py
+```
 
 > [!TIP]
 > This feature is experimental. Change `PY123D_DATA_ROOT` in `scripts/main.sh` to set the output directory.
