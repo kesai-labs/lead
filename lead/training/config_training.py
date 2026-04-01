@@ -159,7 +159,7 @@ class TrainingConfig(BaseConfig):
     @overridable_property
     def visualize_training(self):
         """If true produce images during training for visualization."""
-        if self.is_on_slurm:
+        if not self.debug_mode:
             return True
         return True
 
@@ -268,7 +268,7 @@ class TrainingConfig(BaseConfig):
     @overridable_property
     def batch_size(self):
         """Batch size for training."""
-        if not self.is_on_slurm:  # Local training
+        if self.debug_mode:
             return 2
         return 64
 
@@ -279,12 +279,8 @@ class TrainingConfig(BaseConfig):
             return torch.bfloat16
         return torch.float32
 
-    @property
-    def use_mixed_precision_training(self):
-        """If true use mixed precision training."""
-        # Context: We found that on some GPUs (e.g., 2080ti) using mixed precision
-        # with b/float16 can be slower
-        return True
+    # If true use mixed precision training with float16. This can speed up training and reduce memory usage on compatible hardware.
+    use_mixed_precision_training = True
 
     @property
     def need_grad_scaler(self):
@@ -299,8 +295,8 @@ class TrainingConfig(BaseConfig):
     @property
     def save_model_checkpoint(self):
         """If true save model checkpoints during training."""
-        if self.is_on_slurm:
-            return True
+        if not self.debug_mode:
+            return False
         return True
 
     @property
@@ -998,7 +994,7 @@ class TrainingConfig(BaseConfig):
     @property
     def log_scalars_frequency(self):
         """How often to log scalar values during training."""
-        if not self.is_on_slurm:
+        if self.debug_mode:
             return 1
         try:
             with open(
@@ -1015,7 +1011,7 @@ class TrainingConfig(BaseConfig):
     @property
     def log_images_frequency(self):
         """How often to log images during training."""
-        if not self.is_on_slurm:
+        if self.debug_mode:
             return 100
         try:
             with open(
@@ -1029,12 +1025,12 @@ class TrainingConfig(BaseConfig):
             LOG.error(f"Error reading log frequency file: {e}.")
             return 100
 
-    @property
+    @overridable_property
     def log_wandb(self):
         """If true log metrics to Weights & Biases."""
-        if self.is_on_slurm:
-            return True
-        return False
+        if self.debug_mode:
+            return False
+        return True
 
     # --- Hardware configuration ---
     @property
@@ -1059,7 +1055,7 @@ class TrainingConfig(BaseConfig):
             f"cuda:{self.local_rank}" if torch.cuda.is_available() else "cpu"
         )
 
-    @property
+    @overridable_property
     def assigned_cpu_cores(self):
         """Number of CPU cores assigned to this job."""
         if "SLURM_JOB_ID" in os.environ:

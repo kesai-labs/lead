@@ -126,9 +126,7 @@ class NavsimData(Dataset):
 
         feature, target = cache[target_path]
 
-        rgb = cv2.imdecode(
-            feature["camera_feature"].detach().cpu().numpy(), cv2.IMREAD_COLOR
-        )
+        rgb = cv2.imdecode(feature["camera_feature"], cv2.IMREAD_COLOR)
         rgb = np.transpose(rgb, (2, 0, 1))  # HWC to CHW
 
         agent_states = target["agent_states"]
