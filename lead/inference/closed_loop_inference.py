@@ -95,9 +95,9 @@ class ClosedLoopInference(OpenLoopInference):
             throttle: Throttle command in [0, 1]
             brake: Brake command in [0, 1]
         """
-        pred_checkpoints = pred_checkpoints[0].data.cpu().numpy()
-        speed = float(speed[0].data.cpu().numpy())
-        pred_target_speed = float(pred_target_speed[0].data.cpu().numpy())
+        pred_checkpoints = pred_checkpoints[0].data.cpu().float().numpy()
+        speed = float(speed[0].data.cpu().float().numpy())
+        pred_target_speed = float(pred_target_speed[0].data.cpu().float().numpy())
 
         brake = bool(
             pred_target_speed < 0.01
@@ -132,8 +132,8 @@ class ClosedLoopInference(OpenLoopInference):
             throttle: Throttle command in [0, 1]
             brake: Brake command in [0, 1]
         """
-        waypoints = waypoints[0].data.cpu().numpy()
-        speed = velocity[0].data.cpu().numpy()
+        waypoints = waypoints[0].data.cpu().float().numpy()
+        speed = velocity[0].data.cpu().float().numpy()
 
         one_second = int(
             self.config_training.carla_fps // self.config_training.data_save_freq

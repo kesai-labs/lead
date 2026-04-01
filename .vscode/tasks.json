@@ -4,7 +4,7 @@
         {
             "label": "Reset Carla World",
             "type": "shell",
-            "command": "python scripts/reset_carla_world.py",
+            "command": "${command:python.interpreterPath} scripts/reset_carla_world.py",
             "options": {
                 "cwd": "${workspaceFolder}"
             },

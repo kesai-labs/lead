@@ -1,6 +1,7 @@
 {
     "version": "0.2.0",
     "configurations": [
+        // Debug configurations for Training
         {
             "name": "Pretrain NAVSIM",
             "type": "debugpy",
@@ -11,32 +12,82 @@
             "args": [
                 "logdir=outputs/local_training/pretrain",
                 "use_navsim_data=true",
-                "use_carla_data=false", "LTF=true", "epochs=61"
-            ],
-            "env": {
-                "PYTHONDONTWRITEBYTECODE": "1"
-            }
-        },
-        {
-            "name": "Expert Py123D Gen Data",
-            "type": "debugpy",
-            "request": "launch",
-            "preLaunchTask": "Reset Carla World",
-            "module": "lead.leaderboard_wrapper",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "args": [
-                "--expert",
-                "--py123d",
-                "--routes",
-                "data/debug_routes/Town15.xml"
+                "use_carla_data=false",
+                "LTF=true",
+                "epochs=61"
             ],
             "env": {
                 "PYTHONDONTWRITEBYTECODE": "1",
-                "LEAD_EXPERT_CONFIG": "target_dataset=6 py123d_data_format=true use_radars=false lidar_stack_size=2 save_only_non_ground_lidar=false save_lidar_only_inside_bev=false",
-                "PY123D_DATA_ROOT": "${workspaceFolder}/outputs/expert_evaluation/py123d/",
+                "LEAD_TRAINING_CONFIG": "debug_mode=true"
             }
         },
+        {
+            "name": "Pretrain",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "lead/training/train.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "logdir=outputs/local_training/pretrain"
+            ],
+            "env": {
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "LEAD_TRAINING_CONFIG": "debug_mode=true"
+            }
+        },
+        {
+            "name": "Posttrain",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "lead/training/train.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "logdir=outputs/local_training/posttrain",
+                "load_file=outputs/local_training/pretrain/model_0030.pth",
+                "use_planning_decoder=true"
+            ],
+            "env": {
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "LEAD_TRAINING_CONFIG": "debug_mode=true"
+            }
+        },
+        {
+            "name": "Pretrain DDP",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "lead/training/train.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "LEAD_TRAINING_CONFIG": "debug_mode=true logdir=outputs/local_training/pretrain",
+                "OMP_NUM_THREADS": "8",
+                "OPENBLAS_NUM_THREADS": "1",
+                "NCCL_P2P_DISABLE": "1",
+                "NCCL_P2P_LEVEL": "NVL",
+                "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+            }
+        },
+        {
+            "name": "Posttrain DDP",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "lead/training/train.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "LEAD_TRAINING_CONFIG": "debug_mode=true logdir=outputs/local_training/posttrain load_file=outputs/local_training/pretrain/model_0030.pth use_planning_decoder=true",
+                "OMP_NUM_THREADS": "8",
+                "OPENBLAS_NUM_THREADS": "1",
+                "NCCL_P2P_DISABLE": "1",
+                "NCCL_P2P_LEVEL": "NVL",
+                "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+            }
+        },
+        // Debug configurations for Evaluation
         {
             "name": "Eval Bench2Drive",
             "type": "debugpy",
@@ -47,13 +98,14 @@
             "justMyCode": false,
             "args": [
                 "--checkpoint",
-                "outputs/checkpoints/tfv6_resnet34",
+                "outputs/training/733_scaled_regnety/010_postrain32_0/251025_182327",
                 "--routes",
-                "data/benchmark_routes/bench2drive/23687.xml",
+                "data/benchmark_routes/bench2drive/2086.xml",
                 "--bench2drive"
             ],
             "env": {
                 "PYTHONDONTWRITEBYTECODE": "1",
+                "LEAD_CLOSED_LOOP_CONFIG": "debug_mode=true"
             }
         },
         {
@@ -66,12 +118,15 @@
             "justMyCode": false,
             "args": [
                 "--checkpoint",
-                "outputs/checkpoints/regnety032",
+                "outputs/training/700_regnety_032/010_postrain32_0/250913_153308",
                 "--routes",
                 "data/benchmark_routes/longest6/00.xml"
             ],
             "env": {
                 "PYTHONDONTWRITEBYTECODE": "1",
+                "LEAD_TRAINING_CONFIG": "use_tfv5_planning_decoder=true use_radar_detection=false radar_detection=false",
+                "LEAD_CLOSED_LOOP_CONFIG": "debug_mode=true",
+                "LEAD_OPEN_LOOP_CONFIG": "strict_weight_load=false"
             }
         },
         {
@@ -92,6 +147,7 @@
             ],
             "env": {
                 "PYTHONDONTWRITEBYTECODE": "1",
+                "LEAD_CLOSED_LOOP_CONFIG": "debug_mode=true"
             }
         },
         {
@@ -114,6 +170,28 @@
             ],
             "env": {
                 "PYTHONDONTWRITEBYTECODE": "1",
+                "LEAD_CLOSED_LOOP_CONFIG": "debug_mode=true"
+            }
+        },
+        // Debug configurations for Expert Evaluation / Data Generation
+        {
+            "name": "Expert Py123D Gen Data",
+            "type": "debugpy",
+            "request": "launch",
+            "preLaunchTask": "Reset Carla World",
+            "module": "lead.leaderboard_wrapper",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "args": [
+                "--expert",
+                "--py123d",
+                "--routes",
+                "data/data_routes/lead/noScenarios/short_route.xml"
+            ],
+            "env": {
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "LEAD_EXPERT_CONFIG": "debug_mode=true target_dataset=6 py123d_data_format=true use_radars=false lidar_stack_size=2 save_only_non_ground_lidar=false save_lidar_only_inside_bev=false",
+                "PY123D_DATA_ROOT": "${workspaceFolder}/outputs/expert_evaluation/py123d/"
             }
         },
         {
@@ -131,6 +209,7 @@
             ],
             "env": {
                 "PYTHONDONTWRITEBYTECODE": "1",
+                "LEAD_EXPERT_CONFIG": "debug_mode=true"
             }
         },
         {
@@ -144,77 +223,12 @@
             "args": [
                 "--expert",
                 "--routes",
-                "data/benchmark_routes/Town13/1.xml"
+                "data/data_routes/lead/noScenarios/short_route.xml"
             ],
             "env": {
                 "PYTHONDONTWRITEBYTECODE": "1",
-                "LEAD_EXPERT_CONFIG": "eval_expert=true profile_expert=false",
+                "LEAD_EXPERT_CONFIG": "debug_mode=true eval_expert=true profile_expert=false"
             }
         },
-        {
-            "name": "Pretrain",
-            "type": "debugpy",
-            "request": "launch",
-            "preLaunchTask": "Reset Carla World",
-            "program": "lead/training/train.py",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "args": [
-                "logdir=outputs/local_training/pretrain"
-            ],
-            "env": {
-                "PYTHONDONTWRITEBYTECODE": "1"
-            }
-        },
-        {
-            "name": "Posttrain",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "lead/training/train.py",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "args": [
-                "logdir=outputs/local_training/posttrain",
-                "load_file=outputs/local_training/pretrain/model_0030.pth",
-                "use_planning_decoder=true"
-            ],
-            "env": {
-                "PYTHONDONTWRITEBYTECODE": "1"
-            }
-        },
-        {
-            "name": "Pretrain DDP",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "lead/training/train.py",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "env": {
-                "PYTHONDONTWRITEBYTECODE": "1",
-                "LEAD_TRAINING_CONFIG": "logdir=outputs/local_training/pretrain",
-                "OMP_NUM_THREADS": "8",
-                "OPENBLAS_NUM_THREADS": "1",
-                "NCCL_P2P_DISABLE": "1",
-                "NCCL_P2P_LEVEL": "NVL",
-                "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
-            }
-        },
-        {
-            "name": "Posttrain DDP",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "lead/training/train.py",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "env": {
-                "PYTHONDONTWRITEBYTECODE": "1",
-                "LEAD_TRAINING_CONFIG": "logdir=outputs/local_training/posttrain load_file=outputs/local_training/pretrain/model_0030.pth use_planning_decoder=true",
-                "OMP_NUM_THREADS": "8",
-                "OPENBLAS_NUM_THREADS": "1",
-                "NCCL_P2P_DISABLE": "1",
-                "NCCL_P2P_LEVEL": "NVL",
-                "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
-            }
-        }
     ]
 }

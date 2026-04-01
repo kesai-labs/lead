@@ -165,6 +165,8 @@ class LeaderboardWrapper:
                 "evaluator_script": self.workspace_root
                 / "3rd_party/Bench2Drive/leaderboard/leaderboard/leaderboard_evaluator.py",
                 "evaluator_module": "leaderboard.leaderboard_evaluator",
+                "carla_path": self.workspace_root
+                / "3rd_party/CARLA_0915/PythonAPI/carla",
             }
         elif self.leaderboard_type == LeaderboardType.AUTOPILOT:
             return {

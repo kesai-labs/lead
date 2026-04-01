@@ -97,6 +97,10 @@ Verify that `~/.bashrc` reflects these paths correctly.
 We use Miniconda, conda-lock, and uv:
 
 ```bash
+# (Optional, needed in some cases) Accept terms and services
+conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main
+conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
+
 # Create conda environment
 pip install conda-lock && conda-lock install -n lead conda-lock.yml
 

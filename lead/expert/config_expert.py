@@ -178,28 +178,28 @@ class ExpertConfig(BaseConfig):
     @property
     def shuffle_weather(self):
         """If true shuffle weather conditions during training."""
-        if self.is_on_slurm:
+        if not self.debug_mode:
             return True
         return True
 
     @property
     def nice_weather(self):
         """If true use only nice weather conditions."""
-        if self.is_on_slurm:
+        if not self.debug_mode:
             return False
         return True
 
     @property
     def jpeg_compression(self):
         """If true enable JPEG compression for image storage."""
-        if self.is_on_slurm:
+        if not self.debug_mode:
             return True
         return True
 
     @property
     def datagen(self):
         """If true enable data generation mode."""
-        if self.is_on_slurm:
+        if not self.debug_mode:
             return True
         return True
 
@@ -552,7 +552,7 @@ class ExpertConfig(BaseConfig):
     # If true  save camera point clouds
     @property
     def save_camera_pc(self):
-        if self.is_on_slurm:
+        if not self.debug_mode:
             return False
         return True
 
@@ -561,7 +561,7 @@ class ExpertConfig(BaseConfig):
         """If true save instance segmentation images."""
         if self.eval_expert:
             return False
-        if self.is_on_slurm:
+        if not self.debug_mode:
             return False
         return True
 
@@ -569,7 +569,7 @@ class ExpertConfig(BaseConfig):
     def eval_expert(self):
         """If true run expert evaluation. This will minimize sensor production and other overheads to maximize
         inference speed."""
-        if self.is_on_slurm:
+        if not self.debug_mode:
             return False
         return False
 
@@ -656,7 +656,7 @@ class ExpertConfig(BaseConfig):
             return False
         if self.forced_debug_visualization:
             return True
-        if self.is_on_slurm:
+        if not self.debug_mode:
             return False
         return False
 
@@ -667,7 +667,7 @@ class ExpertConfig(BaseConfig):
             return False
         if self.forced_debug_visualization:
             return True
-        if self.is_on_slurm:
+        if not self.debug_mode:
             return False
         return False
 
@@ -678,7 +678,7 @@ class ExpertConfig(BaseConfig):
             return False
         if self.forced_debug_visualization:
             return True
-        if self.is_on_slurm:
+        if not self.debug_mode:
             return False
         return False
 
@@ -689,7 +689,7 @@ class ExpertConfig(BaseConfig):
             return False
         if self.forced_debug_visualization:
             return True
-        if self.is_on_slurm:
+        if not self.debug_mode:
             return False
         return False
 
@@ -700,7 +700,7 @@ class ExpertConfig(BaseConfig):
             return False
         if self.forced_debug_visualization:
             return True
-        if self.is_on_slurm:
+        if not self.debug_mode:
             return False
         return False
 
@@ -711,7 +711,7 @@ class ExpertConfig(BaseConfig):
             return False
         if self.forced_debug_visualization:
             return True
-        if self.is_on_slurm:
+        if not self.debug_mode:
             return False
         return False
 
@@ -721,7 +721,7 @@ class ExpertConfig(BaseConfig):
             return False
         if self.forced_debug_visualization:
             return True
-        if self.is_on_slurm:
+        if not self.debug_mode:
             return False
         return False
 
@@ -732,7 +732,7 @@ class ExpertConfig(BaseConfig):
             return False
         if self.forced_debug_visualization:
             return True
-        if self.is_on_slurm:
+        if not self.debug_mode:
             return False
         return False
 
@@ -743,7 +743,7 @@ class ExpertConfig(BaseConfig):
             return False
         if self.forced_debug_visualization:
             return True
-        if self.is_on_slurm:
+        if not self.debug_mode:
             return False
         return False
 
@@ -753,7 +753,7 @@ class ExpertConfig(BaseConfig):
             return False
         if self.forced_debug_visualization:
             return True
-        if self.is_on_slurm:
+        if not self.debug_mode:
             return False
         return False
 
@@ -764,7 +764,7 @@ class ExpertConfig(BaseConfig):
             return False
         if self.forced_debug_visualization:
             return True
-        if self.is_on_slurm:
+        if not self.debug_mode:
             return False
         return False
 
@@ -775,7 +775,7 @@ class ExpertConfig(BaseConfig):
             return False
         if self.forced_debug_visualization:
             return True
-        if self.is_on_slurm:
+        if not self.debug_mode:
             return False
         return False
 
@@ -809,7 +809,7 @@ class ExpertConfig(BaseConfig):
         """If true 3rd person camera images should be saved."""
         if self.eval_expert:
             return True
-        if self.is_on_slurm:
+        if not self.debug_mode:
             return False
         # If true save the 3rd person camera images
         return False
@@ -819,7 +819,7 @@ class ExpertConfig(BaseConfig):
         """If true depth images should be saved."""
         if self.eval_expert:
             return False
-        if self.is_on_slurm:
+        if not self.debug_mode:
             return True
         return True
 

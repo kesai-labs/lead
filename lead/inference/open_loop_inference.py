@@ -350,7 +350,12 @@ class OpenLoopInference:
             EnsemblePrediction object containing the aggregated predictions
         """
         self.step += 1
-        self.predictions: list[Prediction] = [net(data) for net in self.nets]
+        with torch.amp.autocast(
+            device_type="cuda",
+            dtype=self.config_training.torch_float_type,
+            enabled=self.config_training.use_mixed_precision_training,
+        ):
+            self.predictions: list[Prediction] = [net(data) for net in self.nets]
         return self.ensemble(data, self.predictions)
 
     def __getitem__(self, index):

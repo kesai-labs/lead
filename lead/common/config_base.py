@@ -14,6 +14,10 @@ class BaseConfig:
     See more details at https://ln2697.github.io/lead/docs/config_system.html
     """
 
+    # If true, run code in debug mode with settings that allow for
+    # faster iteration and easier debugging (e.g., lower resolution, fewer data points saved, etc.)
+    debug_mode = False
+
     @property
     def target_dataset(self):
         raise NotImplementedError(
@@ -326,7 +330,7 @@ class BaseConfig:
     @property
     def save_depth_resolution_ratio(self):
         """Resolution reduction ratio for depth image storage."""
-        if self.is_on_slurm:
+        if not self.debug_mode:
             return 4
         return 4
 
@@ -393,11 +397,6 @@ class BaseConfig:
     def safety_box_x_max(self):
         """Maximum x coordinate of the safety box relative to ego vehicle."""
         return self.ego_extent_x + 2.5
-
-    @property
-    def is_on_slurm(self):
-        """Check if running on SLURM cluster environment."""
-        return "SLURM_JOB_ID" in os.environ and os.environ["SLURM_JOB_ID"] is not None
 
     @property
     def is_on_tcml(self):

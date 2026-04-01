@@ -43,14 +43,11 @@ export NCCL_P2P_DISABLE=1 # https://github.com/huggingface/accelerate/issues/314
 export NCCL_P2P_LEVEL=NVL # https://github.com/huggingface/accelerate/issues/314
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-# If SLURM_JOB_ID is not set, we are local and use only one node
-if [ -z "$SLURM_JOB_ID" ]; then
-	nproc_per_node=1
-else
-	nproc_per_node=$(nvidia-smi --query-gpu=name --format=csv,noheader | wc -l)
-fi
+nproc_per_node=$(python -c "import torch; print(torch.cuda.device_count())")
 export MASTER_ADDR=127.0.0.1
 export MASTER_PORT=$((10000 + RANDOM % 50000))
+echo "Using $nproc_per_node GPUs per node. MASTER_ADDR=$MASTER_ADDR MASTER_PORT=$MASTER_PORT"
+echo "LEAD_TRAINING_CONFIG: $LEAD_TRAINING_CONFIG"
 if [ "$nproc_per_node" -le 1 ]; then
     python lead/training/train.py
 else

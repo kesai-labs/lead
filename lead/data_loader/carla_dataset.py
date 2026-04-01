@@ -544,12 +544,14 @@ class CARLAData(Dataset):
             loaded_depth = sensor_data.depth.astype(
                 np.float32
             )  # Use only current frame
-            if self.config.save_depth_lower_resolution:
+            if meta["dataset_information"]["save_depth_resolution_ratio"] != 1.0:
                 loaded_depth = cv2.resize(
                     loaded_depth,
                     dsize=(
-                        loaded_depth.shape[1] * self.config.save_depth_resolution_ratio,
-                        loaded_depth.shape[0] * self.config.save_depth_resolution_ratio,
+                        loaded_depth.shape[1]
+                        * meta["dataset_information"]["save_depth_resolution_ratio"],
+                        loaded_depth.shape[0]
+                        * meta["dataset_information"]["save_depth_resolution_ratio"],
                     ),
                     interpolation=cv2.INTER_LINEAR,
                 )

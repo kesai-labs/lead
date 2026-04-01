@@ -28,7 +28,6 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
-      - id: ruff-check
 
   # - repo: https://github.com/DetachHead/basedpyright-pre-commit-mirror
   #   rev: 1.36.2
@@ -56,6 +55,18 @@ repos:
             lead/,
             tests/
           ]
+        pass_filenames: false
+        always_run: true
+        types: [python]
+
+    # Markdown linting
+  - repo: https://github.com/executablebooks/mdformat
+    rev: 0.7.17
+    hooks:
+      - id: mdformat
+        additional_dependencies:
+          - mdformat-gfm
+          - mdformat-black
         pass_filenames: false
         always_run: true
 

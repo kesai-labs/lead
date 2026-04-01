@@ -163,7 +163,7 @@ class ExpertData(ExpertBase):
 
         # Debug camera setup
         if self.config_expert.save_3rd_person_camera and (
-            not self.config_expert.is_on_slurm or self.save_path is not None
+            self.config_expert.debug_mode or self.save_path is not None
         ):
             bp_lib = self.carla_world.get_blueprint_library()
             camera_bp = bp_lib.find("sensor.camera.rgb")
@@ -192,7 +192,7 @@ class ExpertData(ExpertBase):
                     bgr = array[:, :, :3]
                     cv2.imwrite(path, bgr)
 
-                if self.config_expert.is_on_slurm or self.save_path is not None:
+                if not self.config_expert.debug_mode or self.save_path is not None:
                     save_path_3rd_person = str(self.save_path / "3rd_person")
                     os.makedirs(save_path_3rd_person, exist_ok=True)
                     _save(

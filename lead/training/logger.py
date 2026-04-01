@@ -73,6 +73,8 @@ class Logger:
                 LOG.info(
                     f"WandB logger will log images every {self.config.log_images_frequency} steps"
                 )
+            else:
+                LOG.info("WandB is disabled. Only TensorBoard logging is enabled.")
 
     def __del__(self):
         if self.config.rank == 0:
@@ -110,7 +112,7 @@ class Logger:
         """
         if (
             self.config.rank == 0
-            and not self.config.is_on_slurm
+            and self.config.debug_mode
             and self.config.visualize_training
             and self.config.carla_leaderboard_mode
             and (
