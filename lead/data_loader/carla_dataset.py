@@ -686,14 +686,19 @@ class CARLAData(Dataset):
 
         # Horizontal FOV reduction: crop left and right, then resize back
         if self.config.horizontal_fov_reduction > 0:
-            crop_pixels = self.config.horizontal_fov_reduction
             if data["rgb"] is not None:  # (C, H, W)
-                data["rgb"] = common_utils.fov_crop(data["rgb"], crop_pixels, chw=True)
+                data["rgb"] = common_utils.fov_crop(
+                    data["rgb"], self.config.horizontal_fov_reduction, chw=True
+                )
             if data.get("depth") is not None:  # (H, W)
-                data["depth"] = common_utils.fov_crop(data["depth"], crop_pixels)
+                data["depth"] = common_utils.fov_crop(
+                    data["depth"], self.config.horizontal_fov_reduction
+                )
             if data.get("semantic") is not None:  # (H, W)
                 data["semantic"] = common_utils.fov_crop(
-                    data["semantic"], crop_pixels, interpolation=cv2.INTER_NEAREST
+                    data["semantic"],
+                    self.config.horizontal_fov_reduction,
+                    interpolation=cv2.INTER_NEAREST,
                 )
 
         return data

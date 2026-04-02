@@ -60,7 +60,7 @@ function resume() {
 
 	# Export training parameters
 	export LEAD_TRAINING_CONFIG="$LEAD_TRAINING_CONFIG load_file=$MODEL_FILE"
-	export LEAD_TRAINING_CONFIG="$LEAD_TRAINING_CONFIG continue_epoch=true"
+	export LEAD_TRAINING_CONFIG="$LEAD_TRAINING_CONFIG continue_failed_training=true"
 	export LEAD_TRAINING_CONFIG="$LEAD_TRAINING_CONFIG wandb_id=$WANDB_ID"
 	export LEAD_TRAINING_CONFIG="$LEAD_TRAINING_CONFIG wandb_resume=allow"
 	export LEAD_TRAINING_CONFIG="$LEAD_TRAINING_CONFIG logdir=$TRAINING_OUTPUT_DIR"
@@ -70,7 +70,7 @@ function resume() {
 	echo "EXPERIMENT_RUN_ID: $EXPERIMENT_RUN_ID"
 	echo "TRAINING_OUTPUT_DIR: $TRAINING_OUTPUT_DIR"
 	echo "MODEL_FILE: $MODEL_FILE"
-	echo "CONTINUE_EPOCH: $MODEL_EPOCH"
+	echo "CONTINUE_FAILED_TRAINING_AT_EPOCH: $MODEL_EPOCH"
 	echo "WANDB_ID: $WANDB_ID"
 	ls "$TRAINING_OUTPUT_DIR"
 }
@@ -90,7 +90,7 @@ function posttrain() {
 
 	# Export training parameters
 	export LEAD_TRAINING_CONFIG="$LEAD_TRAINING_CONFIG load_file=$model_file"
-	export LEAD_TRAINING_CONFIG="$LEAD_TRAINING_CONFIG continue_epoch=false"
+	export LEAD_TRAINING_CONFIG="$LEAD_TRAINING_CONFIG continue_failed_training=false"
 
 	# Output for confirmation
 	echo "Fine-tuning with the following model file:"
@@ -108,15 +108,15 @@ function train() {
 	export LEAD_TRAINING_CONFIG="$LEAD_TRAINING_CONFIG id=$EXPERIMENT_RUN_ID"
 	# Submit the job
 	echo "$TRAINING_OUTPUT_DIR"
+	export output_file=$TRAINING_OUTPUT_DIR/stdout_${SLURM_JOB_DATE}.txt
+	export error_file=$TRAINING_OUTPUT_DIR/stderr_${SLURM_JOB_DATE}.txt
 	if [[ -z "$SLURM_JOB_ID" && $(which sbatch) ]]; then
-		output_file=$TRAINING_OUTPUT_DIR/stdout_${SLURM_JOB_DATE}.txt
-		error_file=$TRAINING_OUTPUT_DIR/stderr_${SLURM_JOB_DATE}.txt
 		echo "${output_file}"
 		echo "${error_file}"
 
 		sbatch --output "${output_file}" "--error" "${error_file}" "--job-name" "${EXPERIMENT_RUN_ID}" "$@" slurm/train.sh
 	else
-		bash slurm/train.sh
+		bash slurm/train.sh > >(tee "$output_file") 2> >(tee "$error_file" >&2)
 	fi
 }
 ############################# CARLA Evaluation #############################

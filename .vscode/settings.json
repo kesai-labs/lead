@@ -23,6 +23,7 @@
     "wandb": true,
     ".ruff_cache": true,
     ".mypy_cache": true,
+    "**/*.egg-info": true,
   },
   "jupyter.notebookFileRoot": "${workspaceRoot}",
   "files.watcherExclude": {

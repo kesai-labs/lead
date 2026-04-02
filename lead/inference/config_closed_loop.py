@@ -246,7 +246,3 @@ class ClosedLoopConfig(OpenLoopConfig):
     def video_fps(self):
         """Calculate video FPS based on frame production frequency."""
         return 20 / self.produce_frame_frequency
-
-    # --- AlpaSim Metric Recording ---
-    # If true, record trajectory and ground-truth data and write <route_id>.json alongside other outputs
-    produce_alpasim_metric = False

@@ -174,6 +174,14 @@ Verify your setup with a single route:
 # Start driving environment
 bash scripts/start_carla.sh
 
+# Turn on images and videos output
+export LEAD_CLOSED_LOOP_CONFIG="produce_demo_image=true \
+  produce_demo_video=true \
+  produce_debug_image=true \
+  produce_debug_video=true \
+  produce_input_image=true \
+  produce_input_video"
+
 # Run policy on one route
 python lead/leaderboard_wrapper.py \
   --checkpoint outputs/checkpoints/tfv6_resnet34 \

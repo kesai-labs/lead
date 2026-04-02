@@ -123,6 +123,7 @@ def initialize_model(
         load_name = str(pathlib.Path(config.load_file).stem)
         if config.continue_failed_training:
             start_epoch = int("".join(filter(str.isdigit, load_name))) + 1
+            LOG.info(f"Continuing training from epoch {start_epoch}")
         model.load_state_dict(
             torch.load(config.load_file, map_location=config.device, weights_only=True),
             strict=config.continue_failed_training,

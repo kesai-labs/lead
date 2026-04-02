@@ -27,7 +27,6 @@ from lead.common.sensor_setup import av_sensor_setup
 from lead.data_loader import carla_dataset_utils, training_cache
 from lead.data_loader.carla_dataset_utils import rasterize_lidar
 from lead.expert import expert_utils
-from lead.inference.alpasim_metric_recorder import AlpaSimMetricRecorder
 from lead.inference.closed_loop_inference import (
     ClosedLoopInference,
     ClosedLoopPrediction,
@@ -104,7 +103,6 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         )
         self.metric_info = {}
         self.meters_travelled = 0.0
-        self.alpasim_recorder: AlpaSimMetricRecorder | None = None
 
         # Infraction tracking
         self.infraction_recorder = InfractionRecorder(
@@ -131,7 +129,7 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
     ):
         """Store the global plan for privileged logging .
         The dense world-coordinate route is stored as privileged information for
-        offline logging and metric computation (e.g. AlpaSim) and must not be
+        offline logging and metric computation and must not be
         used by the driving policy. This is expected to be called by the
         leaderboard/runner before the scenario starts and before `_init`
         initialises components that consume the stored plan.
@@ -173,34 +171,6 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         )
 
         self.set_weather()
-
-        # Set up AlpaSim metric recorder
-        if (
-            self.config_closed_loop.produce_alpasim_metric
-            and self.config_closed_loop.save_path is not None
-        ):
-            route_id = self.config_closed_loop.route_id
-            output_path = self.config_closed_loop.save_path / "alpasim_metric_log.json"
-
-            model_name = self.config_path.split("+")[0].split("/")[-3]
-
-            LOG.info(
-                "Set global plan with %d waypoints. This is a privileged information, do not use it for driving!",
-                len(self.privileged_org_dense_route_world_coord),
-            )
-
-            self.alpasim_recorder = AlpaSimMetricRecorder(
-                route_original_name=route_id,
-                output_path=output_path,
-                agent_name="sensor_agent",
-                team_name="lead",
-                model_name=model_name,
-                vehicle=self._vehicle,
-                global_plan_world_coord=self.privileged_org_dense_route_world_coord,
-            )
-            LOG.info(
-                "[SensorAgent] AlpaSim metric recorder initialised -> %s", output_path
-            )
 
         self.initialized = True
 
@@ -330,14 +300,16 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
 
         # Horizontal FOV reduction: crop left and right, then resize back
         if self.training_config.horizontal_fov_reduction > 0:
-            crop_pixels = self.training_config.horizontal_fov_reduction
             if input_data["rgb"] is not None:  # (C, H, W)
                 input_data["rgb"] = common_utils.fov_crop(
-                    input_data["rgb"], crop_pixels, chw=True
+                    input_data["rgb"],
+                    self.training_config.horizontal_fov_reduction,
+                    chw=True,
                 )
             if input_data["original_rgb"] is not None:  # (H, W, C)
                 input_data["original_rgb"] = common_utils.fov_crop(
-                    input_data["original_rgb"], crop_pixels
+                    input_data["original_rgb"],
+                    self.training_config.horizontal_fov_reduction,
                 )
 
         # Cut cameras down to only used cameras
@@ -566,19 +538,6 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
         # Check for infractions at this step
         self.check_infractions()
 
-        # Record trajectory step for AlpaSim metrics
-        if self.alpasim_recorder is not None:
-            step_infractions = [
-                e.get("message") or e.get("infraction", "")
-                for e in self.infraction_recorder.infractions_log
-                if e.get("step") == self.step
-                and "Agent has completed"
-                not in (e.get("message") or e.get("infraction", ""))
-                and "Average speed is"
-                not in (e.get("message") or e.get("infraction", ""))
-            ]
-            self.alpasim_recorder.record_step(step_infractions)
-
         # Visualization of prediction for debugging and video recording
         input_data_tensors.update(
             {
@@ -686,14 +645,6 @@ class SensorAgent(BaseAgent, autonomous_agent.AutonomousAgent):
 
     def destroy(self, results=None):
         LOG.info(results)
-
-        # Write AlpaSim metric JSON
-        if self.alpasim_recorder is not None:
-            score_composed = (
-                results.scores.get("score_composed") if results is not None else None
-            )
-            avg_score = score_composed / 100.0 if score_composed is not None else None
-            self.alpasim_recorder.save(avg_score=avg_score)
 
         # Clean up video recorder
         if hasattr(self, "video_recorder"):

@@ -159,8 +159,6 @@ class TrainingConfig(BaseConfig):
     @overridable_property
     def visualize_training(self):
         """If true produce images during training for visualization."""
-        if not self.debug_mode:
-            return True
         return True
 
     # Unique experiment identifier.
@@ -295,8 +293,6 @@ class TrainingConfig(BaseConfig):
     @property
     def save_model_checkpoint(self):
         """If true save model checkpoints during training."""
-        if not self.debug_mode:
-            return False
         return True
 
     @property
